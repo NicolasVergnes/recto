@@ -59,3 +59,25 @@ export function putBack(q: SessionQueue, id: string): SessionQueue {
 export function nextLaterDue(q: SessionQueue): number | null {
   return q.later[0]?.due ?? null
 }
+
+export interface RemainingCounts {
+  learning: number
+  review: number
+  new: number
+}
+
+/** Cards left in the session (queue and learning cards set aside), counted by state. */
+export function remainingByState(
+  q: SessionQueue,
+  cards: ReadonlyMap<string, { state: CardState }>,
+): RemainingCounts {
+  const out = { learning: 0, review: 0, new: 0 }
+  for (const id of [...q.ids, ...q.later.map((l) => l.id)]) {
+    const c = cards.get(id)
+    if (!c) continue
+    if (c.state === 0) out.new++
+    else if (c.state === 2) out.review++
+    else out.learning++
+  }
+  return out
+}
