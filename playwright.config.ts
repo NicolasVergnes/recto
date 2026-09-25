@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
-const port = 4173
+// PW_PORT lets several checkouts run their e2e suites side by side.
+const port = Number(process.env.PW_PORT ?? 4173)
 // Optional: reuse a preinstalled Chromium (e.g. cloud containers) instead of `playwright install`.
 const executablePath = process.env.PW_CHROMIUM_PATH
 const launchOptions = executablePath ? { executablePath } : {}

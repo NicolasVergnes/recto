@@ -1,10 +1,29 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-09-25 · Branche : claude/great-feynman-7vbb6d · **V0 livrée** (M0 à M5)
+Dernière mise à jour : 2026-09-25 · Branche : claude/compassionate-albattani-f8qn5u · Jalon en cours : **M6 (V1)** — V0 fusionnée sur `main`
 
 ## Jalon en cours
 
-Aucun : **V0 livrée**, en attente de relecture et de fusion par Nicolas. Suivant : M6 (V1, périmètre ouvert, docs/07-ROADMAP.md).
+### M6 — V1
+
+Périmètre retenu : celui de la SPEC (prioritaire sur la roadmap) — §8 « M6 (optimiseur, occlusion, export apkg) ouvre la V1 » et §5.2 « LaTeX … rendu par KaTeX en V1 ». La synchronisation par fichier et l'empaquetage Android, listés dans 07-ROADMAP M6, sont placés en **V2** par la SPEC (§2 et §3) : reportés, contradiction signalée ci-dessous (« Écarts »).
+
+Plan :
+
+1. Dette : découper `src/routes/Review.svelte` (795 lignes) et `src/routes/Editor.svelte` (373 lignes) en composants de `src/lib/ui/review/` et `src/lib/ui/editor/` (≤ 200 lignes), comportement identique (E2E existants inchangés).
+2. KaTeX (ADR-009) : marquage pur des formules `\( … \)` / `\[ … \]` (`src/lib/domain/math.ts`), rendu chargé à la demande dans `CardContent` (`src/lib/math/katex.ts`), réponse tapée sans délimiteurs ; `tests/unit/domain/math.test.ts`, E2E.
+3. Export `.apkg` legacy (05 §4) : `src/lib/export/apkg.ts` (pur, sql.js), worker, dialogue d'export CSV | Anki depuis un paquet ou la sélection ; réimport dans Recto sans doublons ; `tests/unit/export-apkg.test.ts` (aller-retour par le lecteur existant), vérification avec le moteur d'Anki (paquet PyPI `anki`), E2E.
+4. Optimiseur FSRS (03 §2.4) : `src/lib/scheduler/optimizer.ts` (jeu d'entraînement depuis le journal, évaluation log-loss/RMSE), worker `fsrs-browser`, bloc « Optimiser » dans les paramètres FSRS du paquet (≥ 1 000 révisions, comparaison avant acceptation) ; tests unitaires et E2E.
+5. Occlusion d'image : type `image_occlusion` (masques rectangulaires, une carte par masque) — domaine `src/lib/domain/occlusion.ts`, éditeur de masques (pointeur et clavier), révision et aperçu, sauvegarde, CSV exclu, import/export Anki (type natif « Image Occlusion ») ; tests unitaires et E2E.
+6. Relecture adversariale, `npm run verify`, docs 02/03/05/08, CHANGELOG, STATUS.
+
+Critères (07-ROADMAP M6, périmètre SPEC) :
+
+- [ ] Optimiseur FSRS dans le navigateur (`fsrs-browser`, worker, ≥ 1 000 révisions, prévisualisation avant acceptation).
+- [ ] Occlusion d'image (type `image_occlusion` : masques rectangulaires sur une image, une carte par masque).
+- [ ] Export `.apkg` legacy.
+- [ ] KaTeX pour les formules.
+- [ ] `npm run verify` vert.
 
 ## Terminé
 
@@ -195,6 +214,7 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## Écarts par rapport aux docs
 
+- M6 : 07-ROADMAP met la synchronisation par fichier et l'empaquetage Android (Capacitor/TWA) dans M6 (V1), alors que la SPEC, prioritaire, les place en V2 (§3 « synchronisation par fichier … envisagée en V2 », §2 « empaquetage TWA/Capacitor en V2 ») et limite la V1 à l'optimiseur, l'occlusion et l'export `.apkg` (§8) plus KaTeX (§5.2). M6 suit la SPEC ; les deux éléments restent à planifier en V2 (à confirmer par Nicolas).
 - TypeScript 6.0.3 au lieu de 7.x (ADR-002/007 disent « 5.9+/7 ») : `svelte-check` et `typescript-eslint` exigent TypeScript ≤ 6.0. Consigné en ADR-008.
 - `@vite-pwa/assets-generator` 1.0.4 au lieu de 2.0.0 : `vite-plugin-pwa` 1.3 déclare `^1.0.0` en dépendance paire.
 - Le manifeste déclare aussi l'icône `pwa-64x64.png` produite par le preset `minimal-2023`.
