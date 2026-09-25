@@ -103,6 +103,15 @@ describe('review keyboard shortcuts (04-UI §2.2)', () => {
     expect(reviewKeyAction(press(' '), ctx({ infoOpen: true }))).toBeNull()
   })
 
+  it('ignores the key-less keydown that Chrome autofill sends to a field', () => {
+    const input = document.createElement('input')
+    const autofill = { ctrlKey: false, metaKey: false, altKey: false, target: input }
+    // A plain Event, not a KeyboardEvent: `key` is undefined at run time despite its type.
+    const keyless = { ...autofill, key: undefined as unknown as string }
+    expect(() => reviewKeyAction(keyless, ctx())).not.toThrow()
+    expect(reviewKeyAction(keyless, ctx({ revealed: true }))).toBeNull()
+  })
+
   it('replaces the browser default except for edit and replay', () => {
     expect(preventsDefault({ kind: 'undo' })).toBe(true)
     expect(preventsDefault({ kind: 'reveal' })).toBe(true)

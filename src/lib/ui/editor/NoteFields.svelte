@@ -7,8 +7,8 @@
   import { addMediaFile, detectMime } from '$lib/media/store'
   import { toast } from '$lib/state/toast.svelte'
   import { errorMessage } from '$lib/ui/errors'
-  import type { FieldSlot } from './draft.svelte'
   import FieldInput from './FieldInput.svelte'
+  import { targetField, type FieldSlot } from './slots'
 
   interface Props {
     /** Text fields to show, each editing `fields[slot.index]`. */
@@ -19,8 +19,12 @@
   }
   let { slots, fields = $bindable(), duplicate, clozeMissing }: Props = $props()
   let textareas = $state<(HTMLTextAreaElement | undefined)[]>([])
-  /** Index of the last focused field: media go there. */
-  let active = $state(0)
+  /** Index of the last focused field (none yet: the first slot). */
+  let active = $state<number>()
+  /** The main text field (first slot). */
+  const first = $derived(slots[0]?.index ?? 0)
+  /** Where media and cloze wrapping go: always a shown field. */
+  const target = $derived(targetField(slots, fields.length, active))
 
   type Change = (text: string, start: number, end: number) => { text: string; caret: number }
 
@@ -36,8 +40,7 @@
   }
 
   function insert(snippet: string): Promise<void> {
-    const i = Math.min(active, fields.length - 1)
-    return change(i, (text, start, end) => insertAt(text, start, end, snippet))
+    return change(target, (text, start, end) => insertAt(text, start, end, snippet))
   }
 
   /** Stores images and sounds, and inserts them at the caret of the last focused field. */
@@ -53,32 +56,32 @@
     }
   }
 
-  /** Wraps the selection of the cloze text (field 0) in a new deletion; false elsewhere. */
+  /** Wraps the selection of the main text (the cloze text) in a new deletion; false elsewhere. */
   export function makeCloze(): boolean {
-    if (active !== 0) return false
-    void change(0, (text, start, end) => wrapCloze(text, start, end))
+    if (target !== first) return false
+    void change(first, (text, start, end) => wrapCloze(text, start, end))
     return true
   }
 
-  /** After adding a note: back to the first field. */
+  /** After adding a note: back to the main text. */
   export function reset() {
-    active = 0
-    void tick().then(() => textareas[0]?.focus())
+    active = undefined
+    void tick().then(() => textareas[first]?.focus())
   }
 </script>
 
-{#each slots as slot (slot.label)}
+{#each slots as slot, j (slot.label)}
   <FieldInput
     id={`field-${slot.index}`}
     label={t(slot.label)}
     bind:value={() => fields[slot.index] ?? '', (v) => (fields[slot.index] = v)}
     bind:textarea={textareas[slot.index]}
-    rows={slot.index === 0 ? 3 : 2}
+    rows={j === 0 ? 3 : 2}
     warnings={slot.label === 'editor.extra' ? [] : atomicityWarnings(fields[slot.index] ?? '')}
     onfocus={() => (active = slot.index)}
     onfiles={addFiles}
   />
-  {#if slot.index === 0}
+  {#if j === 0}
     {#if duplicate}<p class="warning-text" role="status">{t('editor.duplicate')}</p>{/if}
     {#if clozeMissing}
       <p class="muted small">{t('editor.clozeHelp')}</p>

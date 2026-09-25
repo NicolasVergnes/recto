@@ -22,8 +22,8 @@ type KeyInput = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey' | '
  * R replay. Other keys, and keys typed in a field, return null.
  */
 export function reviewKeyAction(e: KeyInput, ctx: ReviewKeyContext): ReviewKeyAction | null {
-  const key = e.key.toLowerCase()
-  if ((e.ctrlKey || e.metaKey) && key === 'z') return { kind: 'undo' }
+  // `key.toLowerCase()` waits for Ctrl/Cmd or the field guard: autofill sends key-less keydowns.
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') return { kind: 'undo' }
   const target = e.target
   const inField = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement
   if (inField || e.ctrlKey || e.metaKey || e.altKey || ctx.infoOpen) return null
@@ -38,6 +38,7 @@ export function reviewKeyAction(e: KeyInput, ctx: ReviewKeyContext): ReviewKeyAc
   }
   const twoButtons = ctx.deck?.scheduler === 'fsrs' && ctx.deck.settings.fsrs.ratingMode === 2
   if (ctx.revealed && e.key === ' ' && twoButtons) return { kind: 'rate', rating: 3 }
+  const key = e.key.toLowerCase()
   if (key === 'e') return { kind: 'edit' }
   if (key === 'r') return { kind: 'replay' }
   return null
