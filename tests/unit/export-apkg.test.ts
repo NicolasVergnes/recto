@@ -523,16 +523,15 @@ describe('round trip through the Recto importer', () => {
     expect(plan.report).toMatchObject({ notesUpdated: 1, skipped: 2 })
   })
 
-  // tests/setup.ts sets TZ=Europe/Paris. From 23:00, the half-day margin of `crt` (30 min) is
-  // shorter than the DST shift: known limit of the importer's arithmetic, see 05 §4.
-  it('keeps review dues on their study day across daylight saving (day start up to 22:00)', async () => {
+  // tests/setup.ts sets TZ=Europe/Paris: the due and `crt` sit on both sides of a DST change.
+  it('keeps review dues on their study day across daylight saving', async () => {
     const deck = makeDeck({ name: 'Heure' }, 'deck', now)
     const cases = [
       { exportAt: Date.UTC(2026, 6, 1, 10), due: { year: 2026, month: 11, day: 15 } },
       { exportAt: Date.UTC(2026, 0, 15, 10), due: { year: 2026, month: 6, day: 15 } },
     ]
     for (const { exportAt, due } of cases)
-      for (const dayStartHour of [0, 4, 12, 22])
+      for (const dayStartHour of [0, 4, 12, 22, 23])
         for (const at of [
           startOfDate(due, dayStartHour),
           startOfDate(due, dayStartHour, 1) - 60_000,

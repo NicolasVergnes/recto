@@ -13,7 +13,7 @@ Fixtures utilisées par les tests unitaires et e2e et par le bouton « Essayer a
 
 ## Valeurs attendues pour `sample-legacy.apkg`
 
-- `col.crt = 1699934400` (secondes) ; la carte en révision a `due = 5` → échéance = `crt + 5 × 86400` s.
+- `col.crt = 1699934400` (secondes) ; la carte en révision a `due = 5` → échéance = début du jour d'étude (04:00, heure de Paris) 5 jours calendaires après la date locale de `crt` (14/11/2023), soit le 19/11/2023 à 04:00.
 - Carte `1700000002001` : `type 2`, `ivl 10`, `factor 2500`, `reps 3` ; revlog aux instants `crt + 10 min` (type 0, learn), `crt + 1 j + 1 h` (type 1), `crt + 5 j + 1 h` (type 1), tous `ease = 3`.
 - Note cloze `1700000001003` : champs `La {{c1::Lune}} tourne autour de la {{c2::Terre}}.<br><img src="lune.png">` / `Satellite naturel` → 2 cartes (`ord` 0 et 1).
 - Note `1700000001004` : carte `queue = -1` → `suspended = true` après import.

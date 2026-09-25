@@ -437,8 +437,7 @@ export async function buildApkg(
   // `crt`: Anki's day 0 is its local date, here the study day of the earliest review due (or
   // today), so that every `due` (days since crt) is ≥ 0; `creationOffset` (its UTC offset) makes
   // Anki read that date as written, whatever the offset at import time. Halfway between the day
-  // start and midnight: `crt + due × 86 400 s` (Recto's import) stays in the right study day
-  // across a DST change, for a day start up to 22:00 (05 §4).
+  // start and midnight, so that its local date is unambiguously that study day (05 §4).
   const earliest = cards.reduce((min, c) => (c.state === 2 ? Math.min(min, c.due) : min), now)
   const crt = dayStart(earliest, dayStartHour) + ((24 - dayStartHour) / 2) * HOUR_MS
 

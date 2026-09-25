@@ -168,7 +168,8 @@ describe('planApkgImport', () => {
     const review = plan.cards.find((c) => c.noteId === byGuid.get('aB3dE5fG7h')?.id)
     expect(review).toMatchObject({
       state: 2,
-      due: (CRT + 5 * 86_400) * 1000,
+      // Day 0 = local date of crt (2023-11-14), + 5 calendar days, at the 04:00 day start.
+      due: new Date(2023, 10, 19, 4).getTime(),
       scheduledDays: 10,
       stability: 10,
       difficulty: 6,

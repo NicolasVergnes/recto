@@ -9,6 +9,7 @@ import type { Card, Deck, ModelType, Note, Rating, Review, SchedulerKind } from 
 import { sha256Hex } from '../media/hash'
 import { mediaKind, mimeFromName } from '../media/mime'
 import { getScheduler } from '../scheduler'
+import { addDays, startOfDate, studyDate } from '../scheduler/day'
 import { boxFromStability } from '../scheduler/leitner'
 import type { ApkgCard, ApkgModel, ApkgPackage } from './apkg-read'
 import { DeckResolver } from './decks'
@@ -16,7 +17,6 @@ import { emptyReport, type ImportMedia, type ImportPlan } from './plan'
 
 export * from './apkg-read'
 
-const DAY_MS = 86_400_000
 const MAX_DURATION_MS = 60_000
 
 export type ApkgTarget =
@@ -105,19 +105,30 @@ export function convertModel(model: ApkgModel): ModelConversion {
   }
 }
 
-/** Card state without history (05 §2.3). */
-function convertCardState(ac: ApkgCard, base: Card, crt: number, now: number, deck: Deck): Card {
+/**
+ * Card state without history (05 §2.3). A review `due` counts days from the collection's day 0,
+ * the local date of `crt`: calendar days are added to that date (a count of 86 400 s would move
+ * the due by an hour across a daylight-saving change, a whole study day near the day start).
+ */
+function convertCardState(
+  ac: ApkgCard,
+  base: Card,
+  crt: number,
+  now: number,
+  deck: Deck,
+  dayStartHour: number,
+): Card {
   const card: Card = { ...base, suspended: ac.queue === -1, reps: ac.reps, lapses: ac.lapses }
   if (ac.type === 2) {
     const ivl = Math.max(1, ac.ivl)
-    const due = (crt + ac.due * 86_400) * 1000
+    const day0 = studyDate(crt * 1000, 0)
     const stability = ivl
     card.state = 2
-    card.due = due
+    card.due = startOfDate(addDays(day0, ac.due), dayStartHour)
     card.scheduledDays = ivl
     card.stability = stability
     card.difficulty = Math.min(10, Math.max(1, 11 - (ac.factor / 1000) * 2))
-    card.lastReview = due - ivl * DAY_MS
+    card.lastReview = startOfDate(addDays(day0, ac.due - ivl), dayStartHour)
     if (deck.scheduler === 'leitner') card.box = boxFromStability(stability)
   } else if (ac.type === 1 || ac.type === 3) {
     // Learning: due now; FSRS treats an empty memory state as a first review.
@@ -253,7 +264,7 @@ export async function planApkgImport(
       }
       const history = options.importHistory ? (revlogByCard.get(ac.id) ?? []) : []
       if (history.length === 0) {
-        plan.cards.push(convertCardState(ac, base, pkg.crt, now, deck))
+        plan.cards.push(convertCardState(ac, base, pkg.crt, now, deck, options.dayStartHour))
         continue
       }
       // Replay: the same algorithm as ts-fsrs `reschedule` (replay = next) or Leitner answers.
