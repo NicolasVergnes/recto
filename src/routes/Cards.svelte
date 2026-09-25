@@ -16,7 +16,7 @@
   import { toast } from '$lib/state/toast.svelte'
   import DeckSelect from '$lib/ui/DeckSelect.svelte'
   import Dialog from '$lib/ui/Dialog.svelte'
-  import ExportCsvDialog from '$lib/ui/ExportCsvDialog.svelte'
+  import ExportDialog from '$lib/ui/ExportDialog.svelte'
   import { errorMessage } from '$lib/ui/errors'
   import { formatDue } from '$lib/ui/format'
   import Icon from '$lib/ui/Icon.svelte'
@@ -305,7 +305,7 @@
   </div>
 </section>
 
-<ExportCsvDialog bind:open={exporting} noteIds={selectedNoteIds} name="recto-selection" />
+<ExportDialog bind:open={exporting} noteIds={selectedNoteIds} name="recto-selection" />
 
 <Dialog
   open={moving}

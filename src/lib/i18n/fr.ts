@@ -521,8 +521,8 @@ export const fr = {
     missingFiles: '{n} média absent de l’archive.|{n} médias absents de l’archive.',
   },
   exportCsv: {
-    button: 'Exporter en CSV',
-    title: 'Exporter en CSV',
+    button: 'Exporter (CSV, Anki)',
+    title: 'Exporter',
     help: 'Colonnes : Recto, Verso, Extra, Tags, Paquet, Type. Les médias ne sont pas inclus (leurs noms de fichiers sont conservés) : pour tout garder, utilisez « Sauvegarder maintenant ».',
     delimiter: 'Séparateur',
     semicolon: 'Point-virgule (Excel en français)',
@@ -552,6 +552,25 @@ export const fr = {
     missingMedia:
       '{n} média référencé est absent du paquet.|{n} médias référencés sont absents du paquet.',
     duration: 'Durée : {s} s',
+  },
+  exportApkg: {
+    format: 'Format',
+    csv: 'CSV (tableur)',
+    apkg: 'Paquet Anki (.apkg)',
+    help: 'Notes, cartes, planification, historique de révisions et médias, pour Anki ou AnkiDroid (Fichier › Importer). Les réglages des paquets et les compartiments Memory Box ne sont pas transmis.',
+    collection: 'Exporter pour Anki (.apkg)',
+    collectionHelp:
+      'Toute la collection au format Anki. Ce n’est pas une sauvegarde : pour tout garder, utilisez « Sauvegarder maintenant ».',
+    exporting: 'Export en cours…',
+    done: 'Paquet Anki exporté',
+    notes: '{n} note|{n} notes',
+    cards: '{n} carte|{n} cartes',
+    reviews: '{n} révision|{n} révisions',
+    media: '{n} média|{n} médias',
+    retired:
+      '{n} carte retirée exportée comme suspendue (Anki n’a pas d’équivalent).|{n} cartes retirées exportées comme suspendues (Anki n’a pas d’équivalent).',
+    missingMedia: '{n} média introuvable, non inclus :|{n} médias introuvables, non inclus :',
+    failed: 'L’export Anki a échoué.',
   },
   common: {
     cancel: 'Annuler',

@@ -140,7 +140,8 @@ export async function planApkgImport(
     fsrs: getScheduler('fsrs', { dayStartHour: options.dayStartHour }),
     leitner: getScheduler('leitner', { dayStartHour: options.dayStartHour }),
   }
-  const byGuid = new Map(existing.notes.filter((n) => n.sourceGuid).map((n) => [n.sourceGuid, n]))
+  // The guid a Recto export writes (05 §4): the Anki guid of imported notes, else the note id.
+  const byGuid = new Map(existing.notes.map((n) => [n.sourceGuid ?? n.id, n]))
   const cardsByNote = new Map<number, ApkgCard[]>()
   for (const c of pkg.cards) cardsByNote.set(c.nid, [...(cardsByNote.get(c.nid) ?? []), c])
   const revlogByCard = new Map<number, { id: number; ease: number; time: number }[]>()

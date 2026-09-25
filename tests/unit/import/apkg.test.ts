@@ -310,6 +310,34 @@ describe('planApkgImport', () => {
     expect(plan.report).toMatchObject({ notesUpdated: 1, skipped: 1 })
   })
 
+  it('matches a Recto note whose id is the Anki guid (package exported by Recto)', async () => {
+    const pkg = sample()
+    const [first, second] = pkg.notes
+    if (!first || !second) throw new Error('fixture')
+    const own: Note = {
+      id: first.guid,
+      deckId: 'd',
+      modelType: 'basic',
+      fields: ['old', '', ''],
+      tags: [],
+      createdAt: 0,
+      updatedAt: now,
+    }
+    // A note imported from Anki is only known by its sourceGuid, not by its id.
+    const imported: Note = { ...own, id: second.guid, sourceGuid: 'elsewhere' }
+    const plan = await planApkgImport(
+      pkg,
+      options,
+      { ...empty, notes: [own, imported] },
+      now,
+      newId,
+    )
+    expect(plan.updates).toEqual([])
+    expect(plan.notes.map((n) => n.sourceGuid)).not.toContain(first.guid)
+    expect(plan.notes.map((n) => n.sourceGuid)).toContain(second.guid)
+    expect(plan.report).toMatchObject({ notesCreated: 3, skipped: 1 })
+  })
+
   it('renames media whose name is taken by another file and rewrites references', async () => {
     const pkg = sample()
     const sha = await sha256Hex(pkg.media[0]?.data ?? new Uint8Array())
