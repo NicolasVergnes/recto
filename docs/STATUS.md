@@ -1,12 +1,32 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-09-25 · Branche : claude/great-feynman-7vbb6d · Jalon en cours : M1
+Dernière mise à jour : 2026-09-25 · Branche : claude/great-feynman-7vbb6d · Jalon en cours : M2
 
 ## Jalon en cours
 
-M1 — Données et création de cartes (plan écrit au démarrage du jalon).
+M2 — Planificateurs et révision (plan écrit au démarrage du jalon).
 
 ## Terminé
+
+### M1 — Données et création de cartes (2026-09-25)
+
+Plan suivi :
+
+1. Domaine pur : `src/lib/domain/{types,defaults,notes,cloze,text,decks,browse}.ts` + tests `tests/unit/domain/*`.
+2. Dexie : `src/lib/db/{schema,repo,settings,errors,storage,live.svelte}.ts` + tests des invariants (`tests/unit/db/repo.test.ts`), de la migration factice (`tests/unit/db/migration.test.ts`) et des réglages.
+3. Médias : `src/lib/media/{mime,hash,resize,store,url,audio}.ts`, `src/lib/sanitize.ts` + tests (`tests/unit/media.test.ts`, `tests/unit/sanitize.test.ts`).
+4. Infrastructure UI : dialogue natif, confirmations, notifications, `CardContent` (HTML assaini + médias IndexedDB), liste virtualisée.
+5. Écrans : Accueil (paquets), Paquet, Éditeur, Navigateur de cartes, Paramètres.
+6. Sauvegarde complète `.recto.zip` (export) utilisée avant toute suppression de paquet et avant « Tout effacer ».
+7. E2E 1 + e2e médias, assainissement, virtualisation, stockage.
+
+Critères :
+
+- [x] Schéma Dexie V1, `repo.ts`, invariants 1 à 3 et 5 testés (`tests/unit/db/repo.test.ts`, `tests/unit/media.test.ts` › « lists orphan and missing media ») ; migration factice V1→V2 dans le test uniquement (`tests/unit/db/migration.test.ts`, sous-classe locale `RectoDBv2`). Invariants 4, 6, 7 : M2 (file et planificateurs).
+- [x] Écran Paquet : créer, renommer, déplacer, fusionner, supprimer avec sauvegarde téléchargée juste avant (`src/routes/Deck.svelte`) ; Éditeur : 3 types, aperçu, avertissements P8, doublons, Ctrl+Entrée (`tests/e2e/create-notes.spec.ts`) ; Navigateur : filtres, tri, sélection, actions groupées, virtualisation (`tests/e2e/media-and-browser.spec.ts` › « the card browser is virtualised with 5 000 cards » : moins de 80 lignes dans le DOM pour 5 000 cartes).
+- [x] Médias : image par fichier/collage/glisser-déposer, redimensionnement à 1 280 px (`tests/e2e/media-and-browser.spec.ts` › « images are resized to 1280 px… »), texte alternatif, audio par fichier ou micro (MediaRecorder), stockage Dexie, rendu assaini (`tests/unit/sanitize.test.ts`, e2e « field HTML is sanitised and remote images are never fetched »), URL objets révoquées (cache LRU de 50, `tests/unit/media.test.ts` › « media object URLs »).
+- [x] Persistance demandée après la première carte (`requestPersistenceOnce`) ; Paramètres avec état du stockage (e2e « settings show the storage state after the first card »).
+- [x] E2E 1 (`tests/e2e/create-notes.spec.ts` › « create a deck and three notes, then see five cards »).
 
 ### M0 — Squelette et outillage (2026-09-25)
 
@@ -38,6 +58,17 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## Décisions prises en session
 
+- 2026-09-25 (M1) : clés `settings` ajoutées à la liste réservée : `lastDeckId` (l'éditeur mémorise le dernier paquet), `sleepTipDay` (rappel de sommeil une fois par jour), `swipeGestures` (option de balayage, 04-UI §2.2). `persistGranted` vaut `null` tant que la persistance n'a jamais été demandée.
+- 2026-09-25 (M1) : les noms de paquets sont uniques entre frères (insensible à la casse) pour que les chemins `Parent::Enfant` (CSV, Anki) ne soient pas ambigus.
+- 2026-09-25 (M1) : supprimer un paquet supprime ses sous-paquets ; fusionner rattache les sous-paquets de la source au paquet principal de la cible. Les lignes `reviews` gardent leur `deckId` historique (journal jamais modifié) ; les statistiques par paquet passeront par la carte.
+- 2026-09-25 (M1) : « Supprimer » dans le navigateur supprime les **notes** des cartes sélectionnées (supprimer une seule carte d'une note inverse violerait l'invariant 2) ; le message le dit.
+- 2026-09-25 (M1) : en édition, une note `cloze` ne change pas de type et une note basique ne devient pas `cloze` (les champs n'ont pas le même sens) ; à la création, le changement de type convertit les champs (`convertFields`).
+- 2026-09-25 (M1) : `sanitize()` transforme `src` en `data-media` : aucune image ne se charge d'elle-même, `CardContent` résout le nom dans IndexedDB ; les URL distantes ne sont jamais chargées (message « Image distante non chargée »). `<div>`, `<strong>`, `<em>` (fréquents dans Anki) sont convertis vers la liste blanche avant assainissement ; attributs gardés : `src`, `alt`, `title`, `class`.
+- 2026-09-25 (M1) : images : ré-encodage WebP 0,82 (JPEG 0,85 sinon) et 1 280 px, sauf GIF (animation) et SVG (assaini par DOMPurify) ; si le ré-encodage d'une petite image la grossit, l'original est gardé. Déduplication par `sha256`.
+- 2026-09-25 (M1) : `t()` gère le pluriel simple `'{n} carte|{n} cartes'` (singulier pour 0 et 1, règle française).
+- 2026-09-25 (M1) : les tests qui exercent DOMPurify tournent sous jsdom (`// @vitest-environment jsdom`), happy-dom restant l'environnement par défaut ; `tests/setup.ts` installe le `Blob` natif de Node pour que les médias traversent fake-indexeddb comme dans un navigateur (ADR-008 complété).
+- 2026-09-25 (M1) : `tsconfig.test.json` (types Node pour les tests) séparé de `tsconfig.json` (application, sans types Node) ; `npm run check` vérifie les trois configurations.
+
 - 2026-09-25 : développement sur la branche imposée par la session cloud `claude/great-feynman-7vbb6d` au lieu de `m<N>-<slug>` (contrainte de l'environnement) ; un commit par jalon pour garder une relecture jalon par jalon.
 - 2026-09-25 : projet Vite écrit à la main à la racine plutôt que par `npm create vite` (l'assistant interactif crée un sous-dossier et des fichiers de démonstration à supprimer) ; contenu équivalent au modèle `svelte-ts`.
 - 2026-09-25 : enregistrement du service worker via `virtual:pwa-register` (API sans store) et un module `src/lib/state/pwa.svelte.ts`, plutôt que `virtual:pwa-register/svelte` qui expose des stores `writable` (interdits pour l'état applicatif par le skill svelte5-conventions). Le bandeau est masqué pendant une séance de révision.
@@ -52,8 +83,11 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 - TypeScript 6.0.3 au lieu de 7.x (ADR-002/007 disent « 5.9+/7 ») : `svelte-check` et `typescript-eslint` exigent TypeScript ≤ 6.0. Consigné en ADR-008.
 - `@vite-pwa/assets-generator` 1.0.4 au lieu de 2.0.0 : `vite-plugin-pwa` 1.3 déclare `^1.0.0` en dépendance paire.
 - Le manifeste déclare aussi l'icône `pwa-64x64.png` produite par le preset `minimal-2023`.
+- Licence : l'écran « À propos » et `package.json` indiquent MIT (choix par défaut, aucune licence n'étant fixée dans les docs) — à confirmer par Nicolas.
 
 ## À vérifier manuellement par Nicolas
+
+- M1 : créer un paquet, un sous-paquet, des notes des trois types ; coller une image (Ctrl+V) et glisser-déposer un fichier dans un champ ; enregistrer un son au micro (autorisation du navigateur) ; fusionner/supprimer un paquet (une sauvegarde `.recto.zip` doit se télécharger avant la suppression) ; thème sombre et taille de texte dans Paramètres.
 
 - `npm install && npm run dev` puis ouvrir http://localhost:5173 : navigation entre les écrans (vides pour l'instant), thème sombre du système respecté.
 - `npm run build && npm run preview -- --host` : installer la PWA depuis Chrome Android (HTTPS requis hors `localhost` : déployer sur Pages ou utiliser `mkcert`), couper le réseau, rouvrir l'app.

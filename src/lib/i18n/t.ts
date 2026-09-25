@@ -22,11 +22,19 @@ const messages = flatten(fr, '', new Map())
 
 /** French typography: no-break space before « : ; ! ? % » and inside guillemets. */
 export function frenchSpacing(text: string): string {
-  return text.replace(/ ([:;!?%»])/g, ' $1').replace(/« /g, '« ')
+  return text.replace(/ ([:;!?%»])/g, '\u00a0$1').replace(/« /g, '«\u00a0')
+}
+
+/** `'{n} carte|{n} cartes'`: French singular for 0 and 1, plural from 2 (param `n`). */
+function plural(template: string, params?: MessageParams): string {
+  if (!template.includes('|')) return template
+  const [one = '', other = one] = template.split('|')
+  const n = params?.n
+  return typeof n === 'number' && Math.abs(n) < 2 ? one : other
 }
 
 export function t(key: MessageKey, params?: MessageParams): string {
-  const template = messages.get(key) ?? key
+  const template = plural(messages.get(key) ?? key, params)
   const filled = params
     ? template.replace(/\{(\w+)\}/g, (match, name: string) => {
         const value = params[name]

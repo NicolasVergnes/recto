@@ -4,7 +4,10 @@
   import { t, type MessageKey } from '$lib/i18n'
   import { matchPath, route, type Params, type RouteProps } from '$lib/router.svelte'
   import { applyUpdate, pwa } from '$lib/state/pwa.svelte'
+  import { loadPrefs } from '$lib/state/prefs.svelte'
+  import ConfirmHost from '$lib/ui/ConfirmHost.svelte'
   import Icon, { type IconName } from '$lib/ui/Icon.svelte'
+  import Toasts from '$lib/ui/Toasts.svelte'
   import Cards from './routes/Cards.svelte'
   import Deck from './routes/Deck.svelte'
   import Editor from './routes/Editor.svelte'
@@ -52,6 +55,10 @@
   const reviewing = $derived(route.path === '/review')
 
   let main: HTMLElement | undefined = $state()
+
+  $effect(() => {
+    void loadPrefs()
+  })
 
   // Move focus to the new screen's heading after navigation (screen readers, keyboard).
   $effect(() => {
@@ -101,6 +108,9 @@
     {/key}
   </main>
 </div>
+
+<ConfirmHost />
+<Toasts />
 
 {#if pwa.needRefresh && !reviewing}
   <div class="update-banner" role="status">

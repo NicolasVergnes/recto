@@ -18,8 +18,17 @@ describe('t()', () => {
   })
 
   it('applies French no-break spaces', () => {
-    expect(t('storage.quotaWarning', { pct: 85 })).toContain('85 %')
-    expect(frenchSpacing('Préfecture : Laon ?')).toBe('Préfecture : Laon ?')
-    expect(frenchSpacing('« bonjour »')).toBe('« bonjour »')
+    expect(t('storage.quotaWarning', { pct: 85 })).toContain('85\u00a0%')
+    expect(frenchSpacing('Préfecture : Laon ?')).toBe('Préfecture\u00a0: Laon\u00a0?')
+    expect(frenchSpacing('« bonjour »')).toBe('«\u00a0bonjour\u00a0»')
+  })
+})
+
+describe('plurals', () => {
+  it('uses the French singular for 0 and 1', () => {
+    expect(t('home.cardCount', { n: 0 })).toBe('0 carte')
+    expect(t('home.cardCount', { n: 1 })).toBe('1 carte')
+    expect(t('home.cardCount', { n: 2 })).toBe('2 cartes')
+    expect(t('home.cardCount')).toBe('{n} cartes')
   })
 })

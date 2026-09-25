@@ -4,6 +4,19 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 ## [Unreleased]
 
+### M1 — Données et création de cartes
+
+#### Added
+
+- Schéma Dexie V1 (`src/lib/db/schema.ts`), dépôt typé (`repo.ts`) avec transactions, réglages typés et validés, lecture réactive `live()`.
+- Domaine pur : génération des cartes (basique, inverse, texte à trous), syntaxe `{{cN::…::indice}}`, avertissements d'atomicité (P8), normalisation pour les doublons, filtres/tri du navigateur.
+- Écrans Accueil (paquets), Paquet (créer, renommer, sous-paquets, déplacer, fusionner, supprimer après sauvegarde automatique), Éditeur (3 types, aperçu, doublons, tags avec suggestions, source, Ctrl+Entrée, Ctrl+Maj+C), Navigateur de cartes virtualisé (filtres dans l'URL, tri, sélection, actions groupées), Paramètres (thème, taille du texte, début de journée, stockage, persistance, médias orphelins, tout effacer, à propos).
+- Médias : images (fichier, collage, glisser-déposer ; redimensionnement 1 280 px WebP/JPEG ; texte alternatif), audio (fichier, micro), stockage en blobs, déduplication sha256, cache d'URL objets révoquées.
+- Rendu sécurisé des champs (`sanitize()`, DOMPurify, liste blanche) ; aucune image distante chargée.
+- Sauvegarde complète `.recto.zip` (export) et partage natif sur mobile.
+- Pluriels dans `t()`.
+- Tests : invariants, migration factice V1→V2, médias, assainissement, e2e 1 et e2e médias/virtualisation/stockage.
+
 ### M0 — Squelette et outillage
 
 #### Added
