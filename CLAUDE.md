@@ -41,7 +41,7 @@ npm run icons          # génère les icônes PWA depuis public/logo.svg
 - Le domaine (`src/lib/scheduler`, `queue`, `import/*` parsers, `stats`) est pur : pas de DOM, pas de Dexie, `now` passé en paramètre.
 - Toute écriture multi-tables est une transaction Dexie ; le journal `reviews` est append-only.
 - Tout texte visible passe par `t('clé')` dans `src/lib/i18n/fr.ts`.
-- HTML des champs rendu uniquement via `sanitize()` (dompurify, liste blanche).
+- HTML des champs rendu uniquement via `sanitize()` (dompurify, liste blanche). Seule exception : la sortie de KaTeX, sûre par sa configuration et détruite par `sanitize()` (ADR-009).
 - Pas de `any` ; pas de `Date.now()` dans le domaine ; pas de `console.log` en production.
 - Accessibilité : chaque contrôle a un libellé texte, chaque image un `alt`, tout est faisable au clavier.
 
