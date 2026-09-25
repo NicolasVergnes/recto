@@ -4,7 +4,7 @@ Application de flashcards à répétition espacée : locale-first, hors ligne, s
 
 **Adresse : <https://nicolasvergnes.github.io/recto/>** — à activer une fois dans GitHub : _Settings → Pages → Source : GitHub Actions_ ; chaque fusion sur `main` republie ensuite l'application (`.github/workflows/pages.yml`).
 
-Statut : **V0 livrée** (jalons M0 à M5, voir `docs/STATUS.md` et `CHANGELOG.md`).
+Statut : **V0 livrée** (jalons M0 à M5) ; **V1 (M6) en relecture** : occlusion d'image, export Anki, optimiseur FSRS, formules. Voir `docs/STATUS.md` et `CHANGELOG.md`.
 
 ## Installer sur Android
 
@@ -24,6 +24,9 @@ Sur ordinateur, Chrome et Edge proposent aussi l'installation (icône dans la ba
 - **Réviser aujourd'hui** : cherchez la réponse, affichez-la, puis notez honnêtement **Encore / Difficile / Bien / Facile** (FSRS) ou **Oublié / Réussi / Sûr** (Memory Box). Chaque bouton annonce le prochain intervalle.
 - Clavier : `Espace` ou `Entrée` affiche la réponse, `1` à `4` notent, `Ctrl+Z` annule la dernière note, `E` modifie la carte, `R` réécoute le son.
 - **Cartes** : recherche, filtres, modification et actions groupées ; **Statistiques** : charge prévue sur 30 jours, rétention réelle, calendrier de l'année.
+- **Occlusion d'image** (type « Occlusion d'image » dans l'éditeur) : choisissez une image, tracez un rectangle sur chaque zone à cacher (ou « Ajouter un masque » puis les flèches du clavier), donnez éventuellement la réponse de chaque masque. Chaque masque — ou groupe de masques portant le même « Carte n° » — devient une carte : la zone demandée est cachée, puis s'ouvre quand vous affichez la réponse.
+- **Formules** : écrivez `\( x^2 \)` dans un champ pour une formule en ligne, `\[ … \]` pour une formule centrée (rendu KaTeX, aussi hors ligne).
+- **Paramètres de mémoire FSRS** : dans les paramètres d'un paquet FSRS, à partir de 1 000 révisions, « Optimiser » calcule des paramètres adaptés à votre historique et les compare aux actuels avant que vous les appliquiez.
 
 ## Sauvegarder
 
@@ -41,13 +44,17 @@ Toutes les données restent dans le navigateur de l'appareil : **la sauvegarde e
 3. Choisir : garder les paquets Anki ou tout mettre dans un seul paquet, le planificateur (FSRS ou Memory Box), la reprise de l'historique des révisions.
 4. Le rapport final liste les notes créées, les types de notes convertis et les médias manquants.
 
-Réimporter le même paquet met à jour les notes modifiées dans Anki au lieu de créer des doublons.
+Réimporter le même paquet met à jour les notes modifiées dans Anki au lieu de créer des doublons (une note dont les cartes changeraient — type de note, trous ou masques ajoutés ou retirés — est laissée telle quelle et comptée parmi les doublons ignorés). Les notes « Image Occlusion » d'Anki (≥ 23.10) deviennent des occlusions d'image Recto.
+
+## Exporter vers Anki
+
+**Exporter (CSV, Anki)** sur la page d'un paquet (ou d'une sélection dans **Cartes**), format **Paquet Anki (.apkg)** ; toute la collection : **Paramètres › Sauvegarde › Exporter pour Anki (.apkg)**. Le fichier contient notes, cartes, planification, historique et médias ; dans Anki : _Fichier › Importer_. Vérifié avec le moteur d'Anki 26.9 ; les versions plus anciennes et AnkiDroid restent à essayer. Les cartes retirées arrivent suspendues ; les réponses des masques d'occlusion, qu'Anki ne sait pas afficher, sont gardées dans le champ « Comments » et reviennent si le paquet est réimporté dans Recto.
 
 ## Importer un tableur (CSV)
 
 **Importer → Fichier CSV ou TSV**. Séparateur détecté automatiquement (`,` `;` tabulation `|`), UTF-8. Colonnes par défaut : 1 → Recto, 2 → Verso, 3 → Extra ; une colonne `tags` et une colonne `deck` (`Parent::Enfant` pour un sous-paquet) sont reconnues. Un aperçu permet de changer le mappage et signale les doublons avant l'import. Des exemples sont dans `data/samples/`.
 
-L'export CSV (depuis un paquet, ou une sélection dans **Cartes**) produit `Recto;Verso;Extra;Tags;Paquet;Type`, lisible par Excel ; les médias n'y sont pas inclus : pour tout garder, utiliser la sauvegarde.
+L'export CSV (depuis un paquet, ou une sélection dans **Cartes**) produit `Recto;Verso;Extra;Tags;Paquet;Type`, lisible par Excel ; les médias n'y sont pas inclus et les occlusions d'image non plus (un message les compte) : pour tout garder, utiliser la sauvegarde ou l'export Anki.
 
 ## Ce que Recto ne fait pas
 
