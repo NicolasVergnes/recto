@@ -77,6 +77,7 @@ Une **note** porte le contenu ; une note génère une ou plusieurs **cartes** (c
 | `basic` | Recto, Verso, Extra (optionnel) | 1 : Recto → Verso |
 | `basic_reverse` | Recto, Verso, Extra | 2 : Recto → Verso et Verso → Recto |
 | `cloze` | Texte, Extra | 1 par index `{{cN::…}}` (syntaxe Anki, indice optionnel `{{c1::réponse::indice}}`) |
+| `image_occlusion` (V1) | Image, masques, En-tête, Extra | 1 par groupe de masques rectangulaires (02 §2.1) ; importé/exporté vers le type « Image Occlusion » d'Anki ≥ 23.10 |
 
 - Les champs sont du HTML restreint (gras, italique, listes, `<img src="nom">`, `[sound:nom]`, LaTeX inline `\( … \)` rendu par KaTeX en V1 seulement — en V0 affiché tel quel).
 - Tags libres (chaîne, séparés par des espaces), autocomplétion.
