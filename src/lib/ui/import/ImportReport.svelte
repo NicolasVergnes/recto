@@ -40,7 +40,9 @@
     <div>
       <p class="small">{t('importReport.converted')}</p>
       <ul class="small">
-        {#each report.convertedModels as model (model)}<li>{model}</li>{/each}
+        {#each report.convertedModels as model (model.name)}
+          <li>{t('importReport.convertedModel', { name: model.name, n: model.mergedFields })}</li>
+        {/each}
       </ul>
     </div>
   {/if}

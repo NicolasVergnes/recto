@@ -1,6 +1,7 @@
 <script lang="ts">
   import { t } from '$lib/i18n'
   import type { RouteProps } from '$lib/router.svelte'
+  import ApkgImport from '$lib/ui/import/ApkgImport.svelte'
   import BackupRestore from '$lib/ui/import/BackupRestore.svelte'
   import CsvImport from '$lib/ui/import/CsvImport.svelte'
 
@@ -18,7 +19,7 @@
 
   <details class="card-surface">
     <summary><h2>{t('import.apkg')}</h2></summary>
-    <p class="muted">{t('common.comingSoon')}</p>
+    <ApkgImport />
   </details>
 
   <details class="card-surface">

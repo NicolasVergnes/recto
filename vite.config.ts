@@ -24,6 +24,8 @@ export default defineConfig({
   base: process.env.BASE_PATH ?? '/',
   resolve: { alias: { $lib: '/src/lib' } },
   define: { __APP_VERSION__: JSON.stringify(pkg.version) },
+  // The .apkg reader worker imports sql.js: ES module workers (Chrome/Firefox ≥ 120).
+  worker: { format: 'es' },
   plugins: [
     svelte(),
     htmlConstants(),

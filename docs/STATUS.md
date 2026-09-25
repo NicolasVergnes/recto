@@ -1,12 +1,29 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-09-25 · Branche : claude/great-feynman-7vbb6d · Jalon en cours : M4
+Dernière mise à jour : 2026-09-25 · Branche : claude/great-feynman-7vbb6d · Jalon en cours : M5
 
 ## Jalon en cours
 
-M4 — Import `.apkg` (plan écrit au démarrage du jalon).
+M5 — Statistiques, finitions, V0 (plan écrit au démarrage du jalon).
 
 ## Terminé
+
+### M4 — Import `.apkg` (2026-09-25)
+
+Plan suivi :
+
+1. `src/lib/import/apkg-read.ts` : dézippage (fflate), détection `anki21b` → `Anki21bUnsupported`, lecture SQLite (sql.js passé en paramètre), `revlog` optionnelle, table `media` JSON.
+2. `src/lib/import/apkg.ts` : conversion (paquets et hiérarchie, modèles, notes, `sourceGuid`, états des cartes, suspension, médias et collisions de noms, rapport), rejeu de l'historique.
+3. `src/lib/import/apkg.worker.ts` + `src/lib/ui/import/apkg-client.ts` : lecture dans un Web Worker, sql.js et son `.wasm` chargés à la demande et précachés ; réduction des images > 1 280 px.
+4. Section « Paquet Anki » de l'écran Importer : analyse, options (paquets Anki ou un seul paquet, historique, planificateur), progression, rapport.
+5. Tests : fixture, refus `anki21b`, robustesse (zip corrompu, base sans `revlog`, `media` absent ou binaire, JSON de modèles irrégulier), paquet synthétique de 5 000 notes / 10 000 cartes ; E2E 4.
+
+Critères :
+
+- [x] Lecture `anki21`/`anki2` dans un worker (`sql.js`), refus `anki21b` avec message (e2e « refuses the anki21b format… », `tests/unit/import/apkg.test.ts`), médias, hiérarchie, modèles convertis, rapport (05 §2).
+- [x] Option « importer l'historique » : rejeu FSRS ou Leitner (`tests/unit/import/apkg.test.ts` › « replays the review log with FSRS », « …with the Leitner scheduler »).
+- [x] Fixture `sample-legacy.apkg` importée en test (comptes, états, carte suspendue, média `lune.png` de 410 octets avec sha256 calculé) ; paquet de ≥ 1 000 cartes : **synthétique** en test automatique (`tests/unit/import/apkg-large.test.ts`, 10 000 cartes avec historique, lots de 500). L'import d'un vrai paquet AnkiWeb reste à faire à la main (voir « À vérifier »).
+- [x] E2E 4 (`tests/e2e/apkg.spec.ts`).
 
 ### M3 — Import CSV et sauvegarde (2026-09-25)
 
@@ -98,6 +115,13 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## Décisions prises en session
 
+- 2026-09-25 (M4) : le `.wasm` de sql.js est importé avec `?url` (Vite l'émet avec un nom haché, le service worker le précache) au lieu d'être copié dans `public/sql/` : pas de plugin ni de script `postinstall`. Worker au format ES (`worker.format: 'es'`).
+- 2026-09-25 (M4) : l'historique Anki est rejoué avec `scheduler.answer` carte par carte (types 0/1/2, notes 1–4) : même algorithme que `fsrs.reschedule` (qui rejoue avec `next`), mais produit directement les lignes `Review` de Recto et fonctionne à l'identique pour Leitner.
+- 2026-09-25 (M4) : cartes Anki en apprentissage/réapprentissage (type 1/3) importées sans historique en « Apprentissage » dues maintenant, avec stabilité et difficulté à 0 : ts-fsrs traite cet état comme une première révision (pas de valeurs inventées) ; en Memory Box, compartiment 1.
+- 2026-09-25 (M4) : seuls les paquets Anki contenant des cartes sont créés (le « Default » vide ne l'est pas) ; toutes les cartes d'une note vont dans le paquet de sa première carte (invariant 1) ; une carte Anki dont l'`ord` n'existe pas dans le type converti est ignorée et comptée ; une carte attendue absente (ex. `basic_reverse` sans carte 2) est créée nouvelle (invariant 2).
+- 2026-09-25 (M4) : `createdAt` d'une note importée = identifiant Anki (horodatage de création en ms), ce qui garde l'ordre d'origine des nouvelles cartes.
+- 2026-09-25 (M4) : médias de types non autorisés ignorés et comptés ; nom déjà pris par un autre contenu → suffixe `-2`, `-3`… et références réécrites ; même contenu → non réimporté.
+
 - 2026-09-25 (M3) : la clé de doublon ajoute au texte normalisé les noms des médias référencés (`frontKey`) : sans cela, les 10 recto « image seule » de `drapeaux.csv` étaient tous doublons les uns des autres (texte vide après retrait du HTML). Même clé pour l'avertissement de l'éditeur.
 - 2026-09-25 (M3) : à l'import CSV, chaque ligne reçoit `createdAt = maintenant + n° de ligne` (ms) pour que « ordre d'ajout » respecte l'ordre du fichier.
 - 2026-09-25 (M3) : une colonne `Type` (valeurs `basic`, `basic_reverse`, `cloze` ou libellés français) est reconnue : l'export CSV l'écrit, l'aller-retour conserve le type des notes.
@@ -146,6 +170,8 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 - Licence : l'écran « À propos » et `package.json` indiquent MIT (choix par défaut, aucune licence n'étant fixée dans les docs) — à confirmer par Nicolas.
 
 ## À vérifier manuellement par Nicolas
+
+- M4 : importer un vrai paquet AnkiWeb d'au moins 1 000 cartes exporté d'Anki avec « Prise en charge des anciennes versions d'Anki » (par exemple « Ultimate Geography », cité dans le dossier) ; noter ici son nom, sa taille et la durée affichée dans le rapport ; vérifier images et sons. Les paquets AnkiWeb ne sont pas commités (licences).
 
 - M3 : ouvrir un export CSV `;` dans Excel (accents, colonnes) ; sauvegarder depuis le téléphone (feuille de partage Android) puis restaurer sur le PC en « Fusionner » ; importer un CSV personnel avec une colonne `deck`.
 

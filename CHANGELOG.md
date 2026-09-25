@@ -4,6 +4,16 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 ## [Unreleased]
 
+### M4 — Import `.apkg`
+
+#### Added
+
+- Import de paquets Anki legacy (`collection.anki21` / `collection.anki2`) dans un Web Worker : sql.js et son WASM chargés à la demande et disponibles hors ligne.
+- Conversion : hiérarchie des paquets (ou un seul paquet), types de notes (cloze, basique, inverse ; autres convertis en basique avec rapport), tags, `sourceGuid` (réimport = mise à jour si plus récent), états des cartes, suspension, médias (collisions renommées, images réduites à 1 280 px sauf option).
+- Option « importer l'historique de révisions » : rejeu FSRS ou Memory Box et journal conservé.
+- Refus explicite du format `anki21b` avec la marche à suivre dans Anki.
+- Tests : fixture, robustesse, paquet synthétique de 10 000 cartes ; E2E 4.
+
 ### M3 — Import CSV et sauvegarde
 
 #### Added

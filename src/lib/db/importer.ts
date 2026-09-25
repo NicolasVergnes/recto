@@ -103,3 +103,13 @@ export async function existingCollection() {
   ])
   return { decks, notes, mediaNames: new Set(mediaNames) }
 }
+
+/** Current decks, notes and media hashes, for the `.apkg` planner. */
+export async function existingForApkg() {
+  const [decks, notes, media] = await Promise.all([
+    db.decks.toArray(),
+    db.notes.toArray(),
+    db.media.toArray(),
+  ])
+  return { decks, notes, media: new Map(media.map((m) => [m.name, m.sha256])) }
+}

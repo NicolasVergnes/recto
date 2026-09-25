@@ -439,7 +439,7 @@ export const fr = {
     skipped: '{n} doublon ignoré|{n} doublons ignorés',
     reviews: '{n} révision importée|{n} révisions importées',
     media: '{n} média importé|{n} médias importés',
-    converted: 'Modèles convertis en « Basique » :',
+    converted: 'Modèles Anki convertis :',
     remote:
       '{n} image référencée par une adresse web : elle n’est pas téléchargée (hors ligne, sans requête réseau).|{n} images référencées par une adresse web : elles ne sont pas téléchargées (hors ligne, sans requête réseau).',
     errors: '{n} ligne en erreur|{n} lignes en erreur',
@@ -450,6 +450,8 @@ export const fr = {
     emptyFile: 'fichier vide.',
     unknownModel: 'modèle inconnu.',
     orphanCard: 'carte sans note.',
+    convertedModel:
+      '« {name} » converti en Basique ({n} champ fusionné dans Extra)|« {name} » converti en Basique ({n} champs fusionnés dans Extra)',
   },
   missingMedia: {
     intro:
@@ -494,6 +496,29 @@ export const fr = {
     tab: 'Tabulation',
     export: 'Exporter',
     done: '{n} note exportée|{n} notes exportées',
+  },
+  apkg: {
+    help: 'Paquets Anki au format « ancien » (collection.anki21 ou collection.anki2). Tout reste sur cet appareil.',
+    reading: 'Lecture du paquet',
+    notZip: 'Ce fichier n’est pas un paquet Anki (archive illisible).',
+    noCollection: 'Ce paquet ne contient pas de collection Anki lisible.',
+    corrupt: 'Paquet Anki endommagé ou illisible.',
+    summary:
+      'Notes : {notes} · cartes : {cards} · médias : {media} · révisions dans l’historique : {reviews} · {size}',
+    models: 'Types de notes',
+    converted: 'converti, voir le rapport',
+    target: 'Destination',
+    keepDecks: 'Recréer les paquets Anki (Parent::Enfant)',
+    singleDeck: 'Tout importer dans un seul paquet',
+    scheduler: 'Planificateur des paquets créés',
+    history: 'Importer l’historique de révisions',
+    historyHelp:
+      'L’historique est rejoué pour reconstruire l’état de chaque carte (FSRS ou Memory Box) et conservé dans votre journal.',
+    keepOriginals: 'Conserver les images originales (sinon réduites à 1 280 px)',
+    import: 'Importer {n} note|Importer {n} notes',
+    missingMedia:
+      '{n} média référencé est absent du paquet.|{n} médias référencés sont absents du paquet.',
+    duration: 'Durée : {s} s',
   },
   common: {
     cancel: 'Annuler',

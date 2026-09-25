@@ -22,7 +22,8 @@ export interface ImportReport {
   missingMedia: string[]
   /** Images referenced by URL: kept as is, never downloaded in V0 (05 §1). */
   remoteMedia: number
-  convertedModels: string[]
+  /** Anki note types converted to `basic` (05 §2.3), with the number of merged fields. */
+  convertedModels: { name: string; mergedFields: number }[]
   cancelled: boolean
 }
 
