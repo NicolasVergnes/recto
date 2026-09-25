@@ -45,17 +45,28 @@ self.onmessage = async (event: MessageEvent<OptimizerRequest>) => {
   const { reviews, dayStartHour, settings, now } = event.data
   if (!sharedMemorySupported()) return reply({ type: 'error', code: 'unsupported' })
   try {
+    // A failed fetch of the .wasm or a memory allocation error: worth another try later.
     await init({ module_or_path: wasmUrl })
-  } catch {
-    return reply({ type: 'error', code: 'unsupported' })
-  }
-  try {
     const set = buildTrainingSet(reviews, dayStartHour)
     if (set.items === 0) return reply({ type: 'error', code: 'notEnoughData' })
+    // Same cap on w17/w18 as ts-fsrs applies when scheduling with these relearning steps.
+    const relearningSteps = settings.relearningSteps.length
     // A Rust panic surfaces here as `RuntimeError: unreachable`.
-    const computed = new Fsrs().computeParameters(set.ratings, set.deltaTs, set.lengths, null, true)
-    const report = compareParams(set.histories, settings, computed, now)
-    reply(report ? { type: 'done', report } : { type: 'error', code: 'failed' })
+    const computed = new Fsrs().computeParameters(
+      set.ratings,
+      set.deltaTs,
+      set.lengths,
+      null,
+      true,
+      null,
+      relearningSteps,
+    )
+    const result = compareParams(set.histories, settings, computed, now)
+    reply(
+      typeof result === 'string'
+        ? { type: 'error', code: result }
+        : { type: 'done', report: result },
+    )
   } catch {
     reply({ type: 'error', code: 'failed' })
   }

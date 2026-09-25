@@ -9,13 +9,15 @@ import {
   MIN_REVIEWS,
   roundParams,
   sampleIntervals,
+  usableReviewCount,
   type TrainingReview,
 } from '$lib/scheduler/optimizer'
-import { DEFAULT_PARAMS } from '$lib/scheduler/fsrs'
+import { buildFsrs, DEFAULT_PARAMS } from '$lib/scheduler/fsrs'
 import { FORGETFUL_W, simulateReviews } from '../../helpers/fsrs-sim'
 
 // tests/setup.ts sets TZ=Europe/Paris.
 const paris = (iso: string) => new Date(iso).getTime()
+const withParams = (params: number[] | null) => ({ ...defaultDeckSettings().fsrs, params })
 
 let seq = 0
 function review(
@@ -137,11 +139,11 @@ describe('buildTrainingSet (03 §2.4)', () => {
   })
 
   it('ignores cards whose history does not start with a new card', () => {
-    const set = buildTrainingSet(
-      [review('a', '2026-09-01T10:00:00Z', 3), review('a', '2026-09-05T10:00:00Z', 3)],
-      4,
-    )
+    // E.g. an Anki card imported without its history: every answer in Recto is a review.
+    const rows = [review('a', '2026-09-01T10:00:00Z', 3), review('a', '2026-09-05T10:00:00Z', 3)]
+    const set = buildTrainingSet(rows, 4)
     expect(set).toMatchObject({ items: 0, reviews: 0, cards: 0, histories: [] })
+    expect(usableReviewCount(rows, 4)).toBe(0)
   })
 
   it('counts study days with the 04:00 boundary', () => {
@@ -176,19 +178,17 @@ describe('buildTrainingSet (03 §2.4)', () => {
   })
 
   it('keeps same-day answers but drops items without any spaced review', () => {
-    const set = buildTrainingSet(
-      [
-        review('a', '2026-09-01T10:00:00Z', 1, 0),
-        review('a', '2026-09-01T10:10:00Z', 3, 1),
-        review('a', '2026-09-02T10:00:00Z', 3),
-        // Only learnt today: no delay to learn from.
-        review('b', '2026-09-01T10:00:00Z', 1, 0),
-        review('b', '2026-09-01T10:10:00Z', 3, 1),
-        // A single answer.
-        review('c', '2026-09-01T10:00:00Z', 3, 0),
-      ],
-      4,
-    )
+    const rows = [
+      review('a', '2026-09-01T10:00:00Z', 1, 0),
+      review('a', '2026-09-01T10:10:00Z', 3, 1),
+      review('a', '2026-09-02T10:00:00Z', 3),
+      // Only learnt today: no delay to learn from.
+      review('b', '2026-09-01T10:00:00Z', 1, 0),
+      review('b', '2026-09-01T10:10:00Z', 3, 1),
+      // A single answer.
+      review('c', '2026-09-01T10:00:00Z', 3, 0),
+    ]
+    const set = buildTrainingSet(rows, 4)
     expect(items(set)).toEqual([
       [
         [1, 0],
@@ -197,6 +197,21 @@ describe('buildTrainingSet (03 §2.4)', () => {
       ],
     ])
     expect(set).toMatchObject({ items: 1, reviews: 3, cards: 1 })
+    expect(usableReviewCount(rows, 4)).toBe(3)
+  })
+
+  it('counts as usable the answers the training set keeps', () => {
+    const rows = [
+      ...simulateReviews(30, FORGETFUL_W, 11),
+      // Before a reset, and a card imported without history: not usable.
+      review('c0000', '2025-12-01T10:00:00Z', 3, 0),
+      review('c0000', '2025-12-03T10:00:00Z', 3),
+      review('imported', '2026-02-01T10:00:00Z', 3),
+      review('imported', '2026-02-09T10:00:00Z', 3),
+    ]
+    const set = buildTrainingSet(rows, 4)
+    expect(usableReviewCount(rows, 4)).toBe(set.reviews)
+    expect(set.reviews).toBe(rows.length - 4)
   })
 
   it('orders cards by their first answer, then by id (deterministic input)', () => {
@@ -223,8 +238,8 @@ describe('evaluate', () => {
   const histories = buildTrainingSet(simulateReviews(400, FORGETFUL_W, 7), 4).histories
 
   it('prefers the parameters that generated the answers', () => {
-    const truth = evaluate(histories, FORGETFUL_W)
-    const defaults = evaluate(histories, null)
+    const truth = evaluate(histories, withParams(FORGETFUL_W))
+    const defaults = evaluate(histories, withParams(null))
     expect(truth.n).toBe(defaults.n)
     expect(truth.n).toBeGreaterThan(1500)
     expect(truth.logLoss).toBeLessThan(defaults.logLoss)
@@ -236,9 +251,22 @@ describe('evaluate', () => {
     expect(isImprovement(truth, defaults)).toBe(false)
   })
 
+  it('caps w17/w18 from the relearning steps, like the scheduler', () => {
+    const w = [...DEFAULT_PARAMS]
+    w[17] = 1.5
+    const two = { ...withParams(w), relearningSteps: ['10m', '1h'] }
+    const capped = evaluate(histories, two)
+    expect(capped).not.toEqual(evaluate(histories, withParams(w)))
+    // The figures describe the parameters ts-fsrs actually schedules with.
+    const scheduled = [...buildFsrs(two, false).parameters.w]
+    expect(scheduled[17]).toBeLessThan(1)
+    expect(capped).toEqual(evaluate(histories, withParams(scheduled)))
+  })
+
   it('returns neutral figures without any spaced review', () => {
-    expect(evaluate([], null)).toEqual({ logLoss: 0, rmse: 0, predicted: 0, observed: 0, n: 0 })
-    expect(evaluate([[{ rating: 3, delta: 0 }]], null).n).toBe(0)
+    const none = { logLoss: 0, rmse: 0, predicted: 0, observed: 0, n: 0 }
+    expect(evaluate([], withParams(null))).toEqual(none)
+    expect(evaluate([[{ rating: 3, delta: 0 }]], withParams(null)).n).toBe(0)
   })
 
   it('stays finite for certain predictions', () => {
@@ -249,7 +277,7 @@ describe('evaluate', () => {
           { rating: 1, delta: 1 },
         ],
       ],
-      null,
+      withParams(null),
     )
     expect(e.n).toBe(1)
     expect(Number.isFinite(e.logLoss)).toBe(true)
@@ -291,16 +319,29 @@ describe('parameters', () => {
     const now = paris('2026-09-25T10:00:00Z')
     const { histories } = buildTrainingSet(simulateReviews(200, FORGETFUL_W, 3), 4)
     const report = compareParams(histories, settings, Float32Array.from(FORGETFUL_W), now)
-    expect(report?.better).toBe(true)
-    expect(report?.params).toEqual(FORGETFUL_W)
-    expect(report?.old.params).toEqual([...DEFAULT_PARAMS])
-    expect(report?.next.intervals).toEqual(
+    if (typeof report === 'string') throw new Error(report)
+    expect(report.better).toBe(true)
+    expect(report.params).toEqual(FORGETFUL_W)
+    expect(report.old.params).toEqual([...DEFAULT_PARAMS])
+    expect(report.next.intervals).toEqual(
       sampleIntervals({ ...settings, params: FORGETFUL_W }, now),
     )
-    // The optimizer returns the defaults when data is scarce: nothing to gain.
-    const same = compareParams(histories, settings, Float32Array.from(DEFAULT_PARAMS), now)
-    expect(same?.better).toBe(false)
-    expect(compareParams(histories, settings, [1, 2], now)).toBeNull()
+    // Already the best parameters: nothing to apply.
+    const custom = { ...settings, params: FORGETFUL_W }
+    const again = compareParams(histories, custom, Float32Array.from(FORGETFUL_W), now)
+    expect(typeof again === 'object' && again.better).toBe(false)
+    expect(compareParams(histories, settings, [1, 2], now)).toBe('failed')
+  })
+
+  it('reports scarce data when the optimizer gives the defaults back', () => {
+    // fsrs-rs returns DEFAULT_PARAMETERS unchanged when it cannot learn: never an « optimisation »,
+    // even if the defaults happen to fit a few answers better than the deck's custom parameters.
+    const now = paris('2026-09-25T10:00:00Z')
+    const { histories } = buildTrainingSet(simulateReviews(4, FORGETFUL_W, 3), 4)
+    const defaults = Float32Array.from(DEFAULT_PARAMS)
+    const settings = defaultDeckSettings().fsrs
+    expect(compareParams(histories, settings, defaults, now)).toBe('notEnoughData')
+    expect(compareParams(histories, withParams(FORGETFUL_W), defaults, now)).toBe('notEnoughData')
   })
 
   it('asks for 1 000 reviews', () => {

@@ -24,9 +24,6 @@
 </script>
 
 <div class="stack">
-  <p class="notice">
-    {t(report.better ? 'optimizer.better' : 'optimizer.notBetter')}
-  </p>
   <table class="small tabular" aria-describedby={`${id}-explain`}>
     <caption>{t('optimizer.caption')}</caption>
     <thead>

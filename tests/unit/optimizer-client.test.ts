@@ -8,6 +8,7 @@ class FakeWorker {
   static last: FakeWorker | null = null
   onmessage: ((event: MessageEvent<OptimizerResponse>) => void) | null = null
   onerror: (() => void) | null = null
+  onmessageerror: (() => void) | null = null
   posted: unknown[] = []
   terminated = false
   constructor() {
@@ -78,13 +79,41 @@ describe('runOptimizer (one-shot worker)', () => {
     expect(worker().terminated).toBe(true)
   })
 
+  it('reports an answer that cannot be received as a failure', async () => {
+    vi.stubGlobal('Worker', FakeWorker)
+    const pending = runOptimizer(request)
+    worker().onmessageerror?.()
+    await expect(pending).rejects.toMatchObject({ code: 'failed' })
+    expect(worker().terminated).toBe(true)
+  })
+
   it('gives up after the timeout', async () => {
     vi.useFakeTimers()
     vi.stubGlobal('Worker', FakeWorker)
-    const pending = runOptimizer(request, 1000)
+    const pending = runOptimizer(request, { timeoutMs: 1000 })
     vi.advanceTimersByTime(1000)
     await expect(pending).rejects.toMatchObject({ code: 'timeout' })
     expect(worker().terminated).toBe(true)
+  })
+
+  it('terminates the worker at once when the caller aborts', async () => {
+    vi.stubGlobal('Worker', FakeWorker)
+    const controller = new AbortController()
+    const pending = runOptimizer(request, { signal: controller.signal })
+    expect(worker().terminated).toBe(false)
+    controller.abort()
+    await expect(pending).rejects.toMatchObject({ code: 'aborted' })
+    expect(worker().terminated).toBe(true)
+  })
+
+  it('does not start a worker for an aborted run', async () => {
+    vi.stubGlobal('Worker', FakeWorker)
+    const controller = new AbortController()
+    controller.abort()
+    await expect(runOptimizer(request, { signal: controller.signal })).rejects.toMatchObject({
+      code: 'aborted',
+    })
+    expect(FakeWorker.last).toBeNull()
   })
 
   it('is unsupported without Web Workers', async () => {

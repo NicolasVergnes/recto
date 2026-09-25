@@ -8,7 +8,7 @@ import type { FsrsSettings, Rating, Review } from '../domain/types'
 import { daysBetween } from './day'
 import { buildFsrs, createFsrsScheduler, DEFAULT_PARAMS, validateFsrsSettings } from './fsrs'
 
-/** Reviews of a deck's own cards needed before optimising (roadmap M6). */
+/** Usable reviews (see `usableReviewCount`) of a deck's own cards needed to optimise (M6). */
 export const MIN_REVIEWS = 1000
 
 export type TrainingReview = Pick<Review, 'id' | 'cardId' | 'reviewedAt' | 'rating' | 'stateBefore'>
@@ -68,6 +68,17 @@ function cardHistories(reviews: readonly TrainingReview[], dayStartHour: number)
 }
 
 /**
+ * Answers the optimizer learns from: those of cards followed since they were new in Recto and
+ * answered again on a later study day (the `reviews` of `buildTrainingSet`, without its items).
+ */
+export function usableReviewCount(
+  reviews: readonly TrainingReview[],
+  dayStartHour: number,
+): number {
+  return cardHistories(reviews, dayStartHour).reduce((n, h) => n + h.length, 0)
+}
+
+/**
  * fsrs-browser items: every prefix (length ≥ 2) of each history holding at least one answer
  * given after a delay (fsrs-rs panics on the others); the last answer of an item is predicted.
  */
@@ -114,12 +125,15 @@ export interface Evaluation {
 const BINS = 20
 const EPSILON = 1e-4
 
-/** How well a parameter set predicts the success of every answer given after a delay. */
+/**
+ * How well FSRS settings predict the success of every answer given after a delay. The whole
+ * settings matter: ts-fsrs caps w17/w18 from the number of relearning steps, as when scheduling.
+ */
 export function evaluate(
   histories: readonly (readonly Step[])[],
-  params: readonly number[] | null,
+  settings: FsrsSettings,
 ): Evaluation {
-  const f = buildFsrs({ ...defaultDeckSettings().fsrs, params: params ? [...params] : null }, false)
+  const f = buildFsrs(settings, false)
   const bins = new Map<number, { n: number; p: number; y: number }>()
   let loss = 0
   let sumP = 0
@@ -197,17 +211,22 @@ export interface OptimizationReport {
   better: boolean
 }
 
-/** Current vs computed parameters on the same history; null when the output is invalid. */
+/**
+ * Current vs computed parameters on the same history. `failed` when the output is invalid;
+ * `notEnoughData` when it is the FSRS-6 defaults, which fsrs-rs returns unchanged when the data
+ * is too scarce to learn from (nothing to offer, whatever the deck uses now).
+ */
 export function compareParams(
   histories: readonly (readonly Step[])[],
   settings: FsrsSettings,
   computed: ArrayLike<number>,
   now: number,
-): OptimizationReport | null {
+): OptimizationReport | 'notEnoughData' | 'failed' {
   const params = roundParams(computed)
-  if (!params) return null
+  if (!params) return 'failed'
+  if (params.every((x, i) => x === DEFAULT_PARAMS[i])) return 'notEnoughData'
   const summary = (p: number[] | null): ParamsSummary => ({
-    ...evaluate(histories, p),
+    ...evaluate(histories, { ...settings, params: p }),
     params: p ?? [...DEFAULT_PARAMS],
     intervals: sampleIntervals({ ...settings, params: p }, now),
   })

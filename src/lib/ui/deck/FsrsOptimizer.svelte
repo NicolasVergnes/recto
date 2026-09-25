@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte'
   import { live } from '$lib/db/live.svelte'
-  import { countDeckReviews, loadDeckReviews } from '$lib/db/optimize'
+  import { deckReviewCounts, loadDeckReviews } from '$lib/db/optimize'
   import type { Deck } from '$lib/domain/types'
   import { t } from '$lib/i18n'
   import { MIN_REVIEWS, type OptimizationReport } from '$lib/scheduler/optimizer'
@@ -19,27 +19,35 @@
   let { deck, params, onApply }: Props = $props()
   const id = $props.id()
 
-  const count = live<number | null>(() => countDeckReviews(deck.id), null)
+  const counts = live<{ total: number; usable: number } | null>(
+    () => deckReviewCounts(deck.id),
+    null,
+  )
   let busy = $state(false)
   let running = $state(false)
   let report = $state.raw<OptimizationReport | null>(null)
-  let failure = $state<OptimizerFailure | null>(null)
+  let failure = $state<Exclude<OptimizerFailure, 'aborted'> | null>(null)
   let status = $state<HTMLElement>()
   let result = $state<HTMLElement>()
+  /** The run in progress, stopped when the settings are closed or the scheduler changes. */
+  let controller: AbortController | null = null
+
+  $effect(() => () => controller?.abort())
 
   async function optimize() {
+    const run = new AbortController()
+    controller = run
     busy = running = true
     report = failure = null
     try {
       const { reviews, dayStartHour } = await loadDeckReviews(deck.id)
-      report = await runOptimizer({
-        reviews,
-        dayStartHour,
-        settings: $state.snapshot(deck.settings.fsrs),
-        now: Date.now(),
-      })
+      report = await runOptimizer(
+        { reviews, dayStartHour, settings: $state.snapshot(deck.settings.fsrs), now: Date.now() },
+        { signal: run.signal },
+      )
     } catch (err) {
-      if (err instanceof OptimizerError) failure = err.code
+      if (run.signal.aborted) return
+      if (err instanceof OptimizerError && err.code !== 'aborted') failure = err.code
       else {
         console.error(err)
         failure = 'failed'
@@ -77,28 +85,53 @@
   <p bind:this={status} tabindex="-1">
     <strong>{t(params ? 'optimizer.statusCustom' : 'optimizer.statusDefault')}</strong>
   </p>
-  {#if count.value !== null && count.value < MIN_REVIEWS}
-    <p class="small">{t('optimizer.threshold', { n: count.value, min: MIN_REVIEWS })}</p>
-  {:else if count.value !== null}
-    <p class="small">{t('optimizer.reviews', { n: count.value })}</p>
-    <p class="muted small">{t('optimizer.help')}</p>
-    <div class="row">
-      <button class="btn btn-sm" type="button" disabled={busy} onclick={optimize}>
-        {t('optimizer.optimize')}
-      </button>
-    </div>
+  {#if counts.value}
+    {@const { total, usable } = counts.value}
+    <p class="small">
+      {#if usable < MIN_REVIEWS}
+        {t('optimizer.threshold', { n: usable, min: MIN_REVIEWS })}
+      {:else}
+        {t('optimizer.reviews', { n: usable })}
+      {/if}
+      {#if total > usable}
+        {t('optimizer.ignored', { n: total - usable })}
+      {/if}
+    </p>
+    {#if total > usable}
+      <p class="muted small">{t('optimizer.ignoredWhy')}</p>
+    {/if}
+    {#if usable >= MIN_REVIEWS}
+      <p class="muted small">{t('optimizer.help')}</p>
+      <div class="row">
+        <button class="btn btn-sm" type="button" disabled={busy} onclick={optimize}>
+          {t('optimizer.optimize')}
+        </button>
+      </div>
+    {/if}
   {/if}
-  {#if running}
-    <div class="stack small" role="status">
+  <!-- Always rendered: a live region inserted already filled is often not announced. -->
+  <div class="stack small live" role="status">
+    {#if running}
       <progress aria-label={t('optimizer.running')}></progress>
       {t('optimizer.running')}
-    </div>
-  {/if}
+    {/if}
+  </div>
   {#if failure || report}
-    <div class="stack" bind:this={result} tabindex="-1">
+    <div
+      class="stack"
+      role="region"
+      aria-labelledby={`${id}-outcome`}
+      bind:this={result}
+      tabindex="-1"
+    >
       {#if failure}
-        <p class="error-text" role="alert">{t(`optimizer.errors.${failure}`)}</p>
+        <p id={`${id}-outcome`} class="error-text" role="alert">
+          {t(`optimizer.errors.${failure}`)}
+        </p>
       {:else if report}
+        <p id={`${id}-outcome`} class="notice">
+          {t(report.better ? 'optimizer.better' : 'optimizer.notBetter')}
+        </p>
         <OptimizerReport {report} />
         {#if report.better}
           <div class="row">
@@ -133,6 +166,11 @@
   h3,
   p {
     margin: 0;
+  }
+
+  /* Empty: still in the accessibility tree, but no gap in the layout. */
+  .live:empty {
+    position: absolute;
   }
 
   progress {

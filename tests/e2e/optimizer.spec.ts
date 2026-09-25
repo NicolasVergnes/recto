@@ -25,104 +25,118 @@ function storedParams(page: Page): Promise<unknown> {
   })
 }
 
+/**
+ * Seeds `cards` cards of the first deck with 6 answers each, spread over the last year (the
+ * learner forgets quickly). `firstState` 2 mimics cards imported without their history.
+ */
+function seedReviews(page: Page, cards: number, firstState = 0): Promise<number> {
+  return page.evaluate(
+    async ({ cards, firstState }) => {
+      const db = await new Promise<IDBDatabase>((resolve) => {
+        const req = indexedDB.open('recto')
+        req.onsuccess = () => resolve(req.result)
+      })
+      const deck = await new Promise<{ id: string }>((resolve) => {
+        const req = db.transaction('decks').objectStore('decks').getAll()
+        req.onsuccess = () => resolve((req.result as { id: string }[])[0] ?? { id: '' })
+      })
+      const DAY = 86_400_000
+      const now = Date.now()
+      let seed = 42
+      const random = () => (seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648) / 2_147_483_648
+      const tx = db.transaction(['notes', 'cards', 'reviews'], 'readwrite')
+      let count = 0
+      for (let i = 0; i < cards; i++) {
+        const start = now - (360 - (i % 60)) * DAY
+        tx.objectStore('notes').put({
+          id: `n${i}`,
+          deckId: deck.id,
+          modelType: 'basic',
+          fields: [`Q${i}`, `A${i}`, ''],
+          tags: [],
+          createdAt: start,
+          updatedAt: start,
+        })
+        let at = start
+        let state = firstState
+        for (const delay of [0, 1, 3, 7, 15, 30]) {
+          at += delay * DAY
+          const rating = delay === 0 ? 3 : random() < Math.exp(-delay / 12) ? 3 : 1
+          tx.objectStore('reviews').put({
+            id: `r${i}-${delay}`,
+            cardId: `c${i}`,
+            deckId: deck.id,
+            reviewedAt: at,
+            rating,
+            scheduler: 'fsrs',
+            durationMs: 4000,
+            stateBefore: state,
+            dueBefore: at,
+            stabilityBefore: 0,
+            difficultyBefore: 0,
+            boxBefore: 0,
+            learningStepsBefore: 0,
+            lastReviewBefore: null,
+            stateAfter: 2,
+            dueAfter: at + DAY,
+            scheduledDays: 1,
+            elapsedDays: delay,
+            boxAfter: 0,
+          })
+          state = 2
+          count++
+        }
+        tx.objectStore('cards').put({
+          id: `c${i}`,
+          noteId: `n${i}`,
+          deckId: deck.id,
+          ord: 0,
+          due: now + 5 * DAY,
+          state: 2,
+          reps: 6,
+          lapses: 0,
+          lastReview: at,
+          suspended: false,
+          retired: false,
+          flag: 0,
+          stability: 10,
+          difficulty: 5,
+          scheduledDays: 10,
+          learningSteps: 0,
+          box: 0,
+          sideFlipped: false,
+          createdAt: start,
+        })
+      }
+      await new Promise((resolve) => (tx.oncomplete = resolve))
+      db.close()
+      return count
+    },
+    { cards, firstState },
+  )
+}
+
 test('optimizes the FSRS parameters of a deck with 1 000+ reviews', async ({ page }) => {
   test.setTimeout(120_000)
   await createDeck(page, 'Optimisation')
-  // 240 cards × 6 answers, spread over the last year; the learner forgets quickly.
-  const total = await page.evaluate(async () => {
-    const db = await new Promise<IDBDatabase>((resolve) => {
-      const req = indexedDB.open('recto')
-      req.onsuccess = () => resolve(req.result)
-    })
-    const deck = await new Promise<{ id: string }>((resolve) => {
-      const req = db.transaction('decks').objectStore('decks').getAll()
-      req.onsuccess = () => resolve((req.result as { id: string }[])[0] ?? { id: '' })
-    })
-    const DAY = 86_400_000
-    const now = Date.now()
-    let seed = 42
-    const random = () => (seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648) / 2_147_483_648
-    const tx = db.transaction(['notes', 'cards', 'reviews'], 'readwrite')
-    let count = 0
-    for (let i = 0; i < 240; i++) {
-      const start = now - (360 - (i % 60)) * DAY
-      tx.objectStore('notes').put({
-        id: `n${i}`,
-        deckId: deck.id,
-        modelType: 'basic',
-        fields: [`Q${i}`, `A${i}`, ''],
-        tags: [],
-        createdAt: start,
-        updatedAt: start,
-      })
-      let at = start
-      let state = 0
-      for (const delay of [0, 1, 3, 7, 15, 30]) {
-        at += delay * DAY
-        const rating = delay === 0 ? 3 : random() < Math.exp(-delay / 12) ? 3 : 1
-        tx.objectStore('reviews').put({
-          id: `r${i}-${delay}`,
-          cardId: `c${i}`,
-          deckId: deck.id,
-          reviewedAt: at,
-          rating,
-          scheduler: 'fsrs',
-          durationMs: 4000,
-          stateBefore: state,
-          dueBefore: at,
-          stabilityBefore: 0,
-          difficultyBefore: 0,
-          boxBefore: 0,
-          learningStepsBefore: 0,
-          lastReviewBefore: null,
-          stateAfter: 2,
-          dueAfter: at + DAY,
-          scheduledDays: 1,
-          elapsedDays: delay,
-          boxAfter: 0,
-        })
-        state = 2
-        count++
-      }
-      tx.objectStore('cards').put({
-        id: `c${i}`,
-        noteId: `n${i}`,
-        deckId: deck.id,
-        ord: 0,
-        due: now + 5 * DAY,
-        state: 2,
-        reps: 6,
-        lapses: 0,
-        lastReview: at,
-        suspended: false,
-        retired: false,
-        flag: 0,
-        stability: 10,
-        difficulty: 5,
-        scheduledDays: 10,
-        learningSteps: 0,
-        box: 0,
-        sideFlipped: false,
-        createdAt: start,
-      })
-    }
-    await new Promise((resolve) => (tx.oncomplete = resolve))
-    db.close()
-    return count
-  })
+  // 240 cards × 6 answers.
+  const total = await seedReviews(page, 240)
   expect(total).toBe(1440)
   await page.reload()
 
   await expect(page.getByText('Paramètres par défaut', { exact: true })).toBeVisible()
-  await expect(page.getByText('1 440 révisions dans ce paquet.')).toBeVisible()
+  await expect(page.getByText('1 440 révisions utilisables dans ce paquet.')).toBeVisible()
   await page.getByRole('button', { name: 'Optimiser' }).click()
   // The real fsrs-browser WASM runs in a worker.
   const table = page.getByRole('table', { name: 'Comparaison sur vos révisions passées' })
   await expect(table).toBeVisible({ timeout: 60_000 })
   await expect(table.getByRole('rowheader', { name: 'Erreur du modèle' })).toBeVisible()
+  // Focus lands on the outcome, named by its conclusion.
   await expect(
-    page.getByText('Les paramètres proposés décrivent mieux votre mémoire.'),
-  ).toBeVisible()
+    page.getByRole('region', {
+      name: 'Les paramètres proposés prédisent mieux vos révisions passées.',
+    }),
+  ).toBeFocused()
   await page.getByText('Voir les 21 valeurs').click()
   await expect(page.getByRole('definition')).toHaveCount(2)
 
@@ -152,6 +166,21 @@ test('a deck with few reviews explains the threshold', async ({ page }) => {
   await createDeck(page, 'Petit paquet')
   await expect(
     page.getByText('Optimisation possible à partir de 1 000 révisions (0 actuellement).'),
+  ).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Optimiser' })).toHaveCount(0)
+})
+
+test('answers to cards imported without their history do not count', async ({ page }) => {
+  await createDeck(page, 'Import Anki')
+  expect(await seedReviews(page, 200, 2)).toBe(1200)
+  await page.reload()
+  await expect(
+    page.getByText(
+      'Optimisation possible à partir de 1 000 révisions (0 actuellement). 1 200 autres révisions ne comptent pas.',
+    ),
+  ).toBeVisible()
+  await expect(
+    page.getByText('Une carte importée sans son historique ne compte pas.', { exact: false }),
   ).toBeVisible()
   await expect(page.getByRole('button', { name: 'Optimiser' })).toHaveCount(0)
 })
