@@ -4,36 +4,10 @@ import { clozeIndices } from '$lib/domain/cloze'
 import { cardOrds, convertFields } from '$lib/domain/notes'
 import { imageRefs, parseTags } from '$lib/domain/text'
 import type { ModelType } from '$lib/domain/types'
-import { t, type MessageKey } from '$lib/i18n'
+import { t } from '$lib/i18n'
 import { navigate } from '$lib/router.svelte'
 import { toast } from '$lib/state/toast.svelte'
-
-/** A text field of the form: its label and the index of the note field it edits. */
-export interface FieldSlot {
-  label: MessageKey
-  index: number
-}
-
-const BASIC: readonly FieldSlot[] = [
-  { label: 'editor.front', index: 0 },
-  { label: 'editor.back', index: 1 },
-  { label: 'editor.extra', index: 2 },
-]
-
-/** Text fields shown for each note type (a type with its own editor lists only its text fields). */
-const SLOTS: Record<ModelType, readonly FieldSlot[]> = {
-  basic: BASIC,
-  basic_reverse: BASIC,
-  cloze: [
-    { label: 'editor.text', index: 0 },
-    { label: 'editor.extra', index: 1 },
-  ],
-  // Image and masks (fields 0–1) are edited by OcclusionEditor.
-  image_occlusion: [
-    { label: 'editor.header', index: 2 },
-    { label: 'editor.extra', index: 3 },
-  ],
-}
+import { SLOTS } from './slots'
 
 /** The note being written in the editor (new or existing) and what it will produce. */
 export class NoteDraft {
