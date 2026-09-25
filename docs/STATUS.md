@@ -1,12 +1,32 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-09-25 · Branche : claude/great-feynman-7vbb6d · Jalon en cours : M2
+Dernière mise à jour : 2026-09-25 · Branche : claude/great-feynman-7vbb6d · Jalon en cours : M3
 
 ## Jalon en cours
 
-M2 — Planificateurs et révision (plan écrit au démarrage du jalon).
+M3 — Import CSV et sauvegarde (plan écrit au démarrage du jalon).
 
 ## Terminé
+
+### M2 — Planificateurs et révision (2026-09-25)
+
+Plan suivi :
+
+1. `src/lib/scheduler/day.ts` (journée d'étude à 04:00, heure locale, heure d'été) + tests en Europe/Paris.
+2. `scheduler/leitner.ts` (deux modes, table `isBoxDue`, alternance, C7) + tests, puis `scheduler/fsrs.ts` (adaptateur ts-fsrs, fuzz désactivé en test) + tests ; `retire.ts` (P7), `convert.ts` (03 §4), `index.ts`.
+3. `src/lib/queue/{build,session,random}.ts` + tests (plafonds, entrelacement, sœurs, tri par R, 04:00, heure d'été, 20 000 cartes).
+4. `src/lib/db/study.ts` : `recordReview` atomique, `undoReview`, `loadTodayQueue`, `setRetired`, `switchScheduler` + tests.
+5. Écran Révision, accueil (« Réviser aujourd'hui », compteurs par paquet), paramètres de paquet (planificateur, plafonds, rétention + charge estimée, mode Leitner), réglages globaux.
+6. E2E 2 + e2e Leitner, réponse tapée, modification en cours de séance.
+
+Critères :
+
+- [x] `scheduler/fsrs.ts` et `scheduler/leitner.ts` conformes à 03 (`tests/unit/scheduler/*.test.ts` : transitions, deux modes, `isBoxDue` sur deux ans, alternance, C7, conversions Card ↔ ts-fsrs, preview = answer, paramètres invalides rejetés) ; couverture scheduler 98 % lignes / 94 % branches, queue 100 % / 97 %.
+- [x] `queue/` conforme à 03 §5 (`tests/unit/queue/build.test.ts`, `session.test.ts`).
+- [x] Écran Révision complet : réponse absente du DOM avant la demande (e2e « review: reveal, rate, undo and rate again »), réponse tapée (e2e « typed answers… »), boutons avec prévisualisation (« 10 min », « → C2 · dans 2 j »), raccourcis 1–4, Espace, Ctrl+Z, E, R, annuler, modifier puis reprendre la séance, suspendre, retirer (P7, bouton désactivé avec explication), drapeau, infos, résumé de fin, rappel du sommeil une fois par jour, jour à 04:00.
+- [x] Accueil : compteurs du jour et « Réviser aujourd'hui » toutes cartes confondues, avant la liste des paquets (P5).
+- [x] Paramètres de paquet : planificateur, plafonds, ordre, réponse tapée, audio, enterrement des sœurs, rétention 0,80–0,97 avec texte d'aide et charge estimée (P9), pas, 4/2 boutons, mode Leitner, intervalles, alternance, « Sûr » ; changement de planificateur converti en une transaction après téléchargement d'une sauvegarde (`tests/unit/db/study.test.ts` › « converts Leitner → FSRS… »).
+- [x] E2E 2 (`tests/e2e/review.spec.ts`).
 
 ### M1 — Données et création de cartes (2026-09-25)
 
@@ -54,9 +74,22 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## Reste à faire / dettes
 
-- M1 à M5 (docs/07-ROADMAP.md).
+- M3 à M5 (docs/07-ROADMAP.md).
+- Plusieurs écrans dépassent 200 lignes (Review, Editor, Cards, Settings, Deck) : extraire des sous-composants lors des finitions (M5).
 
 ## Décisions prises en session
+
+- 2026-09-25 (M2) : pas d'apprentissage FSRS par défaut `['10m', '10m']` au lieu de `['10m']` : avec un seul pas, ts-fsrs 5 fait graduer « Bien » immédiatement, ce qui contredit P11 (SPEC prioritaire). Docs 02, 03 §2.5 et skill `srs-rules` mis à jour.
+- 2026-09-25 (M2) : l'annulation restaure l'instantané exact de la carte gardé en mémoire pendant la séance et supprime la ligne de journal (transaction) ; `f.rollback` de ts-fsrs n'est pas utilisé car il remet `due` à l'heure de la révision et ne connaît pas Leitner. Annulation possible jusqu'à 20 réponses en arrière dans la séance.
+- 2026-09-25 (M2) : `retrievability` FSRS calculée directement par la courbe d'oubli (`forgetting_curve`, jours fractionnaires) : même modèle que `get_retrievability`, beaucoup plus rapide pour trier des milliers de retards.
+- 2026-09-25 (M2) : `elapsedDays` du journal = nombre de journées d'étude (bornes à 04:00) entre deux révisions, pour les deux planificateurs ; P7 compte les réussites dont `elapsedDays ≥ 7`.
+- 2026-09-25 (M2) : Leitner : « Oublié » compte un oubli (`lapses`) par épisode (les re-présentations d'une carte déjà en réapprentissage n'en ajoutent pas) ; « Difficile » n'existe pas et serait traité comme « Réussi ». Le libellé sous « Oublié » est « → C1 · maintenant » (la carte revient dans la séance, 03 §3.4).
+- 2026-09-25 (M2) : mode calendrier : une carte due un jour de compartiment manqué reste due les jours suivants (rattrapage, P6) plutôt que d'attendre la prochaine date du compartiment.
+- 2026-09-25 (M2) : file du jour : retards triés par R croissante **dans chaque paquet**, puis paquets entrelacés en round-robin (retards, puis révisions du jour) ; plafond `reviewsPerDay` par paquet (sous-paquets inclus séparément), puis plafond global. Les cartes en apprentissage gardent leur place et enterrent leurs sœurs.
+- 2026-09-25 (M2) : la séance vit dans `src/lib/state/session.svelte.ts` : « Modifier » ouvre l'éditeur et le retour reprend la séance (cartes et notes relues). Modifier les paramètres d'un paquet termine la séance en cours.
+- 2026-09-25 (M2) : Espace = « Bien » seulement en mode 2 boutons (04-UI) ; en mode 4 boutons, Espace ne note pas (évite les notes involontaires).
+- 2026-09-25 (M2) : P9 : la « charge estimée » est un facteur relatif à 90 % calculé sur la courbe d'oubli FSRS-6 (intervalle inversé, + 2 révisions par oubli).
+- 2026-09-25 (M2) : tout objet `$state` passé à Dexie est d'abord copié (`$state.snapshot`) : un Proxy ne peut pas être stocké dans IndexedDB.
 
 - 2026-09-25 (M1) : clés `settings` ajoutées à la liste réservée : `lastDeckId` (l'éditeur mémorise le dernier paquet), `sleepTipDay` (rappel de sommeil une fois par jour), `swipeGestures` (option de balayage, 04-UI §2.2). `persistGranted` vaut `null` tant que la persistance n'a jamais été demandée.
 - 2026-09-25 (M1) : les noms de paquets sont uniques entre frères (insensible à la casse) pour que les chemins `Parent::Enfant` (CSV, Anki) ne soient pas ambigus.
@@ -86,6 +119,8 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 - Licence : l'écran « À propos » et `package.json` indiquent MIT (choix par défaut, aucune licence n'étant fixée dans les docs) — à confirmer par Nicolas.
 
 ## À vérifier manuellement par Nicolas
+
+- M2 : une vraie séance sur téléphone (sons en lecture automatique, gestes de balayage activés dans Paramètres), passage d'un paquet en Memory Box mode calendrier, rappel « une nuit de sommeil » en fin de première séance.
 
 - M1 : créer un paquet, un sous-paquet, des notes des trois types ; coller une image (Ctrl+V) et glisser-déposer un fichier dans un champ ; enregistrer un son au micro (autorisation du navigateur) ; fusionner/supprimer un paquet (une sauvegarde `.recto.zip` doit se télécharger avant la suppression) ; thème sombre et taille de texte dans Paramètres.
 

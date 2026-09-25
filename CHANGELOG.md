@@ -4,6 +4,21 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 ## [Unreleased]
 
+### M2 — Planificateurs et révision
+
+#### Added
+
+- FSRS-6 via ts-fsrs (`src/lib/scheduler/fsrs.ts`) : prévisualisation, réponse, récupérabilité, validation des paramètres, rejeu d'historique, estimation de charge (P9).
+- Memory Box à 7 compartiments (`src/lib/scheduler/leitner.ts`) : modes intervalles et calendrier du coffret, « Sûr » +2, alternance recto/verso, C7.
+- Journée d'étude à 04:00 (heure locale, heure d'été), règle P7 (`canRetire`), conversion FSRS ↔ Leitner.
+- File du jour (`src/lib/queue`) : apprentissage, retards par récupérabilité, révisions du jour en ordre aléatoire stable, nouvelles intercalées, round-robin entre paquets, plafonds par paquet et global, sœurs enterrées ou espacées ; file de séance en mémoire.
+- Écran de révision : réponse masquée (P1), réponse tapée avec comparaison, boutons avec intervalles ou compartiments, raccourcis, annuler, modifier et reprendre, suspendre, retirer (P7), drapeau, infos, résumé, attente des cartes en apprentissage, rappel du sommeil, gestes optionnels.
+- Accueil : « Réviser aujourd'hui » et compteurs par paquet ; paramètres de révision par paquet ; plafond global et gestes dans Paramètres.
+
+#### Changed
+
+- Pas d'apprentissage FSRS par défaut : `['10m', '10m']` (P11 avec la sémantique de ts-fsrs).
+
 ### M1 — Données et création de cartes
 
 #### Added

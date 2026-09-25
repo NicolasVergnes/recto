@@ -1,12 +1,14 @@
 <script lang="ts">
+  import { QUOTA_WARNING_RATIO } from '$lib/config/app'
   import { live } from '$lib/db/live.svelte'
   import * as repo from '$lib/db/repo'
   import { storageInfo, usageRatio } from '$lib/db/storage'
-  import { QUOTA_WARNING_RATIO } from '$lib/config/app'
+  import { countsByDeck, loadTodayQueue } from '$lib/db/study'
   import { deckTree } from '$lib/domain/decks'
   import type { Deck } from '$lib/domain/types'
   import { t } from '$lib/i18n'
-  import { navigate, type RouteProps } from '$lib/router.svelte'
+  import type { QueueCounts } from '$lib/queue/build'
+  import { href, navigate, type RouteProps } from '$lib/router.svelte'
   import Icon from '$lib/ui/Icon.svelte'
   import NewDeckDialog from '$lib/ui/NewDeckDialog.svelte'
 
@@ -14,7 +16,13 @@
 
   const decks = live(() => repo.listDecks(), [])
   const counts = live(() => repo.deckCounts(), new Map())
+  const today = live(async () => {
+    const q = await loadTodayQueue(Date.now())
+    return { total: q.result.counts, perDeck: countsByDeck(q) }
+  }, null)
   const tree = $derived(deckTree(decks.value))
+  const due = $derived(today.value ? today.value.total.learning + today.value.total.review : 0)
+  const fresh = $derived(today.value?.total.new ?? 0)
   let creating = $state(false)
   let quotaPct = $state<number | null>(null)
 
@@ -24,6 +32,12 @@
       if (ratio !== null && ratio >= QUOTA_WARNING_RATIO) quotaPct = Math.round(ratio * 100)
     })
   })
+
+  const EMPTY: QueueCounts = { learning: 0, review: 0, new: 0 }
+
+  function dueOf(deck: Deck): QueueCounts {
+    return today.value?.perDeck.get(deck.id) ?? EMPTY
+  }
 
   function cardCount(deck: Deck): number {
     return counts.value.get(deck.id)?.cards ?? 0
@@ -55,6 +69,21 @@
       </div>
     </div>
   {:else if decks.loaded}
+    <!-- P5: the single mixed daily queue comes first; per-deck review is secondary. -->
+    <section class="card-surface stack today" aria-labelledby="today-title">
+      <h2 id="today-title" class="visually-hidden">{t('common.today')}</h2>
+      <p class="tabular counts" aria-live="polite">
+        <strong>{t('home.due', { n: due })}</strong>
+        <span class="muted" aria-hidden="true">·</span>
+        <span>{t('home.newCards', { n: fresh })}</span>
+      </p>
+      {#if due + fresh > 0}
+        <a class="btn btn-primary btn-block big" href="#/review">{t('home.reviewToday')}</a>
+      {:else if today.loaded}
+        <p class="muted">{t('home.nothingDue')}</p>
+      {/if}
+    </section>
+
     <section class="stack" aria-labelledby="decks-title">
       <div class="row spread">
         <h2 id="decks-title">{t('home.decks')}</h2>
@@ -71,23 +100,11 @@
       <ul class="decks">
         {#each tree as node (node.deck.id)}
           <li>
-            <a class="deck" href={`#/decks/${node.deck.id}`}>
-              <span class="name">{node.deck.emoji ?? ''} {node.deck.name}</span>
-              <span class="muted small tabular"
-                >{t('home.cardCount', { n: cardCount(node.deck) })}</span
-              >
-            </a>
+            {@render deckRow(node.deck)}
             {#if node.children.length > 0}
               <ul class="children">
                 {#each node.children as child (child.id)}
-                  <li>
-                    <a class="deck" href={`#/decks/${child.id}`}>
-                      <span class="name">{child.emoji ?? ''} {child.name}</span>
-                      <span class="muted small tabular"
-                        >{t('home.cardCount', { n: cardCount(child) })}</span
-                      >
-                    </a>
-                  </li>
+                  <li>{@render deckRow(child)}</li>
                 {/each}
               </ul>
             {/if}
@@ -98,6 +115,26 @@
   {/if}
 </section>
 
+{#snippet deckRow(deck: Deck)}
+  {@const c = dueOf(deck)}
+  <div class="deck">
+    <a class="name" href={`#/decks/${deck.id}`}>{deck.emoji ?? ''} {deck.name}</a>
+    <span class="row small tabular">
+      {#if c.learning + c.review + c.new > 0}
+        <span class="due" title={t('home.dueTitle')}>{c.learning + c.review}</span>
+        <span class="new" title={t('home.newTitle')}>{c.new}</span>
+        <a
+          class="btn btn-sm"
+          href={href('/review', { deck: deck.id })}
+          aria-label={t('home.reviewDeckLabel', { name: deck.name })}>{t('home.reviewDeck')}</a
+        >
+      {:else}
+        <span class="muted">{t('home.cardCount', { n: cardCount(deck) })}</span>
+      {/if}
+    </span>
+  </div>
+{/snippet}
+
 <NewDeckDialog
   bind:open={creating}
   decks={decks.value}
@@ -107,6 +144,19 @@
 <style>
   .welcome .btn {
     justify-content: flex-start;
+  }
+
+  .today .counts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    font-size: 1.15rem;
+    margin: 0;
+  }
+
+  .big {
+    min-height: 3.5rem;
+    font-size: 1.1rem;
   }
 
   .decks,
@@ -133,12 +183,10 @@
     justify-content: space-between;
     gap: var(--space-3);
     min-height: 3rem;
-    padding: var(--space-2) var(--space-4);
+    padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    color: var(--text);
-    text-decoration: none;
   }
 
   .children .deck {
@@ -146,11 +194,32 @@
     background: transparent;
   }
 
-  .deck:hover {
-    background: var(--surface-2);
+  .name {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    min-height: 2.75rem;
+    font-weight: 600;
+    color: var(--text);
+    text-decoration: none;
   }
 
-  .name {
-    font-weight: 600;
+  .name:hover {
+    text-decoration: underline;
+  }
+
+  .due,
+  .new {
+    min-width: 2ch;
+    text-align: right;
+    font-weight: 700;
+  }
+
+  .due {
+    color: var(--rate-good-text);
+  }
+
+  .new {
+    color: var(--rate-easy-text);
   }
 </style>

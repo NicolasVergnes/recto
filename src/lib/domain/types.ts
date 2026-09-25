@@ -7,7 +7,7 @@ export interface FsrsSettings {
   requestRetention: number
   /** Days, default 365 (echo of box 7 "every year"). */
   maximumInterval: number
-  /** Default ['10m'] (P11: never '1m'). */
+  /** Default ['10m', '10m'] (P11: new card → 10 min → ≥ 1 day; never '1m'). */
   learningSteps: string[]
   relearningSteps: string[]
   /** null = FSRS-6 defaults; otherwise 21 values. */

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { APP_VERSION } from '$lib/config/app'
   import * as repo from '$lib/db/repo'
-  import { getSetting } from '$lib/db/settings'
+  import { getSetting, setSetting } from '$lib/db/settings'
   import { requestPersistence, storageInfo, usageRatio, type StorageInfo } from '$lib/db/storage'
   import type { Theme } from '$lib/db/settings'
   import { BACKUP_EXTENSION, createBackup } from '$lib/export/backup'
@@ -11,7 +11,13 @@
   import { clearMediaUrls } from '$lib/media/url'
   import type { RouteProps } from '$lib/router.svelte'
   import { confirmAction } from '$lib/state/confirm.svelte'
-  import { prefs, setDayStartHour, setFontScale, setTheme } from '$lib/state/prefs.svelte'
+  import {
+    prefs,
+    setDayStartHour,
+    setFontScale,
+    setSwipeGestures,
+    setTheme,
+  } from '$lib/state/prefs.svelte'
   import { toast } from '$lib/state/toast.svelte'
   import Dialog from '$lib/ui/Dialog.svelte'
   import { errorMessage } from '$lib/ui/errors'
@@ -32,9 +38,19 @@
   let wiping = $state(false)
   let backupFirst = $state(true)
 
+  let globalReviews = $state(500)
+
   async function refresh() {
     info = await storageInfo()
     lastBackupAt = await getSetting('lastBackupAt')
+    globalReviews = await getSetting('globalReviewsPerDay')
+  }
+
+  async function saveGlobalReviews(n: number) {
+    if (!Number.isInteger(n) || n < 0) return
+    globalReviews = n
+    await setSetting('globalReviewsPerDay', n)
+    toast(t('settings.saved'))
   }
 
   $effect(() => {
@@ -161,6 +177,26 @@
       </select>
       <p class="muted small">{t('settings.dayStartHelp')}</p>
     </div>
+    <div class="field">
+      <label for="global-reviews">{t('settings.globalReviews')}</label>
+      <input
+        id="global-reviews"
+        type="number"
+        min="0"
+        max="99999"
+        value={globalReviews}
+        onchange={(e) => saveGlobalReviews(Number(e.currentTarget.value))}
+      />
+      <p class="muted small">{t('settings.globalReviewsHelp')}</p>
+    </div>
+    <label class="check">
+      <input
+        type="checkbox"
+        checked={prefs.swipeGestures}
+        onchange={(e) => setSwipeGestures(e.currentTarget.checked)}
+      />
+      {t('settings.swipe')}
+    </label>
     <p class="muted small">{t('settings.language')}</p>
   </section>
 

@@ -20,6 +20,10 @@
   --rate-hard: #9c4f00;
   --rate-good: #2c6e31;
   --rate-easy: #1f5a9e;
+  /* Same meanings as text colours on the page background (AA in both themes). */
+  --rate-again-text: #a93a3a;
+  --rate-good-text: #2c6e31;
+  --rate-easy-text: #1f5a9e;
   --overlay: rgb(0 0 0 / 45%);
 
   --space-1: 0.25rem;
@@ -66,6 +70,9 @@
     --warning: #f3c27a;
     --warning-soft: #3a2c16;
     --focus: #58b8ad;
+    --rate-again-text: #f2a7a0;
+    --rate-good-text: #8fd694;
+    --rate-easy-text: #9cc3f5;
     --overlay: rgb(0 0 0 / 60%);
     --shadow: 0 1px 2px rgb(0 0 0 / 40%);
   }
@@ -87,6 +94,9 @@
   --warning: #f3c27a;
   --warning-soft: #3a2c16;
   --focus: #58b8ad;
+  --rate-again-text: #f2a7a0;
+  --rate-good-text: #8fd694;
+  --rate-easy-text: #9cc3f5;
   --overlay: rgb(0 0 0 / 60%);
   --shadow: 0 1px 2px rgb(0 0 0 / 40%);
 }

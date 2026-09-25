@@ -9,6 +9,7 @@
   import { confirmAction } from '$lib/state/confirm.svelte'
   import { toast } from '$lib/state/toast.svelte'
   import DeckSelect from '$lib/ui/DeckSelect.svelte'
+  import DeckSettingsForm from '$lib/ui/DeckSettingsForm.svelte'
   import Dialog from '$lib/ui/Dialog.svelte'
   import { errorMessage } from '$lib/ui/errors'
   import Icon from '$lib/ui/Icon.svelte'
@@ -141,6 +142,7 @@
           <Icon name="cards" />
           {t('deck.browse')}
         </a>
+        <a class="btn" href={href('/review', { deck: deck.id })}>{t('deck.review')}</a>
       </div>
     </header>
 
@@ -187,6 +189,10 @@
         </div>
       </form>
     </section>
+
+    {#key deck.id + deck.scheduler}
+      <DeckSettingsForm {deck} />
+    {/key}
 
     <section class="stack" aria-labelledby="actions-title">
       <h2 id="actions-title">{t('deck.actions')}</h2>

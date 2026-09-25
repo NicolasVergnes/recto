@@ -13,7 +13,8 @@ export function defaultDeckSettings(): DeckSettings {
     fsrs: {
       requestRetention: 0.9,
       maximumInterval: 365,
-      learningSteps: ['10m'],
+      // P11 with ts-fsrs step semantics: Good on a new card → 10 min, then graduation (≥ 1 day).
+      learningSteps: ['10m', '10m'],
       relearningSteps: ['10m'],
       params: null,
       ratingMode: 4,

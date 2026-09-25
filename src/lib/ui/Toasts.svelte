@@ -17,7 +17,7 @@
 <style>
   .toasts {
     position: fixed;
-    bottom: calc(4.5rem + env(safe-area-inset-bottom));
+    top: calc(var(--space-2) + env(safe-area-inset-top));
     left: 50%;
     transform: translateX(-50%);
     z-index: 200;
@@ -44,11 +44,5 @@
 
   .toast.error {
     border-left-color: var(--danger);
-  }
-
-  @media (min-width: 900px) {
-    .toasts {
-      bottom: var(--space-4);
-    }
   }
 </style>

@@ -75,7 +75,9 @@ Quand `ratingMode = 2`, l'UI n'affiche que **Encore** (`Rating.Again`) et **Bien
 
 ### 2.5 Règles produit liées
 
-- P11 : `learning_steps: ['10m']` par défaut ; l'intervalle de graduation suit FSRS (≥ 1 jour). Ne pas mettre de pas à `'1m'`.
+- P11 : `learning_steps: ['10m', '10m']` par défaut ; l'intervalle de graduation suit FSRS (≥ 1 jour). Ne pas mettre de pas à `'1m'`.
+  *Mise à jour du 2026-09-25 (M2)* : dans ts-fsrs 5, avec un seul pas `['10m']`, « Bien » sur une carte nouvelle **gradue immédiatement** (le pas suivant n'existe pas) : seuls Encore/Difficile donnent 10 min, ce qui contredit P11. Avec `['10m', '10m']` : nouvelle carte → Encore/Difficile/Bien = 10 min, Facile = graduation ; au passage suivant, Bien = graduation (≥ 1 jour). Les pas de réapprentissage restent `['10m']`.
+- ts-fsrs impose Difficile < Bien < Facile : l'intervalle de Facile peut dépasser `maximum_interval` de 1 à 2 jours. Accepté.
 - Retard : une carte en retard est notée normalement ; FSRS tient compte du délai réel (`elapsed_days`). Aucune pénalité ajoutée.
 - `maximum_interval` par défaut 365 j en V0 pour que les cartes « acquises » repassent au moins une fois par an, en écho au compartiment 7 du livret ; réglable.
 

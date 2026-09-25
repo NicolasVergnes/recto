@@ -21,7 +21,7 @@ Ces règles viennent du dossier de recherche (`Dossier-Flashcards.html`) ; les r
 | P8 | Cartes atomiques | Wozniak 1999 ; Rowland 2014 | Éditeur : avertissements non bloquants > 200 caractères ou liste > 4 éléments ; suggérer cloze. |
 | P9 | Rétention cible visible | Manuel Anki ; simulations FSRS | Curseur 0,80–0,97, défaut 0,90, texte d'aide `scheduler.retentionHelp`. |
 | P10 | Données libres | Audit : Quizlet, Memrise, Tinycards | Export un clic ; `reviews` append-only ; rappel de sauvegarde 7 j. |
-| P11 | Premier rappel différé | Karpicke & Roediger 2007 ; Cepeda 2008 (~1 j pour 7 j) | `learning_steps: ['10m']` ; pas de pas `'1m'` ; graduation ≥ 1 j. |
+| P11 | Premier rappel différé | Karpicke & Roediger 2007 ; Cepeda 2008 (~1 j pour 7 j) | `learning_steps: ['10m', '10m']` (avec un seul pas, ts-fsrs gradue « Bien » immédiatement, voir 03 §2.5) ; pas de pas `'1m'` ; graduation ≥ 1 j. |
 
 Complément : images = indice, pas béquille (Carpenter & Olson 2012) → dans l'aide de l'éditeur, pas de contrainte technique. Sommeil (Mazza 2016) → `review.sleepTip` une fois par jour à la fin de la première séance.
 
@@ -31,7 +31,7 @@ Complément : images = indice, pas béquille (Carpenter & Olson 2012) → dans l
 import { fsrs, Rating, State, createEmptyCard, type Card as FCard, type FSRSParameters } from 'ts-fsrs'
 
 const f = fsrs({ request_retention: 0.9, maximum_interval: 365, enable_fuzz: true,
-                 enable_short_term: true, learning_steps: ['10m'], relearning_steps: ['10m'] })
+                 enable_short_term: true, learning_steps: ['10m', '10m'], relearning_steps: ['10m'] })
 // paramètres personnalisés : { ...params, w: number[21] }
 
 const c: FCard = createEmptyCard(new Date(now))          // nouvelle carte

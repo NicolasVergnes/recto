@@ -60,6 +60,7 @@ test('the editor warns about long fields and duplicates without blocking', async
 
   await page.getByLabel('Recto').fill('Bonjour')
   await page.getByRole('button', { name: 'Ajouter', exact: true }).click()
+  await expect(page.getByLabel('Recto')).toHaveValue('')
   await page.getByLabel('Recto').fill('  bonjour ')
   await expect(
     page.getByText('Une carte avec le même recto existe déjà dans ce paquet.'),

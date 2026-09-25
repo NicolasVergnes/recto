@@ -58,7 +58,7 @@ describe('notes and cards', () => {
   it('builds decks and cards with defaults', () => {
     const deck = makeDeck({ name: '  Géo ', emoji: '🌍' }, 'd1', 1000)
     expect(deck).toMatchObject({ id: 'd1', name: 'Géo', parentId: null, scheduler: 'fsrs' })
-    expect(deck.settings.fsrs.learningSteps).toEqual(['10m'])
+    expect(deck.settings.fsrs.learningSteps).toEqual(['10m', '10m'])
     expect(deck.settings.leitner.intervals).toEqual([1, 2, 7, 30, 90, 180, 365])
     const card = makeCard({ id: 'n1', deckId: 'd1' }, 1, 'c1', 5000)
     expect(card).toMatchObject({ noteId: 'n1', deckId: 'd1', ord: 1, due: 5000, state: 0, box: 0 })

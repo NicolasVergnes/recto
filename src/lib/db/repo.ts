@@ -209,6 +209,14 @@ export function getNote(id: string): Promise<Note | undefined> {
   return db.notes.get(id)
 }
 
+export async function getNotes(ids: readonly string[]): Promise<Note[]> {
+  return (await db.notes.bulkGet([...ids])).filter((n): n is Note => n !== undefined)
+}
+
+export async function getCards(ids: readonly string[]): Promise<Card[]> {
+  return (await db.cards.bulkGet([...ids])).filter((c): c is Card => c !== undefined)
+}
+
 export function getCardsOfNote(noteId: string): Promise<Card[]> {
   return db.cards.where('noteId').equals(noteId).sortBy('ord')
 }

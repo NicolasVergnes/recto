@@ -154,8 +154,9 @@
     el?.setSelectionRange(r.caret, r.caret)
   }
 
-  function resetForm() {
-    fields = fields.map(() => '')
+  /** Clears the submitted fields; text typed meanwhile (fast Ctrl+Entrée) is kept. */
+  function resetForm(submitted: readonly string[]) {
+    fields = fields.map((f, i) => (f === submitted[i] ? '' : f))
     duplicate = false
     activeField = 0
     void tick().then(() => textareas[0]?.focus())
@@ -184,7 +185,7 @@
       toast(t('editor.added', { n: cards.length }))
       if ((await requestPersistenceOnce()) === false) showPersistAsk = true
       if (close) navigate(`/decks/${deckId}`)
-      else resetForm()
+      else resetForm(input.fields)
     } catch (e) {
       toast(errorMessage(e), 'error')
     } finally {
