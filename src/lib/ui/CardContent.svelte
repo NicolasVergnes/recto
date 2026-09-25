@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { markMath } from '$lib/domain/math'
   import { extractSounds, isRemoteUrl } from '$lib/domain/text'
   import { t } from '$lib/i18n'
   import { playSounds } from '$lib/media/audio'
@@ -13,7 +14,8 @@
   let { html, label }: Props = $props()
 
   const parts = $derived(extractSounds(html))
-  const safe = $derived(sanitize(parts.html))
+  // Formulas are marked before sanitising (their source is escaped text in a span.math).
+  const safe = $derived(sanitize(markMath(parts.html)))
   let root: HTMLDivElement | undefined = $state()
 
   // Images are stored in IndexedDB: resolve `data-media` names to object URLs after render.
@@ -38,6 +40,23 @@
         }
       })
     }
+    return () => {
+      cancelled = true
+    }
+  })
+
+  // Formulas: KaTeX is downloaded on first use only (ADR-009), then served by the precache.
+  $effect(() => {
+    void safe
+    const el = root
+    if (!el?.querySelector('span.math')) return
+    let cancelled = false
+    import('$lib/math/katex')
+      .then((katex) => {
+        if (!cancelled) katex.renderMath(el, t('math.invalid'))
+      })
+      // Not downloadable (offline before any visit): the source stays readable, as in V0.
+      .catch((e: unknown) => console.warn(e))
     return () => {
       cancelled = true
     }

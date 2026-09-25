@@ -31,4 +31,18 @@ describe('typed answers (SPEC §5.3)', () => {
     expect(suggestRating(compareTyped('Lyon', ''), [1, 3, 4])).toBe(1)
     expect(similarity(compareTyped('', ''))).toBe(1)
   })
+
+  it('expects formulas without their delimiters', () => {
+    expect(compareTyped('\\(x^2\\)', ' x^2 ')).toEqual([{ text: 'x^2', kind: 'same' }])
+    expect(compareTyped('\\[\\frac{1}{2}\\]', '\\frac{1}{2}')).toEqual([
+      { text: '\\frac{1}{2}', kind: 'same' },
+    ])
+    const parts = compareTyped('<b>\\(a &lt; b\\)</b>', 'a<b')
+    expect(
+      parts
+        .filter((p) => p.kind !== 'wrong')
+        .map((p) => p.text)
+        .join(''),
+    ).toBe('a < b')
+  })
 })

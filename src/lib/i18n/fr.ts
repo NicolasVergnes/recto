@@ -375,6 +375,9 @@ export const fr = {
     missing: 'Média manquant : {name}',
     remoteBlocked: 'Image distante non chargée : {name}',
   },
+  math: {
+    invalid: 'Formule LaTeX invalide',
+  },
   errors: {
     unexpected: 'Une erreur inattendue est survenue.',
     deckNameEmpty: 'Donnez un nom au paquet.',

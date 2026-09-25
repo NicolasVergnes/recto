@@ -431,6 +431,18 @@ kbd {
   color: var(--accent);
 }
 
+/* KaTeX formulas (ADR-009) take the text colour; a wide display formula scrolls on a phone. */
+.card-content .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.card-content .math-error {
+  text-decoration: underline wavy var(--danger);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.25em;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

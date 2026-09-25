@@ -59,7 +59,7 @@ SELECT id, cid, ease, ivl, lastIvl, factor, time, type FROM revlog ORDER BY id;
 
 - **Paquets** : `decks` → paquets Recto (hiérarchie sur un niveau : `A::B::C` devient `A::B` → sous-paquet `C` ; au-delà, le nom est aplati). Option « tout importer dans un seul paquet ».
 - **Modèles** : `type = 1` → `cloze` (champ 0 → Texte, champ 1 → Extra, autres concaténés). `type = 0` avec 1 template → `basic` (champ 0 → Recto, champ 1 → Verso, reste → Extra concaténé avec `<br>`) ; avec 2 templates dont l'un a `{{Back}}`/`{{Verso}}` en question → `basic_reverse` ; sinon `basic` + entrée dans le rapport « modèle N converti, M champs fusionnés ». Le CSS du modèle est ignoré.
-- **Notes** : `guid` → `sourceGuid` (déduplication à la réimportation : mise à jour des champs si `mod` plus récent). Tags découpés sur espaces, LaTeX `[latex]…[/latex]` conservé tel quel.
+- **Notes** : `guid` → `sourceGuid` (déduplication à la réimportation : mise à jour des champs si `mod` plus récent). Tags découpés sur espaces, LaTeX `[latex]…[/latex]` (ainsi que `[$]…[/$]` et `[$$]…[/$$]`) conservé tel quel et affiché en source ; les formules MathJax `\( … \)` et `\[ … \]` sont rendues par KaTeX.
 - **Cartes** : créer une carte Recto par carte Anki (`ord` conservé ; pour `basic_reverse`, `ord` 0/1). État :
   - `queue = -1` → `suspended = true`.
   - Sans historique importé : `type 0` → `New` ; `type 2` → `Review` avec `due = crt + due×86400 s`, `scheduledDays = ivl`, `stability = ivl` (approximation), `difficulty = clamp(11 − factor/1000 × 2, 1, 10)` ; `type 1/3` → `Learning` due maintenant. Pour un paquet cible Leitner, `box` selon la table de 03-SCHEDULING §4.

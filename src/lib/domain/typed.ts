@@ -1,3 +1,4 @@
+import { stripMathDelimiters } from './math'
 import { stripHtml } from './text'
 import type { Rating } from './types'
 
@@ -13,10 +14,11 @@ const fold = (s: string) => s.normalize('NFC').trim().replace(/\s+/g, ' ')
 /**
  * Character-by-character comparison of a typed answer (SPEC §5.3), by longest common
  * subsequence: `same` characters, `wrong` typed characters, `missing` expected characters.
+ * Formulas are expected without their delimiters: `x^2` for `\(x^2\)`.
  */
 export function compareTyped(expectedHtml: string, typed: string): DiffPart[] {
   const a = [...fold(typed)]
-  const b = [...fold(stripHtml(expectedHtml))]
+  const b = [...fold(stripHtml(stripMathDelimiters(expectedHtml)))]
   const eq = (x: string | undefined, y: string | undefined) =>
     x !== undefined && y !== undefined && x.toLocaleLowerCase('fr') === y.toLocaleLowerCase('fr')
   const n = a.length
