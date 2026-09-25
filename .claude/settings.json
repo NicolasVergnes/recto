@@ -35,9 +35,6 @@
       "Bash(mv *)"
     ],
     "deny": [
-      "Bash(git merge*)",
-      "Bash(git rebase*)",
-      "Bash(git reset --hard*)",
       "Bash(rm -rf *)",
       "Bash(curl *)",
       "Bash(wget *)",
