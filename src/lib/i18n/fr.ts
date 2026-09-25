@@ -605,6 +605,8 @@ export const fr = {
     tab: 'Tabulation',
     export: 'Exporter',
     done: '{n} note exportée|{n} notes exportées',
+    leftOut:
+      '{n} note d’occlusion d’image non exportée : le CSV ne peut pas la décrire (utilisez le format Anki ou la sauvegarde).|{n} notes d’occlusion d’image non exportées : le CSV ne peut pas les décrire (utilisez le format Anki ou la sauvegarde).',
   },
   apkg: {
     help: 'Paquets Anki au format « ancien » (collection.anki21 ou collection.anki2). Tout reste sur cet appareil.',

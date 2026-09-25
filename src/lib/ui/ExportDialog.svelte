@@ -1,7 +1,7 @@
 <script lang="ts">
   import * as repo from '$lib/db/repo'
   import type { ApkgExportReport } from '$lib/export/apkg'
-  import { notesToCsv, type CsvDelimiter } from '$lib/export/csv'
+  import { csvExportable, notesToCsv, type CsvDelimiter } from '$lib/export/csv'
   import { shareOrDownload, timestampedName } from '$lib/export/download'
   import { slugify } from '$lib/media/mime'
   import { t } from '$lib/i18n'
@@ -49,7 +49,10 @@
       timestampedName(slugify(name), ext, Date.now()),
     )
     close()
-    toast(t('exportCsv.done', { n: rows.length }))
+    const left = rows.filter((r) => !csvExportable(r.note)).length
+    toast(t('exportCsv.done', { n: rows.length - left }))
+    // Occlusion notes have no CSV form: say so rather than drop them silently.
+    if (left > 0) toast(t('exportCsv.leftOut', { n: left }))
   }
 
   async function run() {
