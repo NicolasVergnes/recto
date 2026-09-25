@@ -4,6 +4,31 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 ## [Unreleased]
 
+### M6 — V1 : occlusion d'image, export Anki, optimiseur FSRS, formules
+
+#### Added
+
+- **Occlusion d'image** (type de note `image_occlusion`, 02 §2.1) : masques rectangulaires sur une image, une carte par masque ou par groupe de masques, réponse facultative par masque, modes « tout cacher, deviner une zone » et « ne cacher que la zone à deviner ». Éditeur de masques au pointeur (tracer, déplacer) et entièrement au clavier (ajouter, flèches pour déplacer, Maj + flèches pour redimensionner, Suppr, n° de carte) ; aperçu des deux faces ; en révision, la zone demandée s'ouvre au dévoilement et les réponses n'existent pas dans la page avant (P1).
+- Import des notes « Image Occlusion » d'Anki ≥ 23.10 (ellipses, polygones et formes tournées convertis en rectangles, formes texte ignorées, rapport) et export vers ce même type natif ; fixture `data/samples/image-occlusion.apkg` exportée par le moteur d'Anki.
+- **Export Anki `.apkg`** (format legacy `collection.anki21`, 05 §4) d'un paquet et de ses sous-paquets, de la sélection du navigateur de cartes ou de toute la collection (Paramètres › Sauvegarde) : notes, cartes et planification (état mémoire FSRS compris), historique, paquets `Parent::Enfant`, médias ; construit dans un Web Worker ; rapport (médias introuvables, cartes retirées exportées comme suspendues) ; annulable. Vérifié avec le moteur d'Anki 26.9.3 (`tests/interop/`).
+- **Optimiseur FSRS** dans le navigateur (03 §2.4) : bloc « Paramètres de mémoire » des paramètres FSRS d'un paquet, à partir de 1 000 révisions utilisables ; `fsrs-browser` 6.6 (WASM mono-thread) dans un worker à usage unique, disponible hors ligne ; comparaison avant acceptation (erreur du modèle, pénalité des erreurs, réussite prédite et réelle, intervalles d'exemple, 21 valeurs) ; « Appliquer » seulement si les nouveaux paramètres prédisent mieux l'historique ; retour aux valeurs par défaut. Les échéances existantes ne sont pas recalculées.
+- **Formules LaTeX** rendues par KaTeX (ADR-009) : `\( … \)` en ligne, `\[ … \]` en bloc, en révision et dans l'aperçu ; module chargé à la demande et précaché avec ses polices ; MathML pour les lecteurs d'écran ; une formule trop large défile seule ; une formule invalide reste en source avec « Formule LaTeX invalide ».
+- Tests : domaine de l'occlusion (masques, Anki aller-retour, édition), import de la fixture Anki, aller-retour export/import `.apkg` (occlusion comprise), optimiseur (jeu d'entraînement, évaluation, WASM réel sous Node), formules (repérage, rendu jsdom), E2E occlusion, formules, export `.apkg`, optimiseur ; vérifications manuelles avec le moteur d'Anki (`tests/interop/`).
+
+#### Changed
+
+- Sauvegarde : `schemaVersion` 2 (ajout du type d'occlusion) ; une sauvegarde de version 1 se restaure telle quelle, une version plus récente que l'application est refusée.
+- Le dialogue d'export devient « Exporter (CSV, Anki) » avec le choix du format ; l'export CSV laisse de côté les notes d'occlusion et le dit.
+- Réponse tapée : proposée seulement s'il y a un texte à taper (pas pour un verso image seule ni un masque sans réponse) ; une formule se tape sans ses délimiteurs (`x^2` pour `\(x^2\)`) ou telle qu'écrite.
+- Écrans Révision (795 → 192 lignes) et Éditeur (373 → 196 lignes) et paramètres de paquet découpés en composants de 200 lignes au plus ; comportement inchangé.
+- Nouvelles dépendances : `katex` 0.18 (ADR-009), `fsrs-browser` 6.6.0 (prévu par l'ADR-007).
+
+#### Fixed
+
+- Import CSV en mode « mettre à jour » : une ligne dont le recto est l'image d'une note d'occlusion n'écrase plus ses masques.
+- Réimport Anki : une note dont le type de note ou les trous ont changé n'est plus mise à jour à moitié (ignorée et comptée) ; un paquet exporté par Recto puis réimporté ne crée plus de doublons.
+- Import Anki : les échéances de révision sont comptées en jours calendaires depuis la date de `crt` (et non en secondes) : plus de décalage d'un jour autour d'un changement d'heure.
+
 ### M5 — Statistiques, finitions, V0
 
 #### Added
