@@ -4,7 +4,7 @@ import { getSetting, setSetting } from '$lib/db/settings'
 import { cardReviews, recordReview, setRetired, undoReview } from '$lib/db/study'
 import { renderCard } from '$lib/domain/notes'
 import { extractSounds } from '$lib/domain/text'
-import { compareTyped, suggestRating } from '$lib/domain/typed'
+import { canTypeAnswer, compareTyped, suggestRating } from '$lib/domain/typed'
 import type { Rating, Review } from '$lib/domain/types'
 import { t } from '$lib/i18n'
 import { playSounds } from '$lib/media/audio'
@@ -60,7 +60,10 @@ export class ReviewController {
       ? this.scheduler.preview(this.card, Date.now(), this.deck)
       : {},
   )
-  readonly typedMode = $derived(!!this.deck?.settings.typedAnswer)
+  // Typed answers need something to type (an image-only back or an unlabelled mask has not).
+  readonly typedMode = $derived(
+    !!this.deck?.settings.typedAnswer && canTypeAnswer(this.rendered?.expected ?? ''),
+  )
   readonly diff = $derived(
     this.revealed && this.typedMode && this.rendered
       ? compareTyped(this.rendered.expected, this.typed)

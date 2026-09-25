@@ -4,6 +4,7 @@
   import { t } from '$lib/i18n'
   import CardContent from '$lib/ui/CardContent.svelte'
   import Icon from '$lib/ui/Icon.svelte'
+  import OcclusionView from '$lib/ui/occlusion/OcclusionView.svelte'
   import TypedDiff from './TypedDiff.svelte'
 
   interface Props {
@@ -28,12 +29,22 @@
   {#if flagged}
     <p class="badge small flag"><Icon name="flag" size={14} /> {t('review.flag')}</p>
   {/if}
-  {#if !revealed || !rendered.answerReplacesQuestion}
+  {#if rendered.occlusion}
+    <!-- Image occlusion: header, then the image whose target mask opens on reveal. -->
+    {#if rendered.question}
+      <div class="side question"><CardContent html={rendered.question} /></div>
+    {/if}
+    <OcclusionView occlusion={rendered.occlusion} {revealed} />
+  {:else if !revealed || !rendered.answerReplacesQuestion}
     <div class="side question"><CardContent html={rendered.question} /></div>
   {/if}
   <!-- P1: the answer is not in the DOM before the user asks for it. -->
   {#if revealed}
-    {#if rendered.answerReplacesQuestion}
+    {#if rendered.occlusion}
+      {#if rendered.answer}<div class="side answer">
+          <CardContent html={rendered.answer} />
+        </div>{/if}
+    {:else if rendered.answerReplacesQuestion}
       <div class="side"><CardContent html={rendered.answer} /></div>
     {:else}
       <hr />

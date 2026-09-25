@@ -11,6 +11,16 @@ export interface DiffPart {
 
 const fold = (s: string) => s.normalize('NFC').trim().replace(/\s+/g, ' ')
 
+/** The text a typed answer is compared with (formulas without their delimiters). */
+function expectedText(expectedHtml: string): string {
+  return fold(stripHtml(stripMathDelimiters(expectedHtml)))
+}
+
+/** Typed answers need something to type: not an image-only back nor an unlabelled mask. */
+export function canTypeAnswer(expectedHtml: string): boolean {
+  return expectedText(expectedHtml) !== ''
+}
+
 /**
  * Character-by-character comparison of a typed answer (SPEC §5.3), by longest common
  * subsequence: `same` characters, `wrong` typed characters, `missing` expected characters.
@@ -18,7 +28,7 @@ const fold = (s: string) => s.normalize('NFC').trim().replace(/\s+/g, ' ')
  */
 export function compareTyped(expectedHtml: string, typed: string): DiffPart[] {
   const a = [...fold(typed)]
-  const b = [...fold(stripHtml(stripMathDelimiters(expectedHtml)))]
+  const b = [...expectedText(expectedHtml)]
   const eq = (x: string | undefined, y: string | undefined) =>
     x !== undefined && y !== undefined && x.toLocaleLowerCase('fr') === y.toLocaleLowerCase('fr')
   const n = a.length

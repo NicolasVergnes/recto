@@ -3,6 +3,7 @@
   import type { ModelType } from '$lib/domain/types'
   import { t } from '$lib/i18n'
   import CardContent from '../CardContent.svelte'
+  import OcclusionView from '../occlusion/OcclusionView.svelte'
 
   interface Props {
     modelType: ModelType
@@ -22,9 +23,18 @@
   {#each cards as card, i (i)}
     <article class="card-surface preview">
       <p class="muted small">{t('editor.cardN', { n: i + 1 })}</p>
-      <CardContent html={card.question} />
-      <hr />
-      <CardContent html={card.answer} />
+      {#if card.occlusion}
+        <CardContent html={card.question} />
+        <div class="sides">
+          <OcclusionView occlusion={card.occlusion} revealed={false} />
+          <OcclusionView occlusion={card.occlusion} revealed={true} />
+        </div>
+        {#if card.answer}<CardContent html={card.answer} />{/if}
+      {:else}
+        <CardContent html={card.question} />
+        <hr />
+        <CardContent html={card.answer} />
+      {/if}
       {#if card.extra}
         <div class="extra"><CardContent html={card.extra} /></div>
       {/if}
@@ -35,6 +45,12 @@
 <style>
   .preview {
     --card-font: 1.05rem;
+  }
+
+  .sides {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: var(--space-2);
   }
 
   hr {

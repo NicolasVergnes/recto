@@ -62,8 +62,8 @@
 
   /** After adding a note: back to the first field. */
   export function reset() {
-    active = 0
-    void tick().then(() => textareas[0]?.focus())
+    active = slots[0]?.index ?? 0
+    void tick().then(() => textareas[active]?.focus())
   }
 </script>
 

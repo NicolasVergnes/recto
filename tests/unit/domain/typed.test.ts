@@ -32,6 +32,15 @@ describe('typed answers (SPEC §5.3)', () => {
     expect(similarity(compareTyped('', ''))).toBe(1)
   })
 
+  it('needs a text to type', async () => {
+    const { canTypeAnswer } = await import('$lib/domain/typed')
+    expect(canTypeAnswer('Paris')).toBe(true)
+    expect(canTypeAnswer('\\(x^2\\)')).toBe(true)
+    expect(canTypeAnswer('<img src="drapeau.svg">')).toBe(false)
+    expect(canTypeAnswer(' <br> ')).toBe(false)
+    expect(canTypeAnswer('')).toBe(false)
+  })
+
   it('expects formulas without their delimiters', () => {
     expect(compareTyped('\\(x^2\\)', ' x^2 ')).toEqual([{ text: 'x^2', kind: 'same' }])
     expect(compareTyped('\\[\\frac{1}{2}\\]', '\\frac{1}{2}')).toEqual([

@@ -15,6 +15,7 @@
   import NoteTypeRow from '$lib/ui/editor/NoteTypeRow.svelte'
   import TagInput from '$lib/ui/editor/TagInput.svelte'
   import { errorMessage } from '$lib/ui/errors'
+  import OcclusionEditor from '$lib/ui/occlusion/OcclusionEditor.svelte'
 
   let { params, query }: RouteProps = $props()
   const editingId = $derived(params.id)
@@ -42,11 +43,16 @@
     }
   })
 
-  // Non-blocking duplicate warning (SPEC §5.2), debounced.
+  // Non-blocking duplicate warning (SPEC §5.2), debounced. Several occlusion notes on the same
+  // image are legitimate (one per set of areas): no warning for them.
   $effect(() => {
     const front = draft.fields[0] ?? ''
     const deck = draft.deckId
     const except = editingId
+    if (draft.modelType === 'image_occlusion') {
+      duplicate = false
+      return
+    }
     const timer = setTimeout(() => {
       void repo.findDuplicate(deck, front, except).then((n) => (duplicate = !!n))
     }, 250)
@@ -124,6 +130,13 @@
           editing={!!editingId}
           ontypechange={(next) => draft.changeType(next)}
         />
+
+        {#if draft.modelType === 'image_occlusion'}
+          <OcclusionEditor
+            bind:image={() => draft.fields[0] ?? '', (v) => (draft.fields[0] = v)}
+            bind:masks={() => draft.fields[1] ?? '', (v) => (draft.fields[1] = v)}
+          />
+        {/if}
 
         <NoteFields
           bind:this={noteFields}

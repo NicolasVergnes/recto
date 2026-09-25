@@ -2,7 +2,7 @@ import * as repo from '$lib/db/repo'
 import { getSetting } from '$lib/db/settings'
 import { clozeIndices } from '$lib/domain/cloze'
 import { cardOrds, convertFields } from '$lib/domain/notes'
-import { parseTags } from '$lib/domain/text'
+import { imageRefs, parseTags } from '$lib/domain/text'
 import type { ModelType } from '$lib/domain/types'
 import { t, type MessageKey } from '$lib/i18n'
 import { navigate } from '$lib/router.svelte'
@@ -28,6 +28,11 @@ const SLOTS: Record<ModelType, readonly FieldSlot[]> = {
     { label: 'editor.text', index: 0 },
     { label: 'editor.extra', index: 1 },
   ],
+  // Image and masks (fields 0–1) are edited by OcclusionEditor.
+  image_occlusion: [
+    { label: 'editor.header', index: 2 },
+    { label: 'editor.extra', index: 3 },
+  ],
 }
 
 /** The note being written in the editor (new or existing) and what it will produce. */
@@ -44,9 +49,16 @@ export class NoteDraft {
     this.modelType === 'cloze' && clozeIndices(this.fields[0] ?? '').length === 0,
   )
   readonly cardCount = $derived(cardOrds(this.modelType, this.fields).length)
-  /** A deck, a front, cloze markers for a cloze note, and the initial load done. */
+  /**
+   * A deck, a front, cloze markers for a cloze note (an image and a mask for an occlusion
+   * note), and the initial load done.
+   */
   readonly complete = $derived(
-    !!this.deckId && (this.fields[0] ?? '').trim() !== '' && !this.clozeMissing && this.loaded,
+    !!this.deckId &&
+      this.loaded &&
+      (this.modelType === 'image_occlusion'
+        ? imageRefs(this.fields[0] ?? '').length > 0 && this.cardCount > 0
+        : (this.fields[0] ?? '').trim() !== '' && !this.clozeMissing),
   )
 
   /** Loads the note being edited, or selects the requested or remembered deck. */
@@ -69,7 +81,7 @@ export class NoteDraft {
     this.loaded = true
   }
 
-  /** Converts the fields to another note type (basic ↔ cloze keeps front and extra). */
+  /** Converts the fields to another note type (front and extra are kept, see convertFields). */
   changeType(next: ModelType): void {
     this.fields = convertFields(this.modelType, next, this.fields)
     this.modelType = next
