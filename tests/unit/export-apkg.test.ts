@@ -1,13 +1,15 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import { strFromU8, unzipSync } from 'fflate'
+import { strFromU8, unzipSync, zipSync } from 'fflate'
 import type { Database, SqlJsStatic, SqlValue } from 'sql.js'
 import { makeCard, makeDeck } from '$lib/domain/defaults'
+import { cardOrds } from '$lib/domain/notes'
 import type { Card, Note, Review } from '$lib/domain/types'
 import {
   ANKI_MODEL_IDS,
   buildApkg,
   easeFromDifficulty,
   fieldChecksum,
+  idAllocator,
   sortField,
   type ApkgExportInput,
 } from '$lib/export/apkg'
@@ -18,7 +20,7 @@ import {
   type ApkgExisting,
   type ApkgImportOptions,
 } from '$lib/import/apkg'
-import { dayKey, daysBetween } from '$lib/scheduler/day'
+import { dayKey, daysBetween, startOfDate } from '$lib/scheduler/day'
 import { MP3, PNG, representativeCollection } from '../helpers/apkg-collection'
 
 let SQL: SqlJsStatic
@@ -58,6 +60,31 @@ async function open(input: ApkgExportInput) {
 }
 
 const json = (v: SqlValue | undefined): unknown => JSON.parse(String(v))
+
+/** A note of `deck` with its cards (ords from its fields), created at `createdAt`. */
+function noteWithCards(
+  id: string,
+  deckId: string,
+  modelType: Note['modelType'],
+  fields: string[],
+  createdAt: number,
+): { note: Note; cards: Card[] } {
+  const note: Note = { id, deckId, modelType, fields, tags: [], createdAt, updatedAt: createdAt }
+  const cards = cardOrds(modelType, fields).map((ord) =>
+    makeCard(note, ord, `${id}-${ord}`, createdAt),
+  )
+  return { note, cards }
+}
+
+/** Runs SQL statements on the collection inside a package and zips it again. */
+function editPackage(bytes: Uint8Array, statements: string[]): Uint8Array {
+  const { 'collection.anki21': collection, ...rest } = unzipSync(bytes)
+  const db = new SQL.Database(collection)
+  for (const sql of statements) db.run(sql)
+  const edited = db.export()
+  db.close()
+  return zipSync({ ...rest, 'collection.anki21': edited })
+}
 
 describe('buildApkg: legacy schema 11 package', () => {
   it('writes collection.anki21 with scheduler v2, the full schema and the media map', async () => {
@@ -281,6 +308,49 @@ describe('buildApkg: legacy schema 11 package', () => {
     db.close()
   })
 
+  it('allocates ids in constant time when thousands of rows share a timestamp', () => {
+    const next = idAllocator()
+    const start = performance.now()
+    // Two rows per millisecond (CSV reverse notes): a probing allocator would walk ~n²/4 ids.
+    const ids = Array.from({ length: 200_000 }, (_, i) => next(now + Math.floor(i / 2)))
+    expect(performance.now() - start).toBeLessThan(1000)
+    expect(ids.slice(0, 3)).toEqual([now, now + 1, now + 2])
+    expect(ids.every((id, i) => i === 0 || id > (ids[i - 1] ?? 0))).toBe(true)
+    // Later timestamps are kept as they are; ids stay above the floor (decks: 1 is Default).
+    expect(next(now + 1_000_000)).toBe(now + 1_000_000)
+    const deckIds = idAllocator(1)
+    expect([deckIds(0), deckIds(1), deckIds(Number.NaN), deckIds(50)]).toEqual([2, 3, 4, 50])
+  })
+
+  it('exports thousands of CSV-imported reverse notes sharing timestamps with unique ids', async () => {
+    const deck = makeDeck({ name: 'CSV' }, 'csv', now)
+    const notes: Note[] = []
+    const cards: Card[] = []
+    // The CSV importer: createdAt = now + line, both cards of a note at the same instant.
+    for (let i = 0; i < 3000; i++) {
+      const made = noteWithCards(`n${i}`, deck.id, 'basic_reverse', [`Q${i}`, `R${i}`, ''], now + i)
+      notes.push(made.note)
+      cards.push(...made.cards)
+    }
+    const { db, report } = await open({ decks: [deck], notes, cards, reviews: [], media: [] })
+    expect(report).toMatchObject({ notes: 3000, cards: 6000 })
+    const ids = (table: string) =>
+      rows(db, `SELECT id FROM ${table} ORDER BY id`).map((r) => Number(r.id))
+    expect(new Set(ids('notes')).size).toBe(3000)
+    expect(ids('notes')[2999]).toBe(now + 2999)
+    const byNote = rows(db, 'SELECT n.sfld, c.ord, c.id FROM cards c JOIN notes n ON n.id = c.nid')
+    expect(new Set(byNote.map((c) => c.id)).size).toBe(6000)
+    // Card ids keep the creation order, then the ord: Anki's "order added".
+    const sorted = [...byNote].sort((a, b) => Number(a.id) - Number(b.id))
+    expect(sorted.slice(0, 4).map((c) => [c.sfld, c.ord])).toEqual([
+      ['Q0', 0],
+      ['Q0', 1],
+      ['Q1', 0],
+      ['Q1', 1],
+    ])
+    db.close()
+  })
+
   it('dates crt on the study day of the earliest review due, whatever the day start', async () => {
     const input = representativeCollection(now)
     const earliest = Math.min(...input.cards.filter((c) => c.state === 2).map((c) => c.due))
@@ -288,10 +358,13 @@ describe('buildApkg: legacy schema 11 package', () => {
       const { bytes } = await buildApkg(SQL, input, { now, dayStartHour })
       const collection = unzipSync(bytes)['collection.anki21']
       const db = new SQL.Database(collection)
-      const crt = Number(rows(db, 'SELECT crt FROM col')[0]?.crt) * 1000
-      // Anki's day 0 is crt's local date: the study date of the earliest due.
+      const [col] = rows(db, 'SELECT crt, conf FROM col')
+      const crt = Number(col?.crt) * 1000
+      // Anki's day 0 is crt's local date: the study date of the earliest due, read with crt's own
+      // UTC offset (Europe/Paris, summer time: 120 minutes east), not the offset at import time.
       expect(dayKey(crt, 0)).toBe(dayKey(earliest, dayStartHour))
       expect(dayKey(crt, dayStartHour)).toBe(dayKey(earliest, dayStartHour))
+      expect(json(col?.conf)).toMatchObject({ rollover: dayStartHour, creationOffset: -120 })
       const dues = rows(db, 'SELECT due FROM cards WHERE type = 2').map((r) => Number(r.due))
       expect(Math.min(...dues)).toBe(0)
       db.close()
@@ -409,6 +482,88 @@ describe('round trip through the Recto importer', () => {
     expect(plan.notes).toEqual([])
     expect(plan.updates).toEqual([])
     expect(plan.report).toMatchObject({ notesCreated: 0, skipped: 6 })
+  })
+
+  it('updates a re-imported note edited in Anki unless its cards would change', async () => {
+    const deck = makeDeck({ name: 'Trous' }, 'deck', now)
+    const cloze = noteWithCards('cz', deck.id, 'cloze', ['{{c1::a}} {{c2::b}}', ''], now)
+    const text = noteWithCards('tx', deck.id, 'cloze', ['{{c1::x}}', 'old'], now + 1)
+    const basic = noteWithCards('bs', deck.id, 'basic', ['Q', 'R', ''], now + 2)
+    const made = [cloze, text, basic]
+    const input: ApkgExportInput = {
+      decks: [deck],
+      notes: made.map((m) => m.note),
+      cards: made.flatMap((m) => m.cards),
+      reviews: [],
+      media: [],
+    }
+    const { bytes } = await open(input)
+    // In Anki: a third cloze, an edited Extra, a note type changed to "basic and reversed".
+    const edited = editPackage(bytes, [
+      "UPDATE notes SET flds = '{{c1::a}} {{c2::b}} {{c3::c}}' || char(31), mod = mod + 60 WHERE guid = 'cz'",
+      "UPDATE notes SET flds = '{{c1::x}}' || char(31) || 'new', mod = mod + 60 WHERE guid = 'tx'",
+      `UPDATE notes SET mid = ${ANKI_MODEL_IDS.basic_reverse}, mod = mod + 60 WHERE guid = 'bs'`,
+    ])
+    const plan = await planApkgImport(
+      readApkg(edited, SQL),
+      importOptions,
+      { ...empty, decks: input.decks, notes: input.notes },
+      now + 120_000,
+      newId,
+    )
+    // Only the Extra edit is applied: the other two would need cards added (invariant 2).
+    expect(plan.updates).toEqual([
+      // Anki's `mod` is in seconds.
+      { ...text.note, fields: ['{{c1::x}}', 'new'], updatedAt: now + 60_000 },
+    ])
+    expect(plan.notes).toEqual([])
+    expect(plan.cards).toEqual([])
+    expect(plan.report).toMatchObject({ notesUpdated: 1, skipped: 2 })
+  })
+
+  // tests/setup.ts sets TZ=Europe/Paris. From 23:00, the half-day margin of `crt` (30 min) is
+  // shorter than the DST shift: known limit of the importer's arithmetic, see 05 §4.
+  it('keeps review dues on their study day across daylight saving (day start up to 22:00)', async () => {
+    const deck = makeDeck({ name: 'Heure' }, 'deck', now)
+    const cases = [
+      { exportAt: Date.UTC(2026, 6, 1, 10), due: { year: 2026, month: 11, day: 15 } },
+      { exportAt: Date.UTC(2026, 0, 15, 10), due: { year: 2026, month: 6, day: 15 } },
+    ]
+    for (const { exportAt, due } of cases)
+      for (const dayStartHour of [0, 4, 12, 22])
+        for (const at of [
+          startOfDate(due, dayStartHour),
+          startOfDate(due, dayStartHour, 1) - 60_000,
+        ]) {
+          const { note, cards } = noteWithCards('n', deck.id, 'basic', ['Q', 'R', ''], exportAt)
+          const card: Card = {
+            ...(cards[0] ?? makeCard(note, 0, 'c', exportAt)),
+            state: 2,
+            due: at,
+            scheduledDays: 30,
+            stability: 30,
+            difficulty: 5,
+            reps: 3,
+            lastReview: exportAt,
+          }
+          const { bytes } = await buildApkg(
+            SQL,
+            { decks: [deck], notes: [note], cards: [card], reviews: [], media: [] },
+            { now: exportAt, dayStartHour },
+          )
+          const plan = await planApkgImport(
+            readApkg(bytes, SQL),
+            { ...importOptions, dayStartHour },
+            empty,
+            exportAt,
+            newId,
+          )
+          const imported = plan.cards[0]?.due ?? 0
+          expect([dayStartHour, dayKey(imported, dayStartHour)]).toEqual([
+            dayStartHour,
+            dayKey(at, dayStartHour),
+          ])
+        }
   })
 
   it('exports an empty selection as a valid package', async () => {

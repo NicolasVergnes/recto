@@ -193,14 +193,16 @@ const DECK_CONF = {
   },
 }
 
-/** Unique integer ids derived from timestamps (Anki ids are ms), bumped on collision. */
-function idAllocator(reserved: readonly number[] = []) {
-  const taken = new Set(reserved)
+/**
+ * Unique integer ids derived from timestamps (Anki ids are ms), bumped on collision. Callers ask
+ * in ascending order (rows sorted by time), so the next free id is the last one + 1: O(1), even
+ * when thousands of cards share a timestamp (CSV reverse and cloze notes). Ids stay > `floor`.
+ */
+export function idAllocator(floor = 0) {
+  let last = floor
   return (wanted: number): number => {
-    let id = Number.isFinite(wanted) ? Math.max(1, Math.floor(wanted)) : 1
-    while (taken.has(id)) id++
-    taken.add(id)
-    return id
+    last = Math.max(Number.isFinite(wanted) ? Math.floor(wanted) : 0, last + 1)
+    return last
   }
 }
 
@@ -335,7 +337,7 @@ export async function buildApkg(
   // "Default" reuses: Anki's deck names are unique regardless of case (so are Recto's siblings).
   const deckById = new Map(input.decks.map((d) => [d.id, d]))
   const deckIds = new Map<string, number>()
-  const newDeckId = idAllocator([DEFAULT_DECK_ID])
+  const newDeckId = idAllocator(DEFAULT_DECK_ID)
   const decksJson: Record<number, ReturnType<typeof ankiDeck>> = {}
   const decks = [...input.decks].sort((a, b) => a.createdAt - b.createdAt || compareIds(a, b))
   for (const deck of decks) {
@@ -348,8 +350,10 @@ export async function buildApkg(
   decksJson[DEFAULT_DECK_ID] ??= ankiDeck(DEFAULT_DECK_ID, 'Default', '', Math.floor(now / 1000))
 
   // `crt`: Anki's day 0 is its local date, here the study day of the earliest review due (or
-  // today), so that every `due` (days since crt) is ≥ 0. Halfway between the day start and
-  // midnight: `crt + due × 86 400 s` stays in the right study day across DST changes.
+  // today), so that every `due` (days since crt) is ≥ 0; `creationOffset` (its UTC offset) makes
+  // Anki read that date as written, whatever the offset at import time. Halfway between the day
+  // start and midnight: `crt + due × 86 400 s` (Recto's import) stays in the right study day
+  // across a DST change, for a day start up to 22:00 (05 §4).
   const earliest = cards.reduce((min, c) => (c.state === 2 ? Math.min(min, c.due) : min), now)
   const crt = dayStart(earliest, dayStartHour) + ((24 - dayStartHour) / 2) * HOUR_MS
 
@@ -439,6 +443,7 @@ export async function buildApkg(
     const conf = {
       schedVer: 2,
       rollover: dayStartHour,
+      creationOffset: new Date(crt).getTimezoneOffset(),
       activeDecks: [DEFAULT_DECK_ID],
       curDeck: DEFAULT_DECK_ID,
       curModel: ANKI_MODEL_IDS.basic,

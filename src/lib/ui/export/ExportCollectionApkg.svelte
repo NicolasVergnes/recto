@@ -25,12 +25,12 @@
 
 <div class="row">
   <button class="btn" type="button" aria-disabled={busy} onclick={run}>
-    {t('exportApkg.collection')}
+    {t(busy ? 'exportApkg.exporting' : 'exportApkg.collection')}
   </button>
 </div>
 <p class="muted small">{t('exportApkg.collectionHelp')}</p>
 {#if busy}<progress aria-label={t('exportApkg.exporting')}></progress>{/if}
-{#if report}<ApkgExportSummary {report} />{/if}
+<ApkgExportSummary {report} {busy} />
 
 <style>
   progress {

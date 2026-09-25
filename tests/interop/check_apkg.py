@@ -3,7 +3,7 @@ JSON summary followed by a verdict. Manual interoperability check, not run by `n
 (see tests/interop/README.md).
 
 Usage:
-  PYTHONPATH=<dir with the anki package> python3 check_apkg.py file.apkg <new work dir> [--twice] [--fsrs]
+  PYTHONPATH=<dir with the anki package> python3 check_apkg.py file.apkg <new work dir> [--twice] [--fsrs] [--aged]
 
 --twice  imports the package a second time: the notes must come back as duplicates, not new ones.
 --fsrs   enables FSRS in the target collection before importing.
@@ -50,7 +50,7 @@ try:
             "queue": c.queue, "due": c.due, "ivl": c.ivl, "factor": c.factor, "reps": c.reps,
             "lapses": c.lapses, "left": c.left, "flags": c.flags,
             "memory": None if ms is None else [round(ms.stability, 2), round(ms.difficulty, 2)],
-            "question": c.question()[:60],
+            "front": c.note().fields[0][:40], "question": c.question()[:60],
         })
     notes, revlog = col.note_count(), col.db.scalar("select count() from revlog")
     out.update({

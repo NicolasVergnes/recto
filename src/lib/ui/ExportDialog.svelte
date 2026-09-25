@@ -25,16 +25,22 @@
   let delimiter = $state<CsvDelimiter>(';')
   let busy = $state(false)
   let report = $state.raw<ApkgExportReport | null>(null)
+  /** The export in progress: closing the dialog (Annuler, Escape) aborts it, nothing is saved. */
+  let running: AbortController | null = null
 
   const scope = $derived(noteIds ? { noteIds } : deckId ? { deckId } : {})
 
   function close() {
+    running?.abort()
+    running = null
+    busy = false
     open = false
     report = null
   }
 
-  async function exportCsv() {
+  async function exportCsv(signal: AbortSignal) {
     const rows = await repo.exportRows(scope)
+    signal.throwIfAborted()
     const csv = notesToCsv(rows, delimiter)
     const ext = delimiter === ';' ? 'csv' : 'tsv'
     const mime = delimiter === ';' ? 'text/csv' : 'text/tab-separated-values'
@@ -48,26 +54,29 @@
 
   async function run() {
     if (busy) return
+    const controller = new AbortController()
+    running = controller
     busy = true
     try {
-      if (format === 'csv') await exportCsv()
+      if (format === 'csv') await exportCsv(controller.signal)
       else {
-        const result = await exportApkg(scope, slugify(name), Date.now())
-        // The dialog stays open on the report (missing media, retired cards), unless closed.
-        if (open) report = result
+        const result = await exportApkg(scope, slugify(name), Date.now(), controller.signal)
+        // The dialog stays open on the report (missing media, retired cards).
+        if (!controller.signal.aborted) report = result
       }
     } catch (e) {
-      toast(exportErrorMessage(e), 'error')
+      if (!controller.signal.aborted) toast(exportErrorMessage(e), 'error')
     } finally {
-      busy = false
+      if (running === controller) {
+        running = null
+        busy = false
+      }
     }
   }
 </script>
 
 <Dialog {open} title={t('exportCsv.title')} onclose={close}>
-  {#if report}
-    <ApkgExportSummary {report} />
-  {:else}
+  {#if !report}
     <fieldset>
       <legend>{t('exportApkg.format')}</legend>
       <label class="check">
@@ -97,6 +106,7 @@
     {/if}
     {#if busy}<progress aria-label={t('exportApkg.exporting')}></progress>{/if}
   {/if}
+  <ApkgExportSummary {report} {busy} />
   {#snippet actions()}
     {#if !report}
       <button class="btn" type="button" onclick={close}>{t('common.cancel')}</button>
