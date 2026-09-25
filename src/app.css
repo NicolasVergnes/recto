@@ -412,11 +412,14 @@ kbd {
   background: var(--surface-2);
 }
 
-/* Rendered card content (sanitized HTML). */
+/* Rendered card content (sanitized HTML). Its width comes from the page, never from its content:
+   otherwise a wide formula widens the editor's grid column and the whole page scrolls sideways.
+   Always a block in a block or stretched flex context, never in a shrink-to-fit one. */
 .card-content {
   font-size: var(--card-font);
   line-height: 1.45;
   overflow-wrap: anywhere;
+  contain: inline-size;
 }
 
 .card-content img {
@@ -431,10 +434,19 @@ kbd {
   color: var(--accent);
 }
 
-/* KaTeX formulas (ADR-009) take the text colour; a wide display formula scrolls on a phone. */
-.card-content .katex-display {
+/* KaTeX formulas (ADR-009) take the text colour. A formula wider than the card, display or
+   inline, scrolls sideways on its own rather than the page (hidden: KaTeX's empty strut boxes).
+   An inline formula keeps its text baseline although it is a scroll container. */
+.card-content .katex-display,
+.card-content .math > .katex {
+  max-width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
+}
+
+.card-content .math > .katex {
+  display: inline-block;
+  baseline-source: last;
 }
 
 .card-content .math-error {

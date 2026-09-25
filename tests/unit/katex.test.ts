@@ -21,6 +21,14 @@ describe('formulas through sanitize()', () => {
       '<span class="math">\\(\\)</span>',
     )
   })
+
+  it('leaves an attribute holding `>` and a delimiter intact', () => {
+    const root = document.createElement('div')
+    root.innerHTML = sanitize(markMath('<img src="a.png" alt="a > \\(x\\)"> suite'))
+    expect(root.querySelector('img')?.alt).toBe('a > \\(x\\)')
+    expect(root.querySelector('span.math')).toBeNull()
+    expect(root.textContent).toBe(' suite')
+  })
 })
 
 describe('renderMath (KaTeX, ADR-009)', () => {
@@ -45,12 +53,24 @@ describe('renderMath (KaTeX, ADR-009)', () => {
     expect(root.querySelector('.math-error')).toBeNull()
   })
 
-  it('keeps the source of an invalid formula, marked and titled', () => {
+  it('renders Anki <div> lines and raw `<` typed in the editor', () => {
+    const lines = rendered('\\[\\sum</div><div>n\\]')
+    expect(lines.querySelector('.math-error')).toBeNull()
+    expect(lines.querySelector('annotation')?.textContent).toBe('\\sum  n')
+    const root = rendered('\\(a<b\\) et \\(b>c\\)')
+    const annotations = [...root.querySelectorAll('annotation')].map((a) => a.textContent)
+    expect(annotations).toEqual(['a<b', 'b>c'])
+    expect(root.querySelector('.math-error')).toBeNull()
+  })
+
+  it('keeps the source of an invalid formula, with its message for all users', () => {
     const root = rendered('\\(\\frac{1\\) et \\(x^2\\)')
     const [bad, good] = root.querySelectorAll<HTMLElement>('span.math')
-    expect(bad?.textContent).toBe('\\(\\frac{1\\)')
+    expect(bad?.firstChild?.textContent).toBe('\\(\\frac{1\\)')
     expect(bad?.classList.contains('math-error')).toBe(true)
     expect(bad?.title).toBe('Formule LaTeX invalide')
+    // No hover on a phone, `title` unreliable for screen readers: the message is also text.
+    expect(bad?.querySelector('.visually-hidden')?.textContent).toBe(' (Formule LaTeX invalide)')
     expect(good?.querySelector('.katex')).not.toBeNull()
   })
 
