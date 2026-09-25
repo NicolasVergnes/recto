@@ -83,7 +83,7 @@ export interface Note {
                                // image_occlusion: [image, masques JSON, en-tête, extra] (§2.1)
   tags: string[]
   source?: string
-  sourceGuid?: string          // guid Anki à l'import (déduplication)
+  sourceGuid?: string          // guid Anki à l'import (déduplication : `sourceGuid ?? id`, guid écrit par l'export .apkg, 05 §4)
   createdAt: number
   updatedAt: number
 }

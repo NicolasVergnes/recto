@@ -137,7 +137,7 @@ Une **note** porte le contenu ; une note génère une ou plusieurs **cartes** (c
 
 ## 7. Architecture cible (résumé)
 
-Svelte 5 (runes) + Vite 8 + TypeScript strict ; Dexie 4 (IndexedDB) ; `ts-fsrs` 5 (FSRS-6) ; `fsrs-browser` (WASM, optimiseur, V1) ; `vite-plugin-pwa` ; `sql.js` (lecture `.apkg`, chargé à la demande) ; `fflate` (zip) ; `papaparse` (CSV) ; `dompurify` (rendu HTML des champs). Aucun backend. Déploiement statique (GitHub Pages ou Cloudflare Pages). Détails et justification : 08-DECISIONS.
+Svelte 5 (runes) + Vite 8 + TypeScript strict ; Dexie 4 (IndexedDB) ; `ts-fsrs` 5 (FSRS-6) ; `fsrs-browser` (WASM, optimiseur, V1) ; `vite-plugin-pwa` ; `sql.js` (lecture et, en V1, écriture `.apkg`, chargé à la demande) ; `fflate` (zip) ; `papaparse` (CSV) ; `dompurify` (rendu HTML des champs). Aucun backend. Déploiement statique (GitHub Pages ou Cloudflare Pages). Détails et justification : 08-DECISIONS.
 
 ```
 src/

@@ -31,7 +31,7 @@ Ordre de détection : si `collection.anki21b` existe et pas `collection.anki21` 
 
 ### 2.2 Lecture SQLite
 
-`sql.js` (WASM) chargé à la demande : `const SQL = await initSqlJs({ locateFile: f => \`${import.meta.env.BASE_URL}sql/${f}\` })` avec le `.wasm` copié dans `public/sql/` au build (script `postinstall` ou plugin Vite `viteStaticCopy`). Exécution dans un **Web Worker** pour ne pas bloquer l'interface (`src/lib/import/apkg.worker.ts`), messages de progression.
+`sql.js` (WASM) chargé à la demande : `initSqlJs({ locateFile: () => wasmUrl })` où `wasmUrl` vient de `import wasmUrl from 'sql.js/dist/sql-wasm-browser.wasm?url'` (Vite émet le fichier avec un nom haché, le service worker le précache ; mise en œuvre M4, qui remplace la copie dans `public/sql/` prévue à l'origine). Exécution dans un **Web Worker** pour ne pas bloquer l'interface (`src/lib/import/apkg.worker.ts`), messages de progression.
 
 Tables utiles :
 
