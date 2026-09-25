@@ -2,6 +2,7 @@ import * as repo from '$lib/db/repo'
 import { getSetting } from '$lib/db/settings'
 import { clozeIndices } from '$lib/domain/cloze'
 import { cardOrds, convertFields } from '$lib/domain/notes'
+import { occlusionGroups, parseOcclusion } from '$lib/domain/occlusion'
 import { imageRefs, parseTags } from '$lib/domain/text'
 import type { ModelType } from '$lib/domain/types'
 import { t } from '$lib/i18n'
@@ -17,12 +18,16 @@ export class NoteDraft {
   tagsText = $state('')
   source = $state('')
   loaded = $state(false)
+  /** Highest mask group of the note as loaded: a new mask never takes over an existing card. */
+  loadedGroups = $state(0)
 
   readonly slots = $derived(SLOTS[this.modelType])
   readonly clozeMissing = $derived(
     this.modelType === 'cloze' && clozeIndices(this.fields[0] ?? '').length === 0,
   )
   readonly cardCount = $derived(cardOrds(this.modelType, this.fields).length)
+  /** First group number a new mask may use (02 §2.1: a card's identity is its group). */
+  readonly nextGroup = $derived(this.loadedGroups + 1)
   /**
    * A deck, a front, cloze markers for a cloze note (an image and a mask for an occlusion
    * note), and the initial load done.
@@ -49,6 +54,9 @@ export class NoteDraft {
       this.fields = [...note.fields]
       this.tagsText = note.tags.join(' ')
       this.source = note.source ?? ''
+      if (note.modelType === 'image_occlusion') {
+        this.loadedGroups = Math.max(0, ...occlusionGroups(parseOcclusion(note.fields[1] ?? '')))
+      }
     } else {
       this.deckId = requestedDeck ?? (await getSetting('lastDeckId')) ?? ''
     }

@@ -2,6 +2,7 @@
   import {
     addMask,
     moveMask,
+    nextMaskGroup,
     rectFromPoints,
     updateMask,
     type Occlusion,
@@ -12,11 +13,20 @@
     url: string
     alt: string
     occlusion: Occlusion
+    firstGroup: number
     selected: number
     onchange: (next: Occlusion) => void
     onfile: (file: File | undefined) => void
   }
-  let { url, alt, occlusion, selected = $bindable(), onchange, onfile }: Props = $props()
+  let {
+    url,
+    alt,
+    occlusion,
+    firstGroup,
+    selected = $bindable(),
+    onchange,
+    onfile,
+  }: Props = $props()
 
   let frame: HTMLDivElement | undefined = $state()
   /** Pointer gesture in progress: a new rectangle, or a mask being moved. */
@@ -53,7 +63,8 @@
     gesture = null
     if (!g) return
     if (g.kind === 'draw') {
-      const next = addMask(occlusion, rectFromPoints(g.start, g.current))
+      const group = Math.max(nextMaskGroup(occlusion), firstGroup)
+      const next = addMask(occlusion, rectFromPoints(g.start, g.current), group)
       if (next === occlusion) return
       onchange(next)
       selected = next.masks.length - 1

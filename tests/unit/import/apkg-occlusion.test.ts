@@ -83,6 +83,21 @@ describe('Anki image occlusion import', () => {
     expect(rendered.occlusion).toMatchObject({ image: 'carte-france.png', target: 2 })
   })
 
+  it('counts converted shapes only for the notes it writes', async () => {
+    const pkg = fixture()
+    const first = await planApkgImport(pkg, options, empty, now, newId)
+    const again = await planApkgImport(
+      pkg,
+      options,
+      { ...empty, decks: first.decks, notes: first.notes },
+      now,
+      newId,
+    )
+    expect(again.notes).toEqual([])
+    expect(again.report.skipped).toBe(1)
+    expect(again.report.shapesConverted).toBe(0)
+  })
+
   it('reports shapes it cannot read and notes left without masks', async () => {
     const pkg = fixture()
     const [note] = pkg.notes

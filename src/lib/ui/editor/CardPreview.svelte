@@ -26,8 +26,14 @@
       {#if card.occlusion}
         <CardContent html={card.question} />
         <div class="sides">
-          <OcclusionView occlusion={card.occlusion} revealed={false} />
-          <OcclusionView occlusion={card.occlusion} revealed={true} />
+          <div>
+            <p class="muted small">{t('editor.previewQuestion')}</p>
+            <OcclusionView occlusion={card.occlusion} revealed={false} />
+          </div>
+          <div>
+            <p class="muted small">{t('editor.previewAnswer')}</p>
+            <OcclusionView occlusion={card.occlusion} revealed={true} />
+          </div>
         </div>
         {#if card.answer}<CardContent html={card.answer} />{/if}
       {:else}

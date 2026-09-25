@@ -123,7 +123,7 @@ describe('Anki image occlusion field', () => {
     )
   })
 
-  it('converts ellipses, polygons and rotated shapes to rectangles, skips the rest', () => {
+  it('converts ellipses and polygons to rectangles, skips rotated shapes and the rest', () => {
     const text = [
       '{{c1::image-occlusion:ellipse:left=.1:top=.1:rx=.05:ry=.1:oi=1}}',
       '{{c2::image-occlusion:polygon:points=.1,.1 .3,.2 .2,.4:oi=1}}',
@@ -135,13 +135,14 @@ describe('Anki image occlusion field', () => {
     ].join('<br>')
     const { occlusion, converted, skipped } = occlusionFromAnki(text)
     expect(occlusion.mode).toBe('hideAll')
+    // The rotated rectangle (c3) is left out: without the image's aspect ratio, no normalised
+    // rectangle is sure to cover it (P1).
     expect(occlusion.masks).toEqual([
       { n: 1, x: 0.1, y: 0.1, w: 0.1, h: 0.2 },
       { n: 2, x: 0.1, y: 0.1, w: 0.2, h: 0.3 },
-      { n: 3, x: 0.5, y: 0.5, w: 0.1, h: 0.1 },
     ])
-    expect(converted).toBe(3)
-    expect(skipped).toBe(3)
+    expect(converted).toBe(2)
+    expect(skipped).toBe(4)
   })
 
   it('unescapes colons and backslashes in values', () => {
@@ -150,6 +151,36 @@ describe('Anki image occlusion field', () => {
     )
     expect(occlusion.masks).toEqual([{ n: 1, x: 0.1, y: 0.2, w: 0.3, h: 0.4 }])
     expect(occlusion.mode).toBe('hideOne')
+  })
+})
+
+describe('mask answers in Anki Comments', () => {
+  it('writes one line per labelled group and reads it back', async () => {
+    const { labelsFromAnkiComments, labelsToAnkiComments } = await import('$lib/domain/occlusion')
+    const labelled: Occlusion = {
+      mode: 'hideAll',
+      masks: [
+        { n: 1, x: 0.1, y: 0.1, w: 0.1, h: 0.1, label: 'a < b' },
+        { n: 2, x: 0.3, y: 0.1, w: 0.1, h: 0.1 },
+        { n: 2, x: 0.5, y: 0.1, w: 0.1, h: 0.1, label: 'Lyon' },
+        { n: 3, x: 0.7, y: 0.1, w: 0.1, h: 0.1 },
+      ],
+    }
+    const comments = labelsToAnkiComments(labelled)
+    expect(comments).toBe('1 : a &lt; b<br>2 : Lyon')
+    const bare: Occlusion = { ...labelled, masks: labelled.masks.map(({ label: _, ...m }) => m) }
+    // Each answer goes back to the first mask of its group.
+    expect(labelsFromAnkiComments(bare, comments)?.masks.map((m) => m.label)).toEqual([
+      'a < b',
+      'Lyon',
+      undefined,
+      undefined,
+    ])
+    expect(labelsToAnkiComments(bare)).toBe('')
+    // Anything else in Comments is a comment written in Anki: not answers.
+    expect(labelsFromAnkiComments(bare, 'Voir le manuel')).toBeNull()
+    expect(labelsFromAnkiComments(bare, '1 : Paris<br>une remarque')).toBeNull()
+    expect(labelsFromAnkiComments(bare, '')).toBeNull()
   })
 })
 

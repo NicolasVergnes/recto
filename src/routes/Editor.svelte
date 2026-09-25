@@ -99,6 +99,8 @@
   function onKeydown(e: KeyboardEvent) {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault()
+      // Fields committed on `change` (mask answers, card numbers) are committed by the blur.
+      if (e.target instanceof HTMLInputElement) e.target.blur()
       void save(false)
     } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'c') {
       e.preventDefault()
@@ -135,6 +137,7 @@
           <OcclusionEditor
             bind:image={() => draft.fields[0] ?? '', (v) => (draft.fields[0] = v)}
             bind:masks={() => draft.fields[1] ?? '', (v) => (draft.fields[1] = v)}
+            firstGroup={draft.nextGroup}
           />
         {/if}
 

@@ -187,6 +187,6 @@
     display: flex;
     flex-direction: column;
     padding: var(--space-3);
-    touch-action: pan-y;
+    touch-action: pan-y pinch-zoom;
   }
 </style>

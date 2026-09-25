@@ -6,7 +6,7 @@ import {
   type OcclusionMask,
   type OcclusionMode,
 } from './occlusion'
-import { escapeHtml, imageRefs, imageTag } from './text'
+import { escapeHtml, imageRefs, imageTag, removeImage, stripHtml } from './text'
 import type { Card, ModelType, Note } from './types'
 
 /**
@@ -92,12 +92,13 @@ export function renderCard(
   if (note.modelType === 'image_occlusion') {
     const occlusion = parseOcclusion(f1)
     const target = card.ord + 1
-    const labels = maskLabels(occlusion, target).join(', ')
+    // Labels are plain text: escaped once, they are HTML like every other side.
+    const labels = escapeHtml(maskLabels(occlusion, target).join(', '))
     const image = imageRefs(f0)[0]
     return {
       question: f2,
       // P1: the labels are part of the answer, never rendered before the reveal.
-      answer: escapeHtml(labels),
+      answer: labels,
       extra: f3,
       answerReplacesQuestion: false,
       flipped: false,
@@ -137,9 +138,14 @@ export function renderCard(
   }
 }
 
+/** Joins the non-empty parts with a line break. */
+const joinLines = (...parts: string[]) =>
+  parts.filter((p) => stripHtml(p) !== '' || /<img\b/i.test(p)).join('<br>')
+
 /**
- * Maps fields when the note type changes in the editor: the front (or cloze text) and the extra
- * are kept; an occlusion note keeps the first image of the fields.
+ * Maps fields when the note type changes in the editor. The front (cloze text; occlusion header
+ * then image) and the extra are kept. To an occlusion note, the first image found becomes its
+ * image, the rest of the front its header, and the rest of the back joins the extra.
  */
 export function convertFields(from: ModelType, to: ModelType, fields: readonly string[]): string[] {
   if (from === to) return normalizeFields(to, fields)
@@ -148,14 +154,20 @@ export function convertFields(from: ModelType, to: ModelType, fields: readonly s
     from === 'cloze'
       ? { front: a, back: '', extra: b }
       : from === 'image_occlusion'
-        ? { front: a, back: '', extra: d }
+        ? { front: joinLines(c, a), back: '', extra: d }
         : { front: a, back: b, extra: c }
   switch (to) {
     case 'cloze':
       return [src.front, src.extra || src.back]
     case 'image_occlusion': {
-      const image = imageRefs(fields.join(' '))[0]
-      return [image ? imageTag(image.name, image.alt) : '', '', '', src.extra]
+      const image = imageRefs([src.front, src.back, src.extra].join(' '))[0]
+      const without = (html: string) => (image ? removeImage(html, image.name) : html)
+      return [
+        image ? imageTag(image.name, image.alt) : '',
+        '',
+        joinLines(without(src.front)),
+        joinLines(without(src.back), without(src.extra)),
+      ]
     }
     default:
       return [src.front, src.back, src.extra]

@@ -43,6 +43,17 @@
     <div class="frame">
       <img src={url} alt={occlusion.alt} draggable="false" />
       <svg viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+        <!-- A white halo under every outline keeps masks readable on dark images. -->
+        {#each shown as m, i (i)}
+          <rect
+            class="halo"
+            x={m.x}
+            y={m.y}
+            width={m.w}
+            height={m.h}
+            class:target={m.n === occlusion.target}
+          />
+        {/each}
         {#each shown as m, i (i)}
           <rect
             x={m.x}
@@ -78,10 +89,11 @@
     line-height: 0;
   }
 
+  /* Room is left for the header, the answer and the rating buttons (1280 × 720 included). */
   img {
     display: block;
     max-width: 100%;
-    max-height: 70dvh;
+    max-height: min(60dvh, calc(100dvh - 18rem));
     height: auto;
     user-select: none;
   }
@@ -94,7 +106,19 @@
   }
 
   /* Fixed colours: masks sit on the image, whatever the theme (Anki's palette). The target
-     also differs by its thicker outline, not only by its colour. */
+     also differs by its thicker outline (dark, over a white halo), not only by its colour. */
+  rect.halo {
+    fill: none;
+    stroke: #fff;
+    stroke-width: 4px;
+  }
+
+  /* More specific than rect.target: a halo never fills (the opened area must stay visible). */
+  rect.halo.target {
+    fill: none;
+    stroke-width: 7px;
+  }
+
   rect {
     fill: #ffeba2;
     stroke: #212121;

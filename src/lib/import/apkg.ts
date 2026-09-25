@@ -3,7 +3,7 @@
  */
 import { makeCard } from '../domain/defaults'
 import { cardOrds } from '../domain/notes'
-import { occlusionFromAnki, serializeOcclusion } from '../domain/occlusion'
+import { labelsFromAnkiComments, occlusionFromAnki, serializeOcclusion } from '../domain/occlusion'
 import { mediaRefs, renameMediaRefs } from '../domain/text'
 import type { Card, Deck, ModelType, Note, Rating, Review, SchedulerKind } from '../domain/types'
 import { sha256Hex } from '../media/hash'
@@ -74,12 +74,13 @@ export function convertModel(model: ApkgModel): ModelConversion {
       modelType: 'image_occlusion',
       mergedFields: Math.max(0, n - 4),
       converted: false,
-      map: (f) => [
-        f[1] ?? '',
-        serializeOcclusion(occlusionFromAnki(f[0] ?? '').occlusion),
-        f[2] ?? '',
-        joinRest(f, 3),
-      ],
+      map: (f) => {
+        const shapes = occlusionFromAnki(f[0] ?? '').occlusion
+        // Answers exported by Recto come back from Comments; any other comment joins the extra.
+        const labelled = labelsFromAnkiComments(shapes, f[4] ?? '')
+        const extra = labelled ? joinRest([f[3] ?? '', ...f.slice(5)], 0) : joinRest(f, 3)
+        return [f[1] ?? '', serializeOcclusion(labelled ?? shapes), f[2] ?? '', extra]
+      },
     }
   }
   if (model.type === 1) {
@@ -210,7 +211,9 @@ export async function planApkgImport(
       report.convertedModels.push({ name: model.name, mergedFields: conversion.mergedFields })
     }
     const fields = conversion.map(an.fields)
-    if (conversion.modelType === 'image_occlusion') {
+    // Occlusion shapes converted or left out, counted for the notes written (created or updated).
+    const countShapes = () => {
+      if (conversion.modelType !== 'image_occlusion') return
       const shapes = occlusionFromAnki(an.fields[0] ?? '')
       report.shapesConverted += shapes.converted
       report.shapesSkipped += shapes.skipped
@@ -224,9 +227,10 @@ export async function planApkgImport(
       const sameCards =
         conversion.modelType === known.modelType &&
         cardOrds(known.modelType, fields).join() === cardOrds(known.modelType, known.fields).join()
-      if (updatedAt > known.updatedAt && sameCards)
+      if (updatedAt > known.updatedAt && sameCards) {
         plan.updates.push({ ...known, fields, tags: an.tags, updatedAt })
-      else report.skipped++
+        countShapes()
+      } else report.skipped++
       continue
     }
     const ankiCards = (cardsByNote.get(an.id) ?? []).sort((a, b) => a.ord - b.ord)
@@ -239,8 +243,10 @@ export async function planApkgImport(
     if (ords.length === 0) {
       const code = conversion.modelType === 'image_occlusion' ? 'noMask' : 'noCloze'
       report.errors.push({ line: an.id, code })
+      countShapes()
       continue
     }
+    countShapes()
     const note: Note = {
       id: newId(),
       deckId: deck.id,

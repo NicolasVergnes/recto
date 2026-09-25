@@ -619,8 +619,8 @@ describe('round trip through the Recto importer', () => {
     expect(report).toMatchObject({ notes: 1, cards: 2, media: 1, missingMedia: [] })
     db.close()
 
-    // Back into Recto: masks and fields come back; answers, which Anki has no place for, land
-    // in the extra field through Comments.
+    // Back into Recto: masks and fields come back, and the answers, which Anki keeps in
+    // Comments, return to the first mask of their group.
     const plan = await planApkgImport(readApkg(bytes, SQL), importOptions, empty, now, newId)
     const back = plan.notes[0]
     expect(back?.modelType).toBe('image_occlusion')
@@ -630,15 +630,32 @@ describe('round trip through the Recto importer', () => {
         v: 1,
         mode: 'hideAll',
         masks: [
-          { n: 1, x: 0.1, y: 0.2, w: 0.3, h: 0.25 },
-          { n: 2, x: 0.5, y: 0.5, w: 0.25, h: 0.125 },
+          { n: 1, x: 0.1, y: 0.2, w: 0.3, h: 0.25, label: 'Paris <1>' },
+          { n: 2, x: 0.5, y: 0.5, w: 0.25, h: 0.125, label: 'Lyon' },
           { n: 2, x: 0, y: 0, w: 0.05, h: 0.05 },
         ],
       }),
       'Villes',
     ])
-    expect(back?.fields[3]).toBe('Source<br>1 : Paris &lt;1&gt;<br>2 : Lyon')
+    expect(back?.fields[3]).toBe('Source')
     expect(plan.cards.map((c) => c.ord)).toEqual([0, 1])
+
+    // Edited in Anki (header), then re-imported over the original note: an update that keeps
+    // the answers, not one that moves them to the extra.
+    const edited = editPackage(bytes, [
+      `UPDATE notes SET flds = replace(flds, 'Villes', 'Grandes villes'), mod = mod + 60`,
+    ])
+    const update = await planApkgImport(
+      readApkg(edited, SQL),
+      importOptions,
+      { ...empty, decks: [deck], notes: [note] },
+      now,
+      newId,
+    )
+    expect(update.notes).toEqual([])
+    expect(update.updates).toHaveLength(1)
+    expect(update.updates[0]?.fields.slice(2)).toEqual(['Grandes villes', 'Source'])
+    expect(JSON.parse(update.updates[0]?.fields[1] ?? '').masks[0].label).toBe('Paris <1>')
   })
 
   it('exports an empty selection as a valid package', async () => {

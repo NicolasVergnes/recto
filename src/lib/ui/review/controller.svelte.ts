@@ -1,6 +1,7 @@
 import { untrack } from 'svelte'
 import * as repo from '$lib/db/repo'
 import { getSetting, setSetting } from '$lib/db/settings'
+import { RepoError } from '$lib/db/errors'
 import { cardReviews, recordReview, setRetired, undoReview } from '$lib/db/study'
 import { renderCard } from '$lib/domain/notes'
 import { extractSounds } from '$lib/domain/text'
@@ -190,10 +191,10 @@ export class ReviewController {
     const last = $state.snapshot(entry)
     this.busy = true
     try {
-      await undoReview(last.previous, last.reviewId)
+      const restored = await undoReview(last.previous, last.reviewId)
       active.undo = active.undo.slice(0, -1)
-      active.cards.set(last.previous.id, last.previous)
-      active.queue = putBack(last.queue, last.previous.id)
+      active.cards.set(restored.id, restored)
+      active.queue = putBack(last.queue, restored.id)
       active.stats.answers--
       if (last.rating === 1) active.stats.again--
       active.stats.totalMs -= last.durationMs
@@ -201,6 +202,8 @@ export class ReviewController {
       this.advance()
       toast(t('review.undone'))
     } catch (e) {
+      // A card deleted since cannot come back: forget that answer so older ones stay undoable.
+      if (e instanceof RepoError && e.code === 'undoGone') active.undo = active.undo.slice(0, -1)
       toast(errorMessage(e), 'error')
     } finally {
       this.busy = false

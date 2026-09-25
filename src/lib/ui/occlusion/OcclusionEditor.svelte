@@ -17,8 +17,10 @@
     image: string
     /** Field 1 of the note: the masks JSON. */
     masks: string
+    /** Lowest group number for a new mask (above the groups the note was loaded with). */
+    firstGroup?: number
   }
-  let { image = $bindable(), masks = $bindable() }: Props = $props()
+  let { image = $bindable(), masks = $bindable(), firstGroup = 1 }: Props = $props()
 
   const occlusion = $derived(parseOcclusion(masks))
   const ref = $derived(imageRefs(image)[0])
@@ -83,6 +85,7 @@
       {url}
       alt={ref?.alt ?? ''}
       {occlusion}
+      {firstGroup}
       bind:selected
       onchange={commit}
       onfile={(file) => void useFile(file)}
@@ -93,5 +96,5 @@
     <p class="muted">{t('occlusion.noImage')}</p>
   {/if}
 
-  <OcclusionMasks {occlusion} bind:selected onchange={commit} />
+  <OcclusionMasks {occlusion} {firstGroup} bind:selected onchange={commit} />
 </div>

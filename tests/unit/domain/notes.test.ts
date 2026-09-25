@@ -127,7 +127,7 @@ describe('image occlusion notes', () => {
       extra: 'Extra',
       answerReplacesQuestion: false,
       flipped: false,
-      expected: 'Paris <b>',
+      expected: 'Paris &lt;b&gt;',
       occlusion: {
         image: 'carte.webp',
         alt: 'Carte',
@@ -151,15 +151,36 @@ describe('image occlusion notes', () => {
   it('converts fields to and from occlusion notes', async () => {
     const { convertFields } = await import('$lib/domain/notes')
     const img = '<img src="carte.webp" alt="Carte">'
+    // Nothing typed is lost: the front becomes the header, the back joins the extra.
     expect(convertFields('basic', 'image_occlusion', ['Q', `A ${img}`, 'X'])).toEqual([
       img,
       '',
+      'Q',
+      'A <br>X',
+    ])
+    expect(convertFields('basic', 'image_occlusion', [`Où ? ${img}`, '', ''])).toEqual([
+      img,
       '',
+      'Où ? ',
+      '',
+    ])
+    expect(convertFields('cloze', 'image_occlusion', ['{{c1::a}}', 'X'])).toEqual([
+      '',
+      '',
+      '{{c1::a}}',
       'X',
     ])
-    expect(convertFields('cloze', 'image_occlusion', ['{{c1::a}}', 'X'])).toEqual(['', '', '', 'X'])
-    expect(convertFields('image_occlusion', 'basic', note.fields)).toEqual([img, '', 'Extra'])
-    expect(convertFields('image_occlusion', 'cloze', note.fields)).toEqual([img, 'Extra'])
+    // Back from occlusion: header and image make the front.
+    expect(convertFields('image_occlusion', 'basic', note.fields)).toEqual([
+      `Villes<br>${img}`,
+      '',
+      'Extra',
+    ])
+    expect(convertFields('image_occlusion', 'cloze', note.fields)).toEqual([
+      `Villes<br>${img}`,
+      'Extra',
+    ])
+    expect(convertFields('image_occlusion', 'basic', [img, '', '', ''])).toEqual([img, '', ''])
     expect(convertFields('image_occlusion', 'image_occlusion', ['a'])).toEqual(['a', '', '', ''])
   })
 })

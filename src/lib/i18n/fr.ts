@@ -228,6 +228,8 @@ export const fr = {
     noDeck: 'Créez d’abord un paquet.',
     imageOcclusion: 'Occlusion d’image',
     header: 'En-tête',
+    previewQuestion: 'Question',
+    previewAnswer: 'Réponse',
   },
   occlusion: {
     noImage: 'Aucune image : choisissez-en une.',
@@ -241,7 +243,8 @@ export const fr = {
     cardCount: '{n} carte|{n} cartes',
     noMask: 'Dessinez au moins un masque sur l’image, ou ajoutez-en un.',
     addMask: 'Ajouter un masque',
-    mask: 'Masque {n}',
+    mask: 'Masque {i} · carte {n}',
+    ofMask: 'masque {n}',
     group: 'Carte n°',
     label: 'Réponse (facultative)',
     delete: 'Supprimer le masque {n}',
@@ -388,6 +391,8 @@ export const fr = {
     noteNotFound: 'Note introuvable',
     noteNoCloze: 'Ajoutez au moins un trou {{c1::…}}.',
     noteNoMask: 'Dessinez au moins un masque sur l’image.',
+    undoGone:
+      'Cette carte a été supprimée en modifiant sa note : sa réponse ne peut plus être annulée.',
     mediaType: 'Type de fichier non pris en charge.',
     mediaTooLarge: 'Fichier trop volumineux (600 Ko par image, 3 Mo par son).',
     mediaUnreadable: 'Image illisible.',
@@ -557,9 +562,9 @@ export const fr = {
     convertedModel:
       '« {name} » converti en Basique ({n} champ fusionné dans Extra)|« {name} » converti en Basique ({n} champs fusionnés dans Extra)',
     shapesConverted:
-      'Occlusion d’image : {n} forme (ellipse, polygone ou forme tournée) remplacée par un rectangle.|Occlusion d’image : {n} formes (ellipses, polygones ou formes tournées) remplacées par des rectangles.',
+      'Occlusion d’image : {n} forme (ellipse ou polygone) remplacée par un rectangle.|Occlusion d’image : {n} formes (ellipses ou polygones) remplacées par des rectangles.',
     shapesSkipped:
-      'Occlusion d’image : {n} forme ignorée (texte ou coordonnées en pixels).|Occlusion d’image : {n} formes ignorées (texte ou coordonnées en pixels).',
+      'Occlusion d’image : {n} forme ignorée (texte, forme tournée ou coordonnées en pixels).|Occlusion d’image : {n} formes ignorées (texte, formes tournées ou coordonnées en pixels).',
   },
   missingMedia: {
     intro:

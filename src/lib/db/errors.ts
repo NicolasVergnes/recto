@@ -8,6 +8,7 @@ export type RepoErrorCode =
   | 'noteNotFound'
   | 'noteNoCloze'
   | 'noteNoMask'
+  | 'undoGone'
   | 'retireLocked'
   | 'mediaType'
   | 'mediaTooLarge'

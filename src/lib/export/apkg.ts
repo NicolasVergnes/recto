@@ -7,7 +7,7 @@ import { strToU8, zipSync, type Zippable } from 'fflate'
 import type { SqlJsStatic } from 'sql.js'
 import { deckPath } from '../domain/decks'
 import { normalizeFields } from '../domain/notes'
-import { maskLabels, occlusionGroups, occlusionToAnki, parseOcclusion } from '../domain/occlusion'
+import { labelsToAnkiComments, occlusionToAnki, parseOcclusion } from '../domain/occlusion'
 import { decodeEntities, escapeHtml, mediaRefs } from '../domain/text'
 import {
   MODEL_TYPES,
@@ -363,11 +363,7 @@ export function ankiFields(note: Pick<Note, 'modelType' | 'fields'>): string[] {
   if (note.modelType !== 'image_occlusion') return fields
   const [image = '', masks = '', header = '', extra = ''] = fields
   const occlusion = parseOcclusion(masks)
-  const comments = occlusionGroups(occlusion).flatMap((n) => {
-    const labels = maskLabels(occlusion, n)
-    return labels.length > 0 ? [`${n} : ${escapeHtml(labels.join(', '))}`] : []
-  })
-  return [occlusionToAnki(occlusion), image, header, extra, comments.join('<br>')]
+  return [occlusionToAnki(occlusion), image, header, extra, labelsToAnkiComments(occlusion)]
 }
 
 const compareIds = (a: { id: string }, b: { id: string }) =>

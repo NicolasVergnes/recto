@@ -16,6 +16,12 @@
     typed: string
   }
   let { rendered, revealed, flagged, diff, typed }: Props = $props()
+  let answer: HTMLDivElement | undefined = $state()
+
+  // A tall occlusion image can push the answer under the rating bar: bring it into view.
+  $effect(() => {
+    if (revealed && rendered.occlusion) answer?.scrollIntoView({ block: 'nearest' })
+  })
 </script>
 
 <!--
@@ -41,9 +47,9 @@
   <!-- P1: the answer is not in the DOM before the user asks for it. -->
   {#if revealed}
     {#if rendered.occlusion}
-      {#if rendered.answer}<div class="side answer">
-          <CardContent html={rendered.answer} />
-        </div>{/if}
+      {#if rendered.answer}
+        <div class="side answer" bind:this={answer}><CardContent html={rendered.answer} /></div>
+      {/if}
     {:else if rendered.answerReplacesQuestion}
       <div class="side"><CardContent html={rendered.answer} /></div>
     {:else}

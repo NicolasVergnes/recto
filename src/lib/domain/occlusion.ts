@@ -2,6 +2,7 @@
  * Image occlusion notes (V1): rectangular masks drawn on an image, one card per mask group.
  * Pure: no DOM. Fields of an `image_occlusion` note: [image, masks JSON, header, extra].
  */
+import { decodeEntities, escapeHtml } from './text'
 
 export type OcclusionMode = 'hideAll' | 'hideOne'
 
@@ -130,9 +131,9 @@ export function occlusionToAnki(o: Occlusion): string {
 
 export interface AnkiOcclusionResult {
   occlusion: Occlusion
-  /** Ellipses, polygons and rotated shapes replaced by their bounding rectangle. */
+  /** Ellipses and polygons replaced by their bounding rectangle. */
   converted: number
-  /** Text shapes, absolute (pixel) coordinates and unreadable shapes. */
+  /** Text shapes, rotated shapes, absolute (pixel) coordinates and unreadable shapes. */
   skipped: number
 }
 
@@ -183,7 +184,10 @@ export function occlusionFromAnki(text: string): AnkiOcclusionResult {
       if (eq > 0) p.set(prop.slice(0, eq), prop.slice(eq + 1))
     }
     if (p.get('oi') === '1') hideAll = true
-    if (shape !== 'rect' && shape !== 'ellipse' && shape !== 'polygon') {
+    // A rotation happens in pixels, around the shape's corner: without the image's aspect ratio,
+    // no normalised rectangle is sure to cover the rotated area (P1), so such shapes are left out.
+    const rotated = Number(p.get('angle') ?? 0) !== 0
+    if ((shape !== 'rect' && shape !== 'ellipse' && shape !== 'polygon') || rotated) {
       skipped++
       continue
     }
@@ -196,7 +200,7 @@ export function occlusionFromAnki(text: string): AnkiOcclusionResult {
       skipped++
       continue
     }
-    if (shape !== 'rect' || Number(p.get('angle') ?? 0) !== 0) converted++
+    if (shape !== 'rect') converted++
     masks.push(mask)
   }
   return { occlusion: { mode: hideAll ? 'hideAll' : 'hideOne', masks }, converted, skipped }
@@ -253,4 +257,40 @@ export function resizeMask(mask: OcclusionMask, dw: number, dh: number): Occlusi
   const w = Math.min(1 - mask.x, Math.max(MIN_MASK_SIZE, mask.w + dw))
   const h = Math.min(1 - mask.y, Math.max(MIN_MASK_SIZE, mask.h + dh))
   return { ...mask, w: round4(w), h: round4(h) }
+}
+
+/**
+ * Mask answers written in Anki's Comments field by Recto's export, one line per group
+ * (`2 : Lyon`, HTML-escaped, joined by `<br>`): Anki has no place for them.
+ */
+export function labelsToAnkiComments(o: Occlusion): string {
+  return occlusionGroups(o)
+    .flatMap((n) => {
+      const labels = maskLabels(o, n)
+      return labels.length > 0 ? [`${n} : ${escapeHtml(labels.join(', '))}`] : []
+    })
+    .join('<br>')
+}
+
+/**
+ * The answers written by `labelsToAnkiComments`, or null when the field holds anything else (a
+ * comment written in Anki stays a comment). Each answer goes to the first mask of its group.
+ */
+export function labelsFromAnkiComments(o: Occlusion, comments: string): Occlusion | null {
+  const lines = comments.split(/<br\s*\/?>|\n/i).filter((l) => l.trim() !== '')
+  const labels = new Map<number, string>()
+  for (const line of lines) {
+    const m = /^\s*(\d+) : (.+)$/.exec(line)
+    if (!m) return null
+    labels.set(Number(m[1]), decodeEntities(m[2] ?? '').trim())
+  }
+  if (labels.size === 0) return null
+  const done = new Set<number>()
+  const masks = o.masks.map((mask) => {
+    const label = labels.get(mask.n)
+    if (!label || done.has(mask.n)) return mask
+    done.add(mask.n)
+    return { ...mask, label }
+  })
+  return { ...o, masks }
 }

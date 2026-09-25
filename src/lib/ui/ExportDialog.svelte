@@ -41,6 +41,13 @@
   async function exportCsv(signal: AbortSignal) {
     const rows = await repo.exportRows(scope)
     signal.throwIfAborted()
+    // Occlusion notes have no CSV form: say so rather than drop them silently, and never save
+    // a file with nothing in it (the Anki format keeps them).
+    const left = rows.filter((r) => !csvExportable(r.note)).length
+    if (left > 0 && left === rows.length) {
+      toast(t('exportCsv.leftOut', { n: left }), 'error')
+      return
+    }
     const csv = notesToCsv(rows, delimiter)
     const ext = delimiter === ';' ? 'csv' : 'tsv'
     const mime = delimiter === ';' ? 'text/csv' : 'text/tab-separated-values'
@@ -49,9 +56,7 @@
       timestampedName(slugify(name), ext, Date.now()),
     )
     close()
-    const left = rows.filter((r) => !csvExportable(r.note)).length
     toast(t('exportCsv.done', { n: rows.length - left }))
-    // Occlusion notes have no CSV form: say so rather than drop them silently.
     if (left > 0) toast(t('exportCsv.leftOut', { n: left }))
   }
 

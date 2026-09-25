@@ -28,7 +28,7 @@ export function buildRow(card: Card, note: Note, deckName: string): BrowserRow {
     ? `${stripHtml(r.question) || occlusion.alt || occlusion.image} #${occlusion.target}`
     : stripHtml(r.question)
   const answer = occlusion
-    ? r.expected || stripHtml(r.extra)
+    ? stripHtml(r.expected) || stripHtml(r.extra)
     : stripHtml(r.answerReplacesQuestion ? r.extra : r.answer)
   return { card, note, deckName, question, answer, status: cardStatus(card) }
 }
