@@ -15,6 +15,8 @@ export default defineConfig(
       'test-results/',
       'public/',
       'node_modules/',
+      // Skills and agent worktrees (full copies of the repository).
+      '.claude/',
     ],
   },
   js.configs.recommended,
