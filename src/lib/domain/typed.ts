@@ -1,4 +1,4 @@
-import { stripMathDelimiters } from './math'
+import { markMath, stripMathDelimiters } from './math'
 import { stripHtml } from './text'
 import type { Rating } from './types'
 
@@ -11,24 +11,30 @@ export interface DiffPart {
 
 const fold = (s: string) => s.normalize('NFC').trim().replace(/\s+/g, ' ')
 
-/** The text a typed answer is compared with (formulas without their delimiters). */
-function expectedText(expectedHtml: string): string {
-  return fold(stripHtml(stripMathDelimiters(expectedHtml)))
-}
-
 /** Typed answers need something to type: not an image-only back nor an unlabelled mask. */
 export function canTypeAnswer(expectedHtml: string): boolean {
-  return expectedText(expectedHtml) !== ''
+  return fold(stripHtml(stripMathDelimiters(expectedHtml))) !== ''
 }
 
 /**
  * Character-by-character comparison of a typed answer (SPEC §5.3), by longest common
  * subsequence: `same` characters, `wrong` typed characters, `missing` expected characters.
- * Formulas are expected without their delimiters: `x^2` for `\(x^2\)`.
+ * Formulas are expected without their delimiters: `x^2` for `\(x^2\)`. Their source as
+ * written, delimiters included, is accepted too when it matches better: an invalid formula
+ * (a regex such as `\(\d+\)`) is displayed that way.
  */
 export function compareTyped(expectedHtml: string, typed: string): DiffPart[] {
+  const tex = stripHtml(stripMathDelimiters(expectedHtml))
+  const source = stripHtml(markMath(expectedHtml))
+  const parts = diff(tex, typed)
+  if (source === tex) return parts
+  const sourceParts = diff(source, typed)
+  return similarity(sourceParts) > similarity(parts) ? sourceParts : parts
+}
+
+function diff(expected: string, typed: string): DiffPart[] {
   const a = [...fold(typed)]
-  const b = [...expectedText(expectedHtml)]
+  const b = [...fold(expected)]
   const eq = (x: string | undefined, y: string | undefined) =>
     x !== undefined && y !== undefined && x.toLocaleLowerCase('fr') === y.toLocaleLowerCase('fr')
   const n = a.length

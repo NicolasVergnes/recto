@@ -53,5 +53,22 @@ describe('typed answers (SPEC §5.3)', () => {
         .map((p) => p.text)
         .join(''),
     ).toBe('a < b')
+    // A raw `<` inside a formula is text, not the start of a tag.
+    expect(compareTyped('\\(a<b\\) et \\(b>c\\)', 'a<b et b>c')).toEqual([
+      { text: 'a<b et b>c', kind: 'same' },
+    ])
+    // On a tie, the expected answer is shown without delimiters.
+    expect(compareTyped('\\(x^2\\)', '')).toEqual([{ text: 'x^2', kind: 'missing' }])
+  })
+
+  it('also accepts a formula typed as written, delimiters included', () => {
+    // A regex deck: KaTeX cannot render `\d`, so the back shows the source `\(\d+\)`.
+    const shown = compareTyped('\\(\\d+\\)', '\\(\\d+\\)')
+    expect(shown).toEqual([{ text: '\\(\\d+\\)', kind: 'same' }])
+    expect(suggestRating(shown, [1, 2, 3, 4])).toBe(3)
+    expect(compareTyped('\\(\\d+\\)', '\\d+')).toEqual([{ text: '\\d+', kind: 'same' }])
+    expect(compareTyped('Soit \\(x^2\\)', 'soit \\(x^2\\)')).toEqual([
+      { text: 'Soit \\(x^2\\)', kind: 'same' },
+    ])
   })
 })
