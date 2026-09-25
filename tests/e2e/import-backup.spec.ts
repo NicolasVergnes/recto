@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 import { resolve } from 'node:path'
 
 const sample = (name: string) => resolve(process.cwd(), 'data/samples', name)

@@ -448,6 +448,8 @@
   .question a {
     color: var(--text);
     display: block;
+    min-height: 2.75rem;
+    line-height: 2.75rem;
     overflow: hidden;
     text-overflow: ellipsis;
   }

@@ -1,12 +1,34 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-09-25 · Branche : claude/great-feynman-7vbb6d · Jalon en cours : M5
+Dernière mise à jour : 2026-09-25 · Branche : claude/great-feynman-7vbb6d · **V0 livrée** (M0 à M5)
 
 ## Jalon en cours
 
-M5 — Statistiques, finitions, V0 (plan écrit au démarrage du jalon).
+Aucun : **V0 livrée**, en attente de relecture et de fusion par Nicolas. Suivant : M6 (V1, périmètre ouvert, docs/07-ROADMAP.md).
 
 ## Terminé
+
+### M5 — Statistiques, finitions, V0 (2026-09-25)
+
+Plan suivi :
+
+1. `src/lib/stats/index.ts` (pur, `now` en paramètre) + tests : aujourd'hui, prévision 30 j, rétention réelle 7/30/90 j, rétention cible, heatmap 365 j, répartitions par état et par compartiment.
+2. `loadStatsData` (`src/lib/db/study.ts`) : paquets, cartes et un an de journal, filtrés par paquet (sous-paquets inclus), compteurs du jour issus de la file réelle.
+3. Graphiques SVG maison `src/lib/ui/charts/` (ColumnChart, Heatmap, BarList) suivant le skill dataviz : barres ≤ 24 px à sommet arrondi, grille fine, info-bulle, clavier, vue tableau ; rampe séquentielle validée par le script du skill en clair et en sombre.
+4. Écran `Stats.svelte` (filtre par paquet dans l'URL).
+5. Passe accessibilité : audit axe-core et Lighthouse ponctuels, cibles 44 px, `prefers-reduced-motion`, focus visible ; E2E clavier.
+6. Hors ligne : E2E 6 (chargement, révision, création sans réseau ; worker Anki et WASM précachés) et vérification du build sous `/recto/`.
+7. Performance : test Vitest existant (file de 20 000 cartes) + mesure E2E dans Chromium ; taille du bundle.
+8. `.github/workflows/pages.yml`, README utilisateur, STATUS, CHANGELOG.
+
+Critères :
+
+- [x] Écran Statistiques (SPEC §5.6) : compteurs, prévision 30 j, rétention réelle 7/30/90 j vs cible, heatmap, répartition par état et par compartiment, filtre par paquet ; SVG maison, clair/sombre (`tests/unit/stats.test.ts`, `tests/unit/db/study.test.ts` › loadStatsData, e2e « the statistics screen reflects today's reviews »).
+- [x] Accessibilité : Lighthouse Accessibilité **100** (et Bonnes pratiques 100) sur Accueil, Ajouter, Cartes, Importer, Statistiques, Paramètres ; axe-core (règles WCAG 2.1 AA, dont le contraste) : **0 violation** sur 11 écrans × clair/sombre × ordinateur/mobile ; toutes les cibles interactives ≥ 44 px (script de mesure) ; `prefers-reduced-motion` et anneau de focus (e2e `a11y-perf.spec.ts`) ; révision complète au clavier seul (même fichier).
+- [x] Performance : file du jour de 20 000 cartes calculée en < 200 ms (`tests/unit/queue/build.test.ts` › « 20 000 cards ») ; dans Chromium, première carte affichée 0,4 à 0,9 s après la navigation avec 20 000 cartes en base (e2e, seuil 2 s) ; bundle initial **≈ 158 Ko gzip** (JS 151,5 + CSS 5,5 + HTML 0,4 ; lecteur Anki et WASM chargés à la demande).
+- [x] Hors ligne : E2E 6 (`tests/e2e/offline-stats.spec.ts`) ; test manuel Android décrit ci-dessous (« À vérifier »).
+- [x] Déploiement : `.github/workflows/pages.yml` (check + tests unitaires, build `BASE_PATH=/recto/`, publication) ; build `/recto/` vérifié localement (service worker à la portée `/recto/`, révision hors ligne). URL notée dans le README : <https://nicolasvergnes.github.io/recto/> — **effective après activation de Pages et fusion sur `main`** (voir « À vérifier »).
+- [x] README utilisateur (Android, sauvegarde, import Anki et CSV, commandes) ; STATUS marqué « V0 livrée ».
 
 ### M4 — Import `.apkg` (2026-09-25)
 
@@ -110,10 +132,19 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## Reste à faire / dettes
 
-- M3 à M5 (docs/07-ROADMAP.md).
-- Plusieurs écrans dépassent 200 lignes (Review, Editor, Cards, Settings, Deck) : extraire des sous-composants lors des finitions (M5).
+- M6 / V1 (docs/07-ROADMAP.md) : optimiseur FSRS, occlusion d'image, export `.apkg`, KaTeX, synchronisation par fichier, empaquetage Android.
+- Plusieurs écrans dépassent 200 lignes (Review, Editor, Cards, Settings, Deck, Stats) : extraire des sous-composants (non fait en M5 pour ne pas risquer de régression hors des critères du jalon).
+- Couverture globale ≈ 89 % (seuils de 90 % appliqués comme prévu au domaine : scheduler, queue, import) ; `db/` et `export/` sont couverts par les tests d'intégration mais sans seuil.
 
 ## Décisions prises en session
+
+- 2026-09-25 (M5) : rétention réelle = réponses ≠ Encore / réponses données en état Révision, sur 7/30/90 **journées d'étude** ; cible = moyenne des `desiredRetention` des paquets FSRS pondérée par leurs cartes (pas de cible pour la Memory Box). Le temps du jour plafonne chaque réponse à 60 s (comme le journal).
+- 2026-09-25 (M5) : prévision : retards comptés aujourd'hui ; nouvelles, suspendues et retirées exclues. Heatmap : 365 journées d'étude, semaines commençant le lundi, 5 niveaux (0 + quartiles du jour le plus chargé). Pas de série de jours ni de record (pas de gamification, SPEC §2).
+- 2026-09-25 (M5) : graphiques explorables au clavier par un rôle `slider` (←/→, Début/Fin, `aria-valuetext` décrit la colonne ou le jour), survol sur toute la bande de la colonne, vue tableau repliable ; rampe du calendrier validée par le validateur du skill dataviz (`--ordinal`) : clair `#6fb9af → #0a5a53`, sombre `#2e6860 → #98dfd3`, cases vides `--heat-0`.
+- 2026-09-25 (M5) : Lighthouse et axe-core exécutés ponctuellement (via `npx` hors du projet) plutôt qu'ajoutés en dépendances : aucune ADR nécessaire, résultats notés dans les critères. À relancer à la main avant une version majeure.
+- 2026-09-25 (M5) : les E2E fixent l'horloge de la page à 11:00 UTC du jour (`tests/e2e/fixtures.ts`, `page.clock.install`) : lancés entre minuit et 04:00, des cartes en apprentissage basculaient sur la journée d'étude suivante.
+- 2026-09-25 (M5) : le test E2E des 20 000 cartes remplit IndexedDB directement (40 000 lignes, 25 à 40 s en Chromium sans tête, délai du test porté à 180 s) ; le critère « < 200 ms » reste mesuré par Vitest, la mesure navigateur (seuil 2 s = démarrage SPEC) le complète.
+- 2026-09-25 (M5) : `pages.yml` lance `check` et les tests unitaires avant de publier ; la porte complète (`verify`, E2E compris) reste dans `ci.yml`. Routage par `#` : pas de `404.html` nécessaire.
 
 - 2026-09-25 (M4) : le `.wasm` de sql.js est importé avec `?url` (Vite l'émet avec un nom haché, le service worker le précache) au lieu d'être copié dans `public/sql/` : pas de plugin ni de script `postinstall`. Worker au format ES (`worker.format: 'es'`).
 - 2026-09-25 (M4) : l'historique Anki est rejoué avec `scheduler.answer` carte par carte (types 0/1/2, notes 1–4) : même algorithme que `fsrs.reschedule` (qui rejoue avec `next`), mais produit directement les lignes `Review` de Recto et fonctionne à l'identique pour Leitner.
@@ -168,8 +199,14 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 - `@vite-pwa/assets-generator` 1.0.4 au lieu de 2.0.0 : `vite-plugin-pwa` 1.3 déclare `^1.0.0` en dépendance paire.
 - Le manifeste déclare aussi l'icône `pwa-64x64.png` produite par le preset `minimal-2023`.
 - Licence : l'écran « À propos » et `package.json` indiquent MIT (choix par défaut, aucune licence n'étant fixée dans les docs) — à confirmer par Nicolas.
+- M5 : la roadmap demande un déploiement « opérationnel » ; le workflow est prêt et le build `/recto/` vérifié, mais la publication elle-même exige d'activer Pages dans les réglages du dépôt et de fusionner sur `main`, ce que seule une personne peut faire.
+- Chromium ne passe pas la requête du favicon SVG par le service worker : hors ligne, la console signale l'échec de `logo.svg` (sans effet sur l'application, les icônes du manifeste sont précachées).
 
 ## À vérifier manuellement par Nicolas
+
+- M5 — publication : dans GitHub, _Settings → Pages → Source : GitHub Actions_, puis fusionner sur `main` ; le workflow « Pages » publie <https://nicolasvergnes.github.io/recto/>.
+- M5 — test Android hors ligne (à consigner ici avec le modèle du téléphone et la date) : ouvrir l'URL dans Chrome Android → menu ⋮ → « Installer l'application » ; ouvrir l'app installée, « Essayer avec un paquet d'exemple », Paramètres → Stockage → demander la persistance ; activer le mode avion ; fermer l'app (liste des apps récentes) et la rouvrir ; faire une séance, ajouter une note avec une photo, ouvrir Statistiques ; désactiver le mode avion, « Sauvegarder maintenant » et partager le fichier vers Drive.
+- M5 — Statistiques : lisibilité des graphiques en thème sombre et sur petit écran (le calendrier défile horizontalement, semaines récentes visibles d'abord).
 
 - M4 : importer un vrai paquet AnkiWeb d'au moins 1 000 cartes exporté d'Anki avec « Prise en charge des anciennes versions d'Anki » (par exemple « Ultimate Geography », cité dans le dossier) ; noter ici son nom, sa taille et la durée affichée dans le rapport ; vérifier images et sons. Les paquets AnkiWeb ne sont pas commités (licences).
 

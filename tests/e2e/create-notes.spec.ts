@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 
 // E2E 1 (06 §4): first launch → create a deck → add 3 notes (basic, reverse, cloze)
 // → 5 cards visible in the card browser.

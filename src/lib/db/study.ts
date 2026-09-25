@@ -170,3 +170,27 @@ export async function switchScheduler(
     return converted.length
   })
 }
+
+/** Data of the statistics screen: cards and review log of a deck (with sub-decks) or all. */
+export async function loadStatsData(now: number, deckId?: string) {
+  const [allDecks, dayStartHour] = await Promise.all([
+    db.decks.toArray(),
+    getSetting('dayStartHour'),
+  ])
+  const decks = studyDecks(allDecks, deckId)
+  const ids = new Set(decks.map((d) => d.id))
+  const cards = deckId
+    ? await db.cards
+        .where('deckId')
+        .anyOf([...ids])
+        .toArray()
+    : await db.cards.toArray()
+  const cardIds = new Set(cards.map((c) => c.id))
+  // One year of history is enough for the heatmap and retention windows.
+  const since = now - 366 * 86_400_000
+  const reviews = (await db.reviews.where('reviewedAt').aboveOrEqual(since).toArray()).filter(
+    (r) => !deckId || cardIds.has(r.cardId),
+  )
+  const queue = await loadTodayQueue(now, deckId)
+  return { decks, cards, reviews, dayStartHour, today: queue.result.counts }
+}

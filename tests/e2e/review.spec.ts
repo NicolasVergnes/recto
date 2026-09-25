@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
+import { expect, test } from './fixtures'
 
 async function deckWithNotes(page: Page, name: string, notes: [string, string][]) {
   await page.goto('/')

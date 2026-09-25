@@ -4,6 +4,21 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 ## [Unreleased]
 
+### M5 — Statistiques, finitions, V0
+
+#### Added
+
+- Écran Statistiques (SPEC §5.6), global ou filtré par paquet : aujourd'hui (dues, nouvelles, réponses, temps, réussite), rétention réelle 7/30/90 jours comparée à la cible, prévision sur 30 jours, calendrier des révisions sur 365 jours, répartition par état et par compartiment Memory Box.
+- Graphiques SVG maison (`src/lib/ui/charts`) : colonnes, calendrier, barres ; info-bulle au survol, exploration au clavier (←/→), vue tableau, palette séquentielle validée en clair et en sombre.
+- Déploiement GitHub Pages (`.github/workflows/pages.yml`, sous-chemin `/recto/`).
+- README utilisateur : installation Android, sauvegarde, import Anki et CSV.
+- Tests : statistiques (unitaires), E2E 6 hors ligne (révision et création sans réseau, lecteur Anki précaché), révision complète au clavier, `prefers-reduced-motion` et anneau de focus, file du jour de 20 000 cartes dans Chromium.
+
+#### Changed
+
+- Cibles tactiles d'au moins 44 px pour les liens isolés (retour au paquet parent, liens de liste), curseurs et sélecteurs de fichiers.
+- Les tests E2E tournent à heure fixe (11:00 UTC) pour ne pas dépendre de la frontière de 04:00.
+
 ### M4 — Import `.apkg`
 
 #### Added

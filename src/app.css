@@ -25,6 +25,13 @@
   --rate-good-text: #2c6e31;
   --rate-easy-text: #1f5a9e;
   --overlay: rgb(0 0 0 / 45%);
+  /* Sequential ramp for the heatmap (validated: monotone, light end ≥ 2:1 on the surface). */
+  --heat-0: #eeeeea;
+  --heat-1: #6fb9af;
+  --heat-2: #3d998d;
+  --heat-3: #1d7c72;
+  --heat-4: #0a5a53;
+  --chart-grid: #e2e2dc;
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -73,6 +80,12 @@
     --rate-again-text: #f2a7a0;
     --rate-good-text: #8fd694;
     --rate-easy-text: #9cc3f5;
+    --heat-0: #252929;
+    --heat-1: #2e6860;
+    --heat-2: #3f9186;
+    --heat-3: #5cb8ab;
+    --heat-4: #98dfd3;
+    --chart-grid: #303534;
     --overlay: rgb(0 0 0 / 60%);
     --shadow: 0 1px 2px rgb(0 0 0 / 40%);
   }
@@ -97,6 +110,12 @@
   --rate-again-text: #f2a7a0;
   --rate-good-text: #8fd694;
   --rate-easy-text: #9cc3f5;
+  --heat-0: #252929;
+  --heat-1: #2e6860;
+  --heat-2: #3f9186;
+  --heat-3: #5cb8ab;
+  --heat-4: #98dfd3;
+  --chart-grid: #303534;
   --overlay: rgb(0 0 0 / 60%);
   --shadow: 0 1px 2px rgb(0 0 0 / 40%);
 }
@@ -355,6 +374,20 @@ input[type='radio'] {
 input[type='range'] {
   accent-color: var(--accent);
   width: 100%;
+  min-height: 2.75rem;
+}
+
+input[type='file'] {
+  font: inherit;
+  min-height: 2.75rem;
+  max-width: 100%;
+}
+
+/* Stand-alone links (not inside a sentence) get a 44 px touch target (04-UI §5). */
+.link-target {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
 }
 
 .check {

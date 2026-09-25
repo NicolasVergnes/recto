@@ -148,3 +148,20 @@ describe('retire (P7) and scheduler switch', () => {
     await expect(switchScheduler('missing', 'fsrs', now)).rejects.toBeInstanceOf(RepoError)
   })
 })
+
+describe('loadStatsData', () => {
+  it('scopes cards and reviews to a deck and its sub-decks', async () => {
+    const { deck, cards } = await setup()
+    const other = await repo.createDeck({ name: 'Autre' }, now)
+    await repo.createNote({ deckId: other.id, modelType: 'basic', fields: ['x'], tags: [] }, now)
+    await recordReview(fsrs.answer(cards[0], 3, now - 3600_000, deck), 1000)
+    const { loadStatsData } = await import('$lib/db/study')
+    const all = await loadStatsData(now)
+    expect(all.cards).toHaveLength(3)
+    expect(all.reviews).toHaveLength(1)
+    const one = await loadStatsData(now, other.id)
+    expect(one.cards).toHaveLength(1)
+    expect(one.reviews).toHaveLength(0)
+    expect(one.today).toEqual({ learning: 0, review: 0, new: 1 })
+  })
+})

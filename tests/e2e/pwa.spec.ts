@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 
 test('the web app manifest is served with name and icons', async ({ request }) => {
   const res = await request.get('/manifest.webmanifest')
