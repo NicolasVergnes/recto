@@ -21,6 +21,7 @@
   import { toast } from '$lib/state/toast.svelte'
   import Dialog from '$lib/ui/Dialog.svelte'
   import { errorMessage } from '$lib/ui/errors'
+  import ExportCollectionApkg from '$lib/ui/export/ExportCollectionApkg.svelte'
   import { formatBytes, formatDateTime } from '$lib/ui/format'
   import { SOURCES } from '$lib/ui/sources'
 
@@ -213,6 +214,7 @@
       </button>
       <a class="btn" href="#/import">{t('settings.restore')}</a>
     </div>
+    <ExportCollectionApkg />
   </section>
 
   <section class="card-surface stack" aria-labelledby="storage-title">

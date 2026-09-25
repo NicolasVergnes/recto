@@ -11,7 +11,7 @@
   import DeckSelect from '$lib/ui/DeckSelect.svelte'
   import DeckSettingsForm from '$lib/ui/DeckSettingsForm.svelte'
   import Dialog from '$lib/ui/Dialog.svelte'
-  import ExportCsvDialog from '$lib/ui/ExportCsvDialog.svelte'
+  import ExportDialog from '$lib/ui/ExportDialog.svelte'
   import { errorMessage } from '$lib/ui/errors'
   import Icon from '$lib/ui/Icon.svelte'
   import NewDeckDialog from '$lib/ui/NewDeckDialog.svelte'
@@ -228,7 +228,7 @@
     </section>
   </section>
 
-  <ExportCsvDialog bind:open={exporting} deckId={deck.id} name={deck.name} />
+  <ExportDialog bind:open={exporting} deckId={deck.id} name={deck.name} />
 
   <NewDeckDialog
     bind:open={creatingChild}

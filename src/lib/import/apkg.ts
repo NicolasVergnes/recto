@@ -164,7 +164,8 @@ export async function planApkgImport(
     fsrs: getScheduler('fsrs', { dayStartHour: options.dayStartHour }),
     leitner: getScheduler('leitner', { dayStartHour: options.dayStartHour }),
   }
-  const byGuid = new Map(existing.notes.filter((n) => n.sourceGuid).map((n) => [n.sourceGuid, n]))
+  // The guid a Recto export writes (05 §4): the Anki guid of imported notes, else the note id.
+  const byGuid = new Map(existing.notes.map((n) => [n.sourceGuid ?? n.id, n]))
   const cardsByNote = new Map<number, ApkgCard[]>()
   for (const c of pkg.cards) cardsByNote.set(c.nid, [...(cardsByNote.get(c.nid) ?? []), c])
   const revlogByCard = new Map<number, { id: number; ease: number; time: number }[]>()
@@ -206,9 +207,13 @@ export async function planApkgImport(
     const updatedAt = an.mod * 1000
     const known = byGuid.get(an.guid)
     if (known) {
-      // Re-import (05 §2.3): update the fields when Anki's copy is more recent — and of the same
-      // note type, since fields of different types do not mean the same thing.
-      if (updatedAt > known.updatedAt && known.modelType === conversion.modelType)
+      // Re-import (05 §2.3): update the fields when Anki's copy is more recent, unless that would
+      // change the note's cards (other note type, cloze added or removed): an update keeps the
+      // cards as they are (invariant 2), so such a note is left untouched and counted as skipped.
+      const sameCards =
+        conversion.modelType === known.modelType &&
+        cardOrds(known.modelType, fields).join() === cardOrds(known.modelType, known.fields).join()
+      if (updatedAt > known.updatedAt && sameCards)
         plan.updates.push({ ...known, fields, tags: an.tags, updatedAt })
       else report.skipped++
       continue
