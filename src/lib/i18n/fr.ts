@@ -226,6 +226,29 @@ export const fr = {
     added: 'Note ajoutée ({n} carte)|Note ajoutée ({n} cartes)',
     saved: 'Note enregistrée',
     noDeck: 'Créez d’abord un paquet.',
+    imageOcclusion: 'Occlusion d’image',
+    header: 'En-tête',
+  },
+  occlusion: {
+    noImage: 'Aucune image : choisissez-en une.',
+    chooseImage: 'Choisir une image',
+    changeImage: 'Changer d’image',
+    drawHelp:
+      'Tracez un rectangle sur chaque zone à cacher ; faites glisser un masque pour le déplacer.',
+    keyboardHelp:
+      'Sur un masque : flèches pour le déplacer, Maj + flèches pour le redimensionner, Suppr pour le supprimer.',
+    masks: 'Masques',
+    cardCount: '{n} carte|{n} cartes',
+    noMask: 'Dessinez au moins un masque sur l’image, ou ajoutez-en un.',
+    addMask: 'Ajouter un masque',
+    mask: 'Masque {n}',
+    group: 'Carte n°',
+    label: 'Réponse (facultative)',
+    delete: 'Supprimer le masque {n}',
+    mode: 'Pendant la révision',
+    hideAll: 'Tout cacher, deviner une zone',
+    hideOne: 'Ne cacher que la zone à deviner',
+    target: 'Zone {n} sur {total} à deviner',
   },
   scheduler: {
     fsrs: 'FSRS (recommandé)',
@@ -480,12 +503,17 @@ export const fr = {
     line: 'Ligne {n} :',
     emptyFront: 'recto vide.',
     noCloze: 'texte à trous sans {{c1::…}}.',
+    noMask: 'occlusion d’image sans masque lisible.',
     tooManyRows: 'fichier trop long (50 000 lignes au maximum).',
     emptyFile: 'fichier vide.',
     unknownModel: 'modèle inconnu.',
     orphanCard: 'carte sans note.',
     convertedModel:
       '« {name} » converti en Basique ({n} champ fusionné dans Extra)|« {name} » converti en Basique ({n} champs fusionnés dans Extra)',
+    shapesConverted:
+      'Occlusion d’image : {n} forme (ellipse, polygone ou forme tournée) remplacée par un rectangle.|Occlusion d’image : {n} formes (ellipses, polygones ou formes tournées) remplacées par des rectangles.',
+    shapesSkipped:
+      'Occlusion d’image : {n} forme ignorée (texte ou coordonnées en pixels).|Occlusion d’image : {n} formes ignorées (texte ou coordonnées en pixels).',
   },
   missingMedia: {
     intro:

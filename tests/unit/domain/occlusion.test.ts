@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  addMask,
   maskLabels,
+  MIN_MASK_SIZE,
+  moveMask,
   nextMaskGroup,
   normalizeMask,
   occlusionFromAnki,
@@ -8,7 +11,11 @@ import {
   occlusionOrds,
   occlusionToAnki,
   parseOcclusion,
+  rectFromPoints,
+  removeMask,
+  resizeMask,
   serializeOcclusion,
+  updateMask,
   type Occlusion,
 } from '$lib/domain/occlusion'
 
@@ -143,5 +150,50 @@ describe('Anki image occlusion field', () => {
     )
     expect(occlusion.masks).toEqual([{ n: 1, x: 0.1, y: 0.2, w: 0.3, h: 0.4 }])
     expect(occlusion.mode).toBe('hideOne')
+  })
+})
+
+describe('mask editing', () => {
+  const empty: Occlusion = { mode: 'hideAll', masks: [] }
+
+  it('turns a drag into a rectangle inside the image', () => {
+    expect(rectFromPoints({ x: 0.6, y: 0.9 }, { x: 0.2, y: 1.4 })).toEqual({
+      x: 0.2,
+      y: 0.9,
+      w: 0.4,
+      h: 0.1,
+    })
+  })
+
+  it('adds masks in new groups, or in a given group, and ignores tiny ones', () => {
+    const one = addMask(empty, { x: 0.1, y: 0.1, w: 0.2, h: 0.2 })
+    const two = addMask(one, { x: 0.5, y: 0.5, w: 0.1, h: 0.1 })
+    const grouped = addMask(two, { x: 0.7, y: 0.1, w: 0.1, h: 0.1 }, 1)
+    expect(grouped.masks.map((m) => m.n)).toEqual([1, 2, 1])
+    expect(addMask(two, { x: 0.5, y: 0.5, w: 0.001, h: 0.2 })).toBe(two)
+  })
+
+  it('updates, relabels, regroups and removes masks', () => {
+    const o = addMask(addMask(empty, { x: 0.1, y: 0.1, w: 0.2, h: 0.2 }), {
+      x: 0.5,
+      y: 0.5,
+      w: 0.2,
+      h: 0.2,
+    })
+    const labelled = updateMask(o, 1, { label: ' Lyon ' })
+    expect(labelled.masks[1]).toMatchObject({ n: 2, label: 'Lyon' })
+    expect(updateMask(labelled, 1, { label: '  ' }).masks[1]).not.toHaveProperty('label')
+    expect(updateMask(o, 1, { n: 1 }).masks.map((m) => m.n)).toEqual([1, 1])
+    expect(updateMask(o, 1, { n: 0 })).toBe(o)
+    expect(updateMask(o, 5, { n: 3 })).toBe(o)
+    expect(removeMask(o, 0).masks).toEqual([o.masks[1]])
+  })
+
+  it('moves and resizes masks within the image', () => {
+    const m = { n: 1, x: 0.8, y: 0.1, w: 0.15, h: 0.2 }
+    expect(moveMask(m, 0.1, -0.2)).toEqual({ n: 1, x: 0.85, y: 0, w: 0.15, h: 0.2 })
+    expect(moveMask(m, -1, 0.01)).toEqual({ n: 1, x: 0, y: 0.11, w: 0.15, h: 0.2 })
+    expect(resizeMask(m, 0.5, -1)).toEqual({ n: 1, x: 0.8, y: 0.1, w: 0.2, h: MIN_MASK_SIZE })
+    expect(resizeMask(m, 0.01, 0.01)).toEqual({ n: 1, x: 0.8, y: 0.1, w: 0.16, h: 0.21 })
   })
 })

@@ -3,6 +3,7 @@
  */
 import { makeCard } from '../domain/defaults'
 import { cardOrds } from '../domain/notes'
+import { occlusionFromAnki, serializeOcclusion } from '../domain/occlusion'
 import { mediaRefs, renameMediaRefs } from '../domain/text'
 import type { Card, Deck, ModelType, Note, Rating, Review, SchedulerKind } from '../domain/types'
 import { sha256Hex } from '../media/hash'
@@ -52,12 +53,35 @@ const joinRest = (fields: readonly string[], from: number) =>
     .join('<br>')
 
 /**
- * Note types (05 §2.3): cloze → [Texte, Extra + rest]; standard with one template → basic;
- * with two templates whose second asks the second field → basic_reverse; otherwise basic and
- * reported. Model CSS is ignored.
+ * Anki 23.10+ « Image Occlusion » note type: a cloze type whose template draws the masks
+ * (`image-occlusion` in the question). Its field names are localised, so detection and field
+ * order ([Occlusion, Image, Header, Back Extra, Comments]) rely on the template, not the names.
+ */
+export function isAnkiImageOcclusion(model: ApkgModel): boolean {
+  return model.type === 1 && model.templates.some((t) => t.qfmt.includes('image-occlusion'))
+}
+
+/**
+ * Note types (05 §2.3): image occlusion → [Image, masks, Header, Back Extra + Comments];
+ * cloze → [Texte, Extra + rest]; standard with one template → basic; with two templates whose
+ * second asks the second field → basic_reverse; otherwise basic and reported. Model CSS is
+ * ignored.
  */
 export function convertModel(model: ApkgModel): ModelConversion {
   const n = model.fields.length
+  if (isAnkiImageOcclusion(model)) {
+    return {
+      modelType: 'image_occlusion',
+      mergedFields: Math.max(0, n - 4),
+      converted: false,
+      map: (f) => [
+        f[1] ?? '',
+        serializeOcclusion(occlusionFromAnki(f[0] ?? '').occlusion),
+        f[2] ?? '',
+        joinRest(f, 3),
+      ],
+    }
+  }
   if (model.type === 1) {
     const merged = Math.max(0, n - 2)
     return {
@@ -174,6 +198,11 @@ export async function planApkgImport(
       report.convertedModels.push({ name: model.name, mergedFields: conversion.mergedFields })
     }
     const fields = conversion.map(an.fields)
+    if (conversion.modelType === 'image_occlusion') {
+      const shapes = occlusionFromAnki(an.fields[0] ?? '')
+      report.shapesConverted += shapes.converted
+      report.shapesSkipped += shapes.skipped
+    }
     const updatedAt = an.mod * 1000
     const known = byGuid.get(an.guid)
     if (known) {
@@ -191,7 +220,8 @@ export async function planApkgImport(
     }
     const ords = cardOrds(conversion.modelType, fields)
     if (ords.length === 0) {
-      report.errors.push({ line: an.id, code: 'noCloze' })
+      const code = conversion.modelType === 'image_occlusion' ? 'noMask' : 'noCloze'
+      report.errors.push({ line: an.id, code })
       continue
     }
     const note: Note = {

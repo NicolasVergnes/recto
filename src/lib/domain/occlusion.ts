@@ -201,3 +201,56 @@ export function occlusionFromAnki(text: string): AnkiOcclusionResult {
   }
   return { occlusion: { mode: hideAll ? 'hideAll' : 'hideOne', masks }, converted, skipped }
 }
+
+// ─── Editing (pure helpers of the mask editor) ────────────────────────────────
+
+export interface Point {
+  x: number
+  y: number
+}
+
+/** The rectangle spanned by a pointer drag, in normalised coordinates. */
+export function rectFromPoints(a: Point, b: Point): Pick<OcclusionMask, 'x' | 'y' | 'w' | 'h'> {
+  const [x0, x1] = [clamp01(Math.min(a.x, b.x)), clamp01(Math.max(a.x, b.x))]
+  const [y0, y1] = [clamp01(Math.min(a.y, b.y)), clamp01(Math.max(a.y, b.y))]
+  return { x: round4(x0), y: round4(y0), w: round4(x1 - x0), h: round4(y1 - y0) }
+}
+
+/** Adds a mask in a new group (or `group`); unchanged when the rectangle is too small. */
+export function addMask(
+  o: Occlusion,
+  rect: Pick<OcclusionMask, 'x' | 'y' | 'w' | 'h'>,
+  group = nextMaskGroup(o),
+): Occlusion {
+  const mask = normalizeMask({ n: group, ...rect })
+  return mask ? { ...o, masks: [...o.masks, mask] } : o
+}
+
+/** Replaces mask `index` with `patch` applied; invalid results leave the occlusion unchanged. */
+export function updateMask(o: Occlusion, index: number, patch: Partial<OcclusionMask>): Occlusion {
+  const current = o.masks[index]
+  if (!current) return o
+  const next: OcclusionMask = { ...current, ...patch }
+  if (patch.label !== undefined && !patch.label.trim()) delete next.label
+  const mask = normalizeMask(next)
+  if (!mask) return o
+  return { ...o, masks: o.masks.map((m, i) => (i === index ? mask : m)) }
+}
+
+export function removeMask(o: Occlusion, index: number): Occlusion {
+  return { ...o, masks: o.masks.filter((_, i) => i !== index) }
+}
+
+/** Moves a mask by (dx, dy) without leaving the image or changing its size. */
+export function moveMask(mask: OcclusionMask, dx: number, dy: number): OcclusionMask {
+  const x = Math.min(1 - mask.w, Math.max(0, mask.x + dx))
+  const y = Math.min(1 - mask.h, Math.max(0, mask.y + dy))
+  return { ...mask, x: round4(x), y: round4(y) }
+}
+
+/** Grows or shrinks a mask from its bottom-right corner, within the image and above the minimum. */
+export function resizeMask(mask: OcclusionMask, dw: number, dh: number): OcclusionMask {
+  const w = Math.min(1 - mask.x, Math.max(MIN_MASK_SIZE, mask.w + dw))
+  const h = Math.min(1 - mask.y, Math.max(MIN_MASK_SIZE, mask.h + dh))
+  return { ...mask, w: round4(w), h: round4(h) }
+}
