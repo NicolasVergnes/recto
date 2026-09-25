@@ -41,3 +41,9 @@ Conséquences : un peu plus de code, aucune dépendance lourde à suivre.
 ## ADR-007 — Versions épinglées au démarrage du projet (2026-09-25)
 
 `svelte` 5.57, `vite` 8.3, `@sveltejs/vite-plugin-svelte` 7.3, `typescript` ≥ 5.9, `dexie` 4.4, `ts-fsrs` 5.4, `vite-plugin-pwa` 1.3 (+ `workbox-window` 7.4), `sql.js` 1.14, `fflate` 0.8, `papaparse` 5.7, `dompurify` (dernière 3.x), `vitest` 5.0, `@playwright/test` 1.63, `eslint` 10, `prettier` 3.9, `prettier-plugin-svelte` 4.1, `svelte-check` 4.7, `fake-indexeddb` (dernière), `happy-dom` (dernière). `fsrs-browser` 6.6 en V1. Vérifier les versions au moment de `npm install` (elles ont été relevées le 25/09/2026) et noter tout écart dans `STATUS.md`.
+
+## ADR-008 — Outillage de développement complémentaire (2026-09-25)
+
+Contexte : `docs/06-PWA-QUALITY.md` impose ESLint (`typescript-eslint`, `eslint-plugin-svelte`), une couverture ≥ 90 % et des icônes générées ; certaines briques nécessaires à ces outils ne figurent pas dans l'ADR-007.
+Décision : dépendances **de développement uniquement** (aucune n'est livrée dans le bundle) : `@eslint/js` et `globals` (configuration plate d'ESLint 10), `@vitest/coverage-v8` (mesure de couverture de Vitest), `@types/papaparse`, `@types/sql.js`, `@types/node` (typages), `jsdom` (environnement Vitest des seuls tests qui exercent DOMPurify : sous happy-dom, DOMPurify perd le premier nœud et laisse passer `<script>` — vérifié le 2026-09-25 —, alors que jsdom est l'environnement de référence de DOMPurify ; happy-dom reste l'environnement par défaut). TypeScript est épinglé en `~6.0` : `svelte-check` 4.7 et `typescript-eslint` 8.70 n'acceptent pas encore TypeScript 7 (`peerDependencies` ≤ 6.0).
+Conséquences : aucune incidence sur la taille de l'application ; passer à TypeScript 7 quand ces deux outils le prendront en charge.

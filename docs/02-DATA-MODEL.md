@@ -61,7 +61,7 @@ export interface DeckSettings {
   fsrs: {
     requestRetention: number   // 0.80–0.97, défaut 0.90
     maximumInterval: number    // jours, défaut 365 (écho au compartiment 7 « tous les ans » ; réglable)
-    learningSteps: string[]    // défaut ['10m']
+    learningSteps: string[]    // défaut ['10m', '10m'] (P11, voir 03 §2.5)
     relearningSteps: string[]  // défaut ['10m']
     params: number[] | null    // null = paramètres par défaut FSRS-6 ; sinon 21 valeurs
     ratingMode: 4 | 2          // 4 boutons ou 2 (Encore/Bien)
