@@ -3,7 +3,15 @@
  * (06 §5: no `any`, manual validators).
  */
 import { defaultDeckSettings } from '../domain/defaults'
-import type { Card, Deck, DeckSettings, Note, Review, Setting } from '../domain/types'
+import {
+  MODEL_TYPES,
+  type Card,
+  type Deck,
+  type DeckSettings,
+  type Note,
+  type Review,
+  type Setting,
+} from '../domain/types'
 import { validateFsrsSettings } from '../scheduler/fsrs'
 
 type Obj = Record<string, unknown>
@@ -85,7 +93,7 @@ export function readNote(x: unknown): Note | null {
   ) {
     return null
   }
-  if (!oneOf(['basic', 'basic_reverse', 'cloze'] as const, x.modelType)) return null
+  if (!oneOf(MODEL_TYPES, x.modelType)) return null
   if (!isNum(x.createdAt) || !isNum(x.updatedAt) || !optStr(x.source) || !optStr(x.sourceGuid)) {
     return null
   }

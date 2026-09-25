@@ -85,6 +85,10 @@ describe('backup validators', () => {
     ).toEqual({ schemaVersion: 1, appVersion: '0.1.0', exportedAt: 5, device: 'd' })
   })
 
+  it('accepts every note type, image occlusion included', () => {
+    expect(readNote({ ...note, modelType: 'image_occlusion' })?.modelType).toBe('image_occlusion')
+  })
+
   it('rejects malformed rows', () => {
     const bad = [
       readDeck(null),
@@ -92,7 +96,7 @@ describe('backup validators', () => {
       readDeck({ ...deck, emoji: 1 }),
       readDeck({ ...deck, settings: null }),
       readDeck({ ...deck, scheduler: 'sm2' }),
-      readNote({ ...note, modelType: 'image_occlusion' }),
+      readNote({ ...note, modelType: 'diagram' }),
       readNote({ ...note, createdAt: 'hier' }),
       readNote({ ...note, fields: [1] }),
       readCard({ ...card, state: 7 }),

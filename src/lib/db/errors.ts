@@ -7,6 +7,7 @@ export type RepoErrorCode =
   | 'deckMergeSelf'
   | 'noteNotFound'
   | 'noteNoCloze'
+  | 'noteNoMask'
   | 'retireLocked'
   | 'mediaType'
   | 'mediaTooLarge'

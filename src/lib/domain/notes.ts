@@ -1,9 +1,27 @@
 import { clozeAnswers, clozeIndices, renderClozeAnswer, renderClozeQuestion } from './cloze'
+import {
+  maskLabels,
+  occlusionOrds,
+  parseOcclusion,
+  type OcclusionMask,
+  type OcclusionMode,
+} from './occlusion'
+import { escapeHtml, imageRefs, imageTag } from './text'
 import type { Card, ModelType, Note } from './types'
 
-/** Number of fields per model: basic [front, back, extra], cloze [text, extra]. */
+/**
+ * Number of fields per model: basic [front, back, extra], cloze [text, extra],
+ * image_occlusion [image, masks JSON, header, extra].
+ */
 export function fieldCount(modelType: ModelType): number {
-  return modelType === 'cloze' ? 2 : 3
+  switch (modelType) {
+    case 'cloze':
+      return 2
+    case 'image_occlusion':
+      return 4
+    default:
+      return 3
+  }
 }
 
 /** Pads or trims `fields` to the model's field count. */
@@ -14,12 +32,20 @@ export function normalizeFields(modelType: ModelType, fields: readonly string[])
 
 /**
  * Card ords a note must have (02-DATA-MODEL §3 invariant 2): basic → [0], basic_reverse → [0, 1],
- * cloze → one per distinct index (ord = index - 1).
+ * cloze → one per distinct index (ord = index - 1), image_occlusion → one per mask group
+ * (ord = group - 1).
  */
 export function cardOrds(modelType: ModelType, fields: readonly string[]): number[] {
-  if (modelType === 'basic') return [0]
-  if (modelType === 'basic_reverse') return [0, 1]
-  return clozeIndices(fields[0] ?? '').map((i) => i - 1)
+  switch (modelType) {
+    case 'basic':
+      return [0]
+    case 'basic_reverse':
+      return [0, 1]
+    case 'cloze':
+      return clozeIndices(fields[0] ?? '').map((i) => i - 1)
+    case 'image_occlusion':
+      return occlusionOrds(parseOcclusion(fields[1] ?? ''))
+  }
 }
 
 /** The duplicate/sort key of a note: its first field (front or cloze text). */
@@ -27,18 +53,31 @@ export function noteFront(note: Pick<Note, 'fields'>): string {
   return note.fields[0] ?? ''
 }
 
+/** What an image occlusion card draws: the image, its masks and the group being asked. */
+export interface OcclusionCard {
+  /** Media name of the image (empty when the note has none). */
+  image: string
+  alt: string
+  mode: OcclusionMode
+  masks: OcclusionMask[]
+  /** The mask group asked by this card (card ord + 1). */
+  target: number
+}
+
 export interface RenderedCard {
-  /** Question side HTML (unsanitised). */
+  /** Question side HTML (unsanitised); the header for image occlusion. */
   question: string
-  /** Answer HTML: the back for basic cards, the revealed text for cloze. */
+  /** Answer HTML: the back for basic cards, the revealed text for cloze, the labels for occlusion. */
   answer: string
   extra: string
   /** Cloze: the answer replaces the question instead of being shown below it. */
   answerReplacesQuestion: boolean
   /** Leitner alternateSides: the back is asked (04-UI §2.2, "↔" indicator). */
   flipped: boolean
-  /** Expected text for typed answers. */
+  /** Expected text for typed answers (empty: nothing to type). */
   expected: string
+  /** Image occlusion only: drawn by the review and preview components, not by CardContent. */
+  occlusion?: OcclusionCard
 }
 
 /**
@@ -49,7 +88,29 @@ export function renderCard(
   card: Pick<Card, 'ord' | 'sideFlipped'>,
   flip = false,
 ): RenderedCard {
-  const [f0 = '', f1 = '', f2 = ''] = note.fields
+  const [f0 = '', f1 = '', f2 = '', f3 = ''] = note.fields
+  if (note.modelType === 'image_occlusion') {
+    const occlusion = parseOcclusion(f1)
+    const target = card.ord + 1
+    const labels = maskLabels(occlusion, target).join(', ')
+    const image = imageRefs(f0)[0]
+    return {
+      question: f2,
+      // P1: the labels are part of the answer, never rendered before the reveal.
+      answer: escapeHtml(labels),
+      extra: f3,
+      answerReplacesQuestion: false,
+      flipped: false,
+      expected: labels,
+      occlusion: {
+        image: image?.name ?? '',
+        alt: image?.alt ?? '',
+        mode: occlusion.mode,
+        masks: occlusion.masks,
+        target,
+      },
+    }
+  }
   if (note.modelType === 'cloze') {
     const index = card.ord + 1
     return {
@@ -76,10 +137,27 @@ export function renderCard(
   }
 }
 
-/** Maps fields when the note type changes in the editor (basic ↔ cloze keeps front and extra). */
+/**
+ * Maps fields when the note type changes in the editor: the front (or cloze text) and the extra
+ * are kept; an occlusion note keeps the first image of the fields.
+ */
 export function convertFields(from: ModelType, to: ModelType, fields: readonly string[]): string[] {
-  const isCloze = (m: ModelType) => m === 'cloze'
-  if (isCloze(from) === isCloze(to)) return normalizeFields(to, fields)
-  const [a = '', b = '', c = ''] = fields
-  return isCloze(to) ? [a, c || b] : [a, '', b]
+  if (from === to) return normalizeFields(to, fields)
+  const [a = '', b = '', c = '', d = ''] = fields
+  const src =
+    from === 'cloze'
+      ? { front: a, back: '', extra: b }
+      : from === 'image_occlusion'
+        ? { front: a, back: '', extra: d }
+        : { front: a, back: b, extra: c }
+  switch (to) {
+    case 'cloze':
+      return [src.front, src.extra || src.back]
+    case 'image_occlusion': {
+      const image = imageRefs(fields.join(' '))[0]
+      return [image ? imageTag(image.name, image.alt) : '', '', '', src.extra]
+    }
+    default:
+      return [src.front, src.back, src.extra]
+  }
 }

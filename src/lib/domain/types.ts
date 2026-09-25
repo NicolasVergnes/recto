@@ -1,6 +1,7 @@
 /** Domain types (02-DATA-MODEL §2). All dates are epoch milliseconds (UTC). */
 export type SchedulerKind = 'fsrs' | 'leitner'
-export type ModelType = 'basic' | 'basic_reverse' | 'cloze'
+export const MODEL_TYPES = ['basic', 'basic_reverse', 'cloze', 'image_occlusion'] as const
+export type ModelType = (typeof MODEL_TYPES)[number]
 
 export interface FsrsSettings {
   /** 0.80–0.97 in the UI, default 0.90 (P9). */
@@ -56,7 +57,7 @@ export interface Note {
   id: string
   deckId: string
   modelType: ModelType
-  /** basic: [front, back, extra]; cloze: [text, extra]. */
+  /** basic: [front, back, extra]; cloze: [text, extra]; image_occlusion: [image, masks JSON, header, extra]. */
   fields: string[]
   tags: string[]
   source?: string
@@ -77,7 +78,7 @@ export interface Card {
   noteId: string
   /** Denormalised copy of note.deckId for indexes. */
   deckId: string
-  /** 0: front→back, 1: back→front, cloze: index - 1. */
+  /** 0: front→back, 1: back→front, cloze: index - 1, image_occlusion: mask group - 1. */
   ord: number
   due: number
   state: CardState

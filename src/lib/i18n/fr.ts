@@ -361,6 +361,7 @@ export const fr = {
     deckMergeSelf: 'Choisissez un autre paquet que celui-ci ou ses sous-paquets.',
     noteNotFound: 'Note introuvable',
     noteNoCloze: 'Ajoutez au moins un trou {{c1::…}}.',
+    noteNoMask: 'Dessinez au moins un masque sur l’image.',
     mediaType: 'Type de fichier non pris en charge.',
     mediaTooLarge: 'Fichier trop volumineux (600 Ko par image, 3 Mo par son).',
     mediaUnreadable: 'Image illisible.',
