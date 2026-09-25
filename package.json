@@ -1,0 +1,58 @@
+{
+  "name": "recto",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Flashcards à répétition espacée, locale-first, hors ligne, sans compte.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings && tsc -p tsconfig.node.json",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest",
+    "e2e": "npm run build && playwright test",
+    "verify": "npm run check && npm run lint && npm run format:check && npm run test && npm run e2e",
+    "icons": "pwa-assets-generator --preset minimal-2023 public/logo.svg"
+  },
+  "dependencies": {
+    "dexie": "^4.4.6",
+    "dompurify": "^3.4.16",
+    "fflate": "^0.8.3",
+    "papaparse": "^5.7.0",
+    "sql.js": "^1.14.2",
+    "ts-fsrs": "^5.4.2",
+    "workbox-window": "^7.4.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@types/node": "^22.20.4",
+    "@types/papaparse": "^5.5.2",
+    "@types/sql.js": "^1.4.11",
+    "@vite-pwa/assets-generator": "^1.0.4",
+    "@vitest/coverage-v8": "^5.0.1",
+    "eslint": "^10.11.0",
+    "eslint-plugin-svelte": "^3.23.0",
+    "fake-indexeddb": "^6.2.5",
+    "globals": "^17.12.0",
+    "happy-dom": "^20.14.5",
+    "prettier": "^3.9.9",
+    "prettier-plugin-svelte": "^4.1.1",
+    "svelte": "^5.57.1",
+    "svelte-check": "^4.7.6",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.70.1",
+    "vite": "^8.3.1",
+    "vite-plugin-pwa": "^1.3.0",
+    "vitest": "^5.0.1"
+  }
+}
