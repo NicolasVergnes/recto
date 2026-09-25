@@ -40,3 +40,16 @@ export function deckOptions(decks: readonly Deck[]): DeckOption[] {
   }
   return out
 }
+
+/**
+ * `Parent::Child` paths (CSV `deck` column, Anki). One nesting level (SPEC §5.1): deeper levels
+ * are flattened into the parent name, `A::B::C` → parent « A › B », child « C » (05 §2.3).
+ */
+export function splitDeckPath(path: string): { parent: string | null; name: string } {
+  const parts = path
+    .split('::')
+    .map((p) => p.trim())
+    .filter(Boolean)
+  const name = parts.pop() ?? ''
+  return { parent: parts.length > 0 ? parts.join(' › ') : null, name }
+}

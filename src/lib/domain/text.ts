@@ -174,3 +174,15 @@ export function renameMediaRefs(html: string, from: string, to: string): string 
 export function insertAt(text: string, start: number, end: number, snippet: string) {
   return { text: text.slice(0, start) + snippet + text.slice(end), caret: start + snippet.length }
 }
+
+/**
+ * Duplicate key of a front (05 §1): normalised text plus referenced media names, so that
+ * image-only fronts (`<img src="flag-fr.svg">`) are not all duplicates of each other.
+ * Empty when there is neither text nor media.
+ */
+export function frontKey(html: string): string {
+  const refs = mediaRefs(html)
+  const media = [...refs.images, ...refs.sounds].join('|')
+  const text = normalizeText(html)
+  return media ? `${text}\u0001${media}` : text
+}

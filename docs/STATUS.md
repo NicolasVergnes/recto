@@ -1,12 +1,31 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-09-25 · Branche : claude/great-feynman-7vbb6d · Jalon en cours : M3
+Dernière mise à jour : 2026-09-25 · Branche : claude/great-feynman-7vbb6d · Jalon en cours : M4
 
 ## Jalon en cours
 
-M3 — Import CSV et sauvegarde (plan écrit au démarrage du jalon).
+M4 — Import `.apkg` (plan écrit au démarrage du jalon).
 
 ## Terminé
+
+### M3 — Import CSV et sauvegarde (2026-09-25)
+
+Plan suivi :
+
+1. `src/lib/import/plan.ts` (plan et rapport communs), `import/decks.ts` (`Parent::Enfant`), `splitDeckPath`.
+2. `src/lib/import/csv.ts` + `tests/unit/import/csv.test.ts` (fixtures `data/samples/*.csv`).
+3. `src/lib/db/importer.ts` (lots de 500, transactions, progression, annulation) + `tests/unit/db/importer.test.ts`.
+4. `src/lib/export/csv.ts` + `tests/unit/export-csv.test.ts` (aller-retour).
+5. `src/lib/import/{backup,validate}.ts`, `src/lib/db/restore.ts` + `tests/unit/import/{backup,validate}.test.ts` (propriété sur 5 graines).
+6. Écran Importer (CSV, sauvegarde), paquet d'exemple et rappel de sauvegarde sur l'accueil, export CSV (paquet, sélection).
+7. E2E 3 et 5 (`tests/e2e/import-backup.spec.ts`).
+
+Critères :
+
+- [x] Import CSV/TSV complet (05 §1) : séparateur détecté, BOM, CRLF, en-tête, mappage modifiable, type auto `cloze` / `basic_reverse` au choix / colonne `Type`, colonne `Paquet` avec sous-paquet, doublons ignorer / mettre à jour / dupliquer, rapport par ligne, médias manquants listés puis ajoutables sous leur nom, images distantes signalées et jamais chargées, 50 000 lignes max, lots de 500 annulables (`tests/unit/import/csv.test.ts`, `tests/unit/db/importer.test.ts`, e2e « CSV import screen… ») ; paquet d'exemple depuis l'accueil (e2e « the sample deck imports 101 cards… »).
+- [x] Export CSV (`;` ou tabulation, BOM, colonnes Recto/Verso/Extra/Tags/Paquet/Type) depuis un paquet ou la sélection du navigateur ; sauvegarde `.recto.zip` complète et restauration « remplacer » (une transaction, sauvegarde des données actuelles téléchargée avant) ou « fusionner » ; rappel après 7 jours sur l'accueil ; partage natif sur mobile si disponible (`shareOrDownload`).
+- [x] Test de propriété aller-retour sauvegarde (`tests/unit/import/backup.test.ts` › « restores seed … bit for bit », 5 collections aléatoires, médias comparés octet par octet).
+- [x] E2E 3 et 5 (`tests/e2e/import-backup.spec.ts`).
 
 ### M2 — Planificateurs et révision (2026-09-25)
 
@@ -79,6 +98,14 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## Décisions prises en session
 
+- 2026-09-25 (M3) : la clé de doublon ajoute au texte normalisé les noms des médias référencés (`frontKey`) : sans cela, les 10 recto « image seule » de `drapeaux.csv` étaient tous doublons les uns des autres (texte vide après retrait du HTML). Même clé pour l'avertissement de l'éditeur.
+- 2026-09-25 (M3) : à l'import CSV, chaque ligne reçoit `createdAt = maintenant + n° de ligne` (ms) pour que « ordre d'ajout » respecte l'ordre du fichier.
+- 2026-09-25 (M3) : une colonne `Type` (valeurs `basic`, `basic_reverse`, `cloze` ou libellés français) est reconnue : l'export CSV l'écrit, l'aller-retour conserve le type des notes.
+- 2026-09-25 (M3) : chemins de paquets à plus de deux niveaux : `A::B::C` → paquet principal « A › B », sous-paquet « C » (05 §2.3, séparateur d'affichage `›` pour ne pas réintroduire `::` dans un nom).
+- 2026-09-25 (M3) : paquet de destination « Nouveau paquet… » créé seulement si une ligne n'a pas de colonne Paquet.
+- 2026-09-25 (M3) : restauration « Remplacer » : vidage et remplissage des tables dans **une seule transaction** (équivalent atomique de `db.delete()` puis import) après téléchargement d'une sauvegarde des données actuelles. « Fusionner » : paquets par id ou par nom (unicité entre frères), notes par id puis `sourceGuid` (la plus récente gagne), cartes par id (la plus récemment révisée gagne, `deckId` suit la note), journaux unionnés, réglages et médias ajoutés s'ils manquent.
+- 2026-09-25 (M3) : les lignes invalides d'une sauvegarde sont ignorées et comptées (validateurs manuels `import/validate.ts`) ; les paramètres de paquet absents prennent les valeurs par défaut ; des paramètres FSRS invalides rejettent le paquet.
+
 - 2026-09-25 (M2) : pas d'apprentissage FSRS par défaut `['10m', '10m']` au lieu de `['10m']` : avec un seul pas, ts-fsrs 5 fait graduer « Bien » immédiatement, ce qui contredit P11 (SPEC prioritaire). Docs 02, 03 §2.5 et skill `srs-rules` mis à jour.
 - 2026-09-25 (M2) : l'annulation restaure l'instantané exact de la carte gardé en mémoire pendant la séance et supprime la ligne de journal (transaction) ; `f.rollback` de ts-fsrs n'est pas utilisé car il remet `due` à l'heure de la révision et ne connaît pas Leitner. Annulation possible jusqu'à 20 réponses en arrière dans la séance.
 - 2026-09-25 (M2) : `retrievability` FSRS calculée directement par la courbe d'oubli (`forgetting_curve`, jours fractionnaires) : même modèle que `get_retrievability`, beaucoup plus rapide pour trier des milliers de retards.
@@ -119,6 +146,8 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 - Licence : l'écran « À propos » et `package.json` indiquent MIT (choix par défaut, aucune licence n'étant fixée dans les docs) — à confirmer par Nicolas.
 
 ## À vérifier manuellement par Nicolas
+
+- M3 : ouvrir un export CSV `;` dans Excel (accents, colonnes) ; sauvegarder depuis le téléphone (feuille de partage Android) puis restaurer sur le PC en « Fusionner » ; importer un CSV personnel avec une colonne `deck`.
 
 - M2 : une vraie séance sur téléphone (sons en lecture automatique, gestes de balayage activés dans Paramètres), passage d'un paquet en Memory Box mode calendrier, rappel « une nuit de sommeil » en fin de première séance.
 

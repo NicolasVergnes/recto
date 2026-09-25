@@ -4,6 +4,21 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 ## [Unreleased]
 
+### M3 — Import CSV et sauvegarde
+
+#### Added
+
+- Import CSV/TSV (`src/lib/import/csv.ts`) : détection du séparateur et de l'en-tête, BOM, aperçu de 20 lignes, mappage des colonnes, type de note (auto `cloze`), colonne `Paquet` (sous-paquets créés), doublons (ignorer, mettre à jour, dupliquer), rapport par ligne, médias manquants ajoutables sous leur nom, écriture par lots de 500 annulable.
+- Paquet d'exemple (101 départements) depuis l'accueil.
+- Export CSV d'un paquet ou de la sélection (`;` ou tabulation, BOM, colonne Type).
+- Restauration de sauvegarde `.recto.zip` : validation, « Remplacer » (transaction unique, sauvegarde préalable) ou « Fusionner » (plus récent gagne, journaux unionnés).
+- Rappel de sauvegarde après 7 jours et bouton « Sauvegarder maintenant » sur l'accueil (partage natif sur mobile).
+- Tests : CSV sur les fixtures, écriture par lots, aller-retour CSV, propriété aller-retour de la sauvegarde, validateurs ; E2E 3 et 5.
+
+#### Fixed
+
+- Doublons : les recto « image seule » ne sont plus considérés comme identiques.
+
 ### M2 — Planificateurs et révision
 
 #### Added

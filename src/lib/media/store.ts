@@ -29,17 +29,18 @@ export function detectMime(file: Blob, name: string): string {
   return baseMime(file.type) || mimeFromName(name) || ''
 }
 
+interface ProcessedMedia {
+  blob: Blob
+  mime: string
+  sha256: string
+}
+
 /**
- * Validates, processes and stores a media file added in the editor (SPEC §5.2): whitelist,
- * raster images resized/re-encoded, SVG sanitised, size limits, content-addressed dedupe.
+ * Validates and processes a media file (SPEC §5.2): whitelist, raster images resized and
+ * re-encoded, SVG sanitised, size limits.
  */
-export async function addMediaFile(
-  file: Blob,
-  originalName: string,
-  now: number,
-  resize: Resizer = defaultResizer,
-): Promise<Media> {
-  const mime = detectMime(file, originalName)
+async function processMedia(file: Blob, name: string, resize: Resizer): Promise<ProcessedMedia> {
+  const mime = detectMime(file, name)
   const kind = mediaKind(mime)
   if (!kind) throw new RepoError('mediaType')
   let blob: Blob = file
@@ -62,16 +63,48 @@ export async function addMediaFile(
   const limit = kind === 'image' ? MAX_IMAGE_BYTES : MAX_AUDIO_BYTES
   if (blob.size > limit) throw new RepoError('mediaTooLarge')
   if (blob.type !== finalMime) blob = new Blob([blob], { type: finalMime })
+  return { blob, mime: finalMime, sha256: await sha256Hex(blob) }
+}
 
-  const sha256 = await sha256Hex(blob)
-  const existing = await db.media.where('sha256').equals(sha256).first()
+/** Media added in the editor: stored under a new unique name, deduplicated by content. */
+export async function addMediaFile(
+  file: Blob,
+  originalName: string,
+  now: number,
+  resize: Resizer = defaultResizer,
+): Promise<Media> {
+  const p = await processMedia(file, originalName, resize)
+  const existing = await db.media.where('sha256').equals(p.sha256).first()
   if (existing) return existing
   const media: Media = {
-    name: mediaFileName(originalName, sha256, finalMime),
-    blob,
-    mime: finalMime,
-    size: blob.size,
-    sha256,
+    name: mediaFileName(originalName, p.sha256, p.mime),
+    blob: p.blob,
+    mime: p.mime,
+    size: p.blob.size,
+    sha256: p.sha256,
+    createdAt: now,
+  }
+  await db.media.put(media)
+  return media
+}
+
+/**
+ * Media whose name is already referenced by imported notes (CSV "missing media", 05 §1): the
+ * file is processed like in the editor but stored under exactly that name.
+ */
+export async function addNamedMedia(
+  file: Blob,
+  name: string,
+  now: number,
+  resize: Resizer = defaultResizer,
+): Promise<Media> {
+  const p = await processMedia(file, name, resize)
+  const media: Media = {
+    name,
+    blob: p.blob,
+    mime: p.mime,
+    size: p.blob.size,
+    sha256: p.sha256,
     createdAt: now,
   }
   await db.media.put(media)

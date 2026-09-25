@@ -1,5 +1,12 @@
 <script lang="ts">
-  import { QUOTA_WARNING_RATIO } from '$lib/config/app'
+  import { BACKUP_REMINDER_DAYS, QUOTA_WARNING_RATIO } from '$lib/config/app'
+  import { getSetting } from '$lib/db/settings'
+  import { BACKUP_EXTENSION, createBackup } from '$lib/export/backup'
+  import { shareOrDownload, timestampedName } from '$lib/export/download'
+  import { toast } from '$lib/state/toast.svelte'
+  import { errorMessage } from '$lib/ui/errors'
+  import { formatDateTime } from '$lib/ui/format'
+  import { importSampleDeck } from '$lib/ui/sample'
   import { live } from '$lib/db/live.svelte'
   import * as repo from '$lib/db/repo'
   import { storageInfo, usageRatio } from '$lib/db/storage'
@@ -25,6 +32,46 @@
   const fresh = $derived(today.value?.total.new ?? 0)
   let creating = $state(false)
   let quotaPct = $state<number | null>(null)
+  let busy = $state(false)
+  const lastBackupAt = live(() => getSetting('lastBackupAt'), null)
+
+  const DAY = 86_400_000
+  /** P10: reminder after 7 days without export (or 7 days after the first deck if never). */
+  const backupAgeDays = $derived.by(() => {
+    if (!lastBackupAt.loaded || decks.value.length === 0) return null
+    const since = lastBackupAt.value ?? Math.min(...decks.value.map((d) => d.createdAt))
+    const days = Math.floor((Date.now() - since) / DAY)
+    return days > BACKUP_REMINDER_DAYS ? days : null
+  })
+
+  async function backup() {
+    busy = true
+    try {
+      const now = Date.now()
+      await shareOrDownload(
+        await createBackup(now),
+        timestampedName('recto-sauvegarde', BACKUP_EXTENSION, now),
+      )
+      toast(t('settings.backupDone'))
+    } catch (e) {
+      toast(errorMessage(e), 'error')
+    } finally {
+      busy = false
+    }
+  }
+
+  async function trySample() {
+    busy = true
+    try {
+      const deckId = await importSampleDeck()
+      toast(t('home.sampleDone'))
+      if (deckId) navigate(`/decks/${deckId}`)
+    } catch (e) {
+      toast(errorMessage(e), 'error')
+    } finally {
+      busy = false
+    }
+  }
 
   $effect(() => {
     void storageInfo().then((info) => {
@@ -66,9 +113,26 @@
           <Icon name="upload" />
           {t('home.import')}
         </a>
+        <button class="btn" type="button" disabled={busy} onclick={trySample}>
+          <Icon name="cards" />
+          {t('home.sample')}
+        </button>
       </div>
     </div>
   {:else if decks.loaded}
+    {#if backupAgeDays !== null}
+      <div class="notice notice-warning row spread" role="status">
+        <span>
+          {lastBackupAt.value
+            ? t('home.backupReminder', { days: backupAgeDays })
+            : t('home.neverBackedUp')}
+        </span>
+        <button class="btn btn-sm" type="button" disabled={busy} onclick={backup}>
+          <Icon name="download" />
+          {t('home.backupNow')}
+        </button>
+      </div>
+    {/if}
     <!-- P5: the single mixed daily queue comes first; per-deck review is secondary. -->
     <section class="card-surface stack today" aria-labelledby="today-title">
       <h2 id="today-title" class="visually-hidden">{t('common.today')}</h2>
@@ -112,6 +176,19 @@
         {/each}
       </ul>
     </section>
+
+    <section class="row spread backup" aria-labelledby="backup-title">
+      <h2 id="backup-title" class="visually-hidden">{t('settings.backup')}</h2>
+      <span class="muted small">
+        {lastBackupAt.value
+          ? t('settings.lastBackup', { date: formatDateTime(lastBackupAt.value) })
+          : t('settings.neverBackedUp')}
+      </span>
+      <button class="btn btn-sm" type="button" disabled={busy} onclick={backup}>
+        <Icon name="download" />
+        {t('home.backupNow')}
+      </button>
+    </section>
   {/if}
 </section>
 
@@ -144,6 +221,11 @@
 <style>
   .welcome .btn {
     justify-content: flex-start;
+  }
+
+  .backup {
+    border-top: 1px solid var(--border);
+    padding-top: var(--space-3);
   }
 
   .today .counts {

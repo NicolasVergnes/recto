@@ -65,3 +65,12 @@ describe('text helpers', () => {
     })
   })
 })
+
+describe('frontKey', () => {
+  it('keeps media names so image-only fronts differ', async () => {
+    const { frontKey } = await import('$lib/domain/text')
+    expect(frontKey('<img src="flag-fr.svg">')).not.toBe(frontKey('<img src="flag-de.svg">'))
+    expect(frontKey(' <b>Chien</b> ')).toBe(frontKey('chien'))
+    expect(frontKey('<b></b>')).toBe('')
+  })
+})

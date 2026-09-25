@@ -16,6 +16,7 @@
   import { toast } from '$lib/state/toast.svelte'
   import DeckSelect from '$lib/ui/DeckSelect.svelte'
   import Dialog from '$lib/ui/Dialog.svelte'
+  import ExportCsvDialog from '$lib/ui/ExportCsvDialog.svelte'
   import { errorMessage } from '$lib/ui/errors'
   import { formatDue } from '$lib/ui/format'
   import Icon from '$lib/ui/Icon.svelte'
@@ -96,6 +97,7 @@
 
   const allVisibleSelected = $derived(rows.length > 0 && rows.every((r) => selected.has(r.card.id)))
 
+  let exporting = $state(false)
   let moving = $state(false)
   let moveTarget = $state('')
   let tagging = $state(false)
@@ -229,6 +231,10 @@
       <button class="btn btn-sm" type="button" onclick={() => suspend(false)}>
         {t('browser.unsuspend')}
       </button>
+      <button class="btn btn-sm" type="button" onclick={() => (exporting = true)}>
+        <Icon name="download" />
+        {t('exportCsv.button')}
+      </button>
       <button class="btn btn-sm" type="button" onclick={reset}>{t('browser.reset')}</button>
       <button class="btn btn-sm btn-danger" type="button" onclick={remove}>
         <Icon name="trash" />
@@ -298,6 +304,8 @@
     {/if}
   </div>
 </section>
+
+<ExportCsvDialog bind:open={exporting} noteIds={selectedNoteIds} name="recto-selection" />
 
 <Dialog
   open={moving}

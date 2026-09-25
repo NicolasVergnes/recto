@@ -6,7 +6,7 @@ import { buildRow, type BrowserRow } from '../domain/browse'
 import { deckPath } from '../domain/decks'
 import { makeCard, makeDeck, resetScheduling, type NewDeckInput } from '../domain/defaults'
 import { cardOrds, normalizeFields, noteFront } from '../domain/notes'
-import { normalizeText } from '../domain/text'
+import { frontKey, normalizeText } from '../domain/text'
 import type { Card, Deck, DeckSettings, Flag, ModelType, Note } from '../domain/types'
 import { RepoError } from './errors'
 import { db, newId } from './schema'
@@ -307,12 +307,12 @@ export async function findDuplicate(
   front: string,
   exceptNoteId?: string,
 ): Promise<Note | undefined> {
-  const key = normalizeText(front)
+  const key = frontKey(front)
   if (!key) return undefined
   return db.notes
     .where('deckId')
     .equals(deckId)
-    .filter((n) => n.id !== exceptNoteId && normalizeText(noteFront(n)) === key)
+    .filter((n) => n.id !== exceptNoteId && frontKey(noteFront(n)) === key)
     .first()
 }
 
@@ -378,4 +378,23 @@ export async function collectionCounts() {
 /** "Tout effacer" (SPEC §5.7): deletes the whole database; the caller reloads the page. */
 export async function wipeAll(): Promise<void> {
   await db.delete()
+}
+
+/** Notes to export as CSV: given notes, or a deck with its sub-decks, or everything. */
+export async function exportRows(options: { noteIds?: readonly string[]; deckId?: string } = {}) {
+  const decks = await db.decks.toArray()
+  const byId = new Map(decks.map((d) => [d.id, d]))
+  let notes: Note[]
+  if (options.noteIds) notes = await getNotes(options.noteIds)
+  else if (options.deckId)
+    notes = await db.notes
+      .where('deckId')
+      .anyOf(await deckFamily(options.deckId))
+      .toArray()
+  else notes = await db.notes.toArray()
+  notes.sort((a, b) => a.createdAt - b.createdAt)
+  return notes.map((note) => {
+    const deck = byId.get(note.deckId)
+    return { note, deckPath: deck ? deckPath(deck, byId) : '' }
+  })
 }
