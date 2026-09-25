@@ -308,6 +308,16 @@ describe('planApkgImport', () => {
     ])
     expect(plan.notes).toHaveLength(2)
     expect(plan.report).toMatchObject({ notesUpdated: 1, skipped: 1 })
+    // Same guid, other note type: the fields would not mean the same thing, nothing is written.
+    const other = await planApkgImport(
+      sample(),
+      options,
+      { ...empty, notes: [{ ...old, modelType: 'cloze', fields: ['{{c1::old}}', ''] }] },
+      now,
+      newId,
+    )
+    expect(other.updates).toEqual([])
+    expect(other.report.skipped).toBe(1)
   })
 
   it('renames media whose name is taken by another file and rewrites references', async () => {

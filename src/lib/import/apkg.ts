@@ -206,8 +206,9 @@ export async function planApkgImport(
     const updatedAt = an.mod * 1000
     const known = byGuid.get(an.guid)
     if (known) {
-      // Re-import (05 §2.3): update the fields when Anki's copy is more recent.
-      if (updatedAt > known.updatedAt)
+      // Re-import (05 §2.3): update the fields when Anki's copy is more recent — and of the same
+      // note type, since fields of different types do not mean the same thing.
+      if (updatedAt > known.updatedAt && known.modelType === conversion.modelType)
         plan.updates.push({ ...known, fields, tags: an.tags, updatedAt })
       else report.skipped++
       continue
