@@ -163,6 +163,10 @@ describe('parseBackup errors', () => {
     expect(code(() => parseBackup(zip({ 'manifest.json': '[1]' }), 1))).toBe('notBackup')
     const manifest = JSON.stringify({ format: 'recto-backup', schemaVersion: 2 })
     expect(code(() => parseBackup(zip({ 'manifest.json': manifest }), 1))).toBe('newerVersion')
+    const next = JSON.stringify({ format: 'recto-backup', schemaVersion: SCHEMA_VERSION + 1 })
+    expect(code(() => parseBackup(zip({ 'manifest.json': next }), SCHEMA_VERSION))).toBe(
+      'newerVersion',
+    )
     const ok = JSON.stringify({ format: 'recto-backup', schemaVersion: 1 })
     expect(code(() => parseBackup(zip({ 'manifest.json': ok, 'data.json': '{' }), 1))).toBe(
       'invalidData',

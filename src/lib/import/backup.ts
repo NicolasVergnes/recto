@@ -56,8 +56,8 @@ function json(entries: Record<string, Uint8Array>, name: string): unknown {
 }
 
 /**
- * Older schema versions would be migrated here with the same steps as the Dexie `upgrade()`
- * functions (05 §3); version 1 is the only one so far.
+ * Older schema versions are migrated here with the same steps as the Dexie `upgrade()` functions
+ * (05 §3). 1 → 2 only adds a note type: version 1 data is valid as is.
  */
 function migrate(data: Record<string, unknown>, _fromVersion: number): Record<string, unknown> {
   return data
