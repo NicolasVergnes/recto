@@ -73,6 +73,14 @@ Quand `ratingMode = 2`, l'UI n'affiche que **Encore** (`Rating.Again`) et **Bien
 - V0 : paramètres par défaut FSRS-6 de `ts-fsrs` (`params = null`). Rétention 0,90.
 - V1 : optimisation dans le navigateur avec `fsrs-browser` (WASM, `Fsrs.computeParameters(ratings, delta_ts, lengths, …)`) dans un Web Worker, proposée quand le paquet cumule ≥ 1 000 révisions ; l'utilisateur voit les anciens/nouveaux paramètres et la rétention simulée avant d'accepter. Le module WASM est chargé à la demande (`import()`), jamais dans le bundle initial.
 
+*Mise en œuvre (M6).*
+
+- **Données** (`src/lib/db/optimize.ts`) : les révisions des cartes **propres** au paquet (chaque sous-paquet a ses réglages), réponses Leitner comprises (1/3/4 sont des notes FSRS valides).
+- **Jeu d'entraînement** (`src/lib/scheduler/optimizer.ts`, pur) : une histoire par carte, triée par date, **coupée à la dernière réponse donnée à l'état Nouveau** (`stateBefore = 0` : remise à zéro, import) ; une carte sans telle réponse est ignorée. Écarts en jours d'étude (`daysBetween`, frontière 04:00, heure d'été comprise) ; les réponses du même jour (écart 0) sont gardées (modèle court terme de FSRS-6). Items = tous les préfixes (longueur ≥ 2) contenant au moins un écart > 0 (sinon fsrs-rs panique). Ordre déterministe : cartes par première réponse puis identifiant ; `card_ids` non transmis.
+- **Worker** (`optimizer.worker.ts`, à usage unique, terminé après la réponse ; délai de garde 2 min côté client) : `init({ module_or_path })` puis `computeParameters(…, null, true)` en **mono-thread** (`initThreadPool` jamais appelé : pas besoin d'isolation cross-origin). Mémoire WASM partagée non disponible → « indisponible dans ce navigateur ».
+- **Évaluation** (TypeScript, sur le même historique) : `next_state`/`forgetting_curve` de ts-fsrs, qui reproduisent les états de fsrs-rs. Pour chaque réponse après un écart > 0 : perte logarithmique, RMSE sur 20 classes de probabilité, réussite prédite moyenne vs réelle ; plus les intervalles d'une nouvelle carte toujours notée « Bien » (réglages du paquet). Paramètres arrondis à 4 décimales et validés (21 nombres finis).
+- **Décision** : « Appliquer » n'est proposé que si la perte logarithmique baisse ; sinon « Vos paramètres actuels conviennent déjà » (cas des données trop rares : fsrs-rs renvoie alors les paramètres par défaut). « Appliquer » n'écrit que `settings.fsrs.params` et termine la séance en cours ; « Revenir aux paramètres par défaut » remet `null`. Les échéances existantes ne sont **pas recalculées** : les nouveaux paramètres s'appliquent à chaque carte lors de sa prochaine réponse.
+
 ### 2.5 Règles produit liées
 
 - P11 : `learning_steps: ['10m', '10m']` par défaut ; l'intervalle de graduation suit FSRS (≥ 1 jour). Ne pas mettre de pas à `'1m'`.
