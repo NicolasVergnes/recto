@@ -9,3 +9,6 @@ test-results/
 .env*
 .DS_Store
 Thumbs.db
+
+# Agent worktrees (Claude Code)
+.claude/worktrees/

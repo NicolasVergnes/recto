@@ -9,6 +9,8 @@ const KEYS: Record<RepoErrorCode, MessageKey> = {
   deckMergeSelf: 'errors.deckMergeSelf',
   noteNotFound: 'errors.noteNotFound',
   noteNoCloze: 'errors.noteNoCloze',
+  noteNoMask: 'errors.noteNoMask',
+  undoGone: 'errors.undoGone',
   retireLocked: 'review.retireLocked',
   mediaType: 'errors.mediaType',
   mediaTooLarge: 'errors.mediaTooLarge',

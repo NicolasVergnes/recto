@@ -87,3 +87,100 @@ describe('convertFields', () => {
     expect(convertFields('cloze', 'basic', ['t', 'x'])).toEqual(['t', '', 'x'])
   })
 })
+
+describe('image occlusion notes', () => {
+  const masks = JSON.stringify({
+    v: 1,
+    mode: 'hideAll',
+    masks: [
+      { n: 2, x: 0.1, y: 0.1, w: 0.2, h: 0.2, label: 'Lyon' },
+      { n: 1, x: 0.5, y: 0.5, w: 0.2, h: 0.2, label: 'Paris <b>' },
+      { n: 2, x: 0.7, y: 0.1, w: 0.2, h: 0.2, label: 'Rhône' },
+    ],
+  })
+  const note = {
+    modelType: 'image_occlusion' as const,
+    fields: ['<img src="carte.webp" alt="Carte">', masks, 'Villes', 'Extra'],
+  }
+
+  it('has four fields and one card per mask group', async () => {
+    const { buildRow } = await import('$lib/domain/browse')
+    expect(fieldCount('image_occlusion')).toBe(4)
+    expect(normalizeFields('image_occlusion', ['a'])).toEqual(['a', '', '', ''])
+    expect(cardOrds('image_occlusion', note.fields)).toEqual([0, 1])
+    expect(cardOrds('image_occlusion', ['<img src="x.png">', ''])).toEqual([])
+    const card = makeCard({ id: 'n1', deckId: 'd1' }, 1, 'c1', 0)
+    const row = buildRow(
+      card,
+      { ...note, id: 'n1', deckId: 'd1', tags: [], createdAt: 0, updatedAt: 0 },
+      'D',
+    )
+    expect(row.question).toBe('Villes #2')
+    expect(row.answer).toBe('Lyon, Rhône')
+  })
+
+  it('renders the target group, its labels only as the answer, and never flips', () => {
+    const r = renderCard(note, { ord: 0, sideFlipped: true }, true)
+    expect(r).toEqual({
+      question: 'Villes',
+      answer: 'Paris &lt;b&gt;',
+      extra: 'Extra',
+      answerReplacesQuestion: false,
+      flipped: false,
+      expected: 'Paris &lt;b&gt;',
+      occlusion: {
+        image: 'carte.webp',
+        alt: 'Carte',
+        mode: 'hideAll',
+        masks: [
+          { n: 2, x: 0.1, y: 0.1, w: 0.2, h: 0.2, label: 'Lyon' },
+          { n: 1, x: 0.5, y: 0.5, w: 0.2, h: 0.2, label: 'Paris <b>' },
+          { n: 2, x: 0.7, y: 0.1, w: 0.2, h: 0.2, label: 'Rhône' },
+        ],
+        target: 1,
+      },
+    })
+    const noImage = renderCard(
+      { ...note, fields: ['', masks, '', ''] },
+      { ord: 1, sideFlipped: false },
+    )
+    expect(noImage.occlusion).toMatchObject({ image: '', alt: '', target: 2 })
+    expect(noImage.expected).toBe('Lyon, Rhône')
+  })
+
+  it('converts fields to and from occlusion notes', async () => {
+    const { convertFields } = await import('$lib/domain/notes')
+    const img = '<img src="carte.webp" alt="Carte">'
+    // Nothing typed is lost: the front becomes the header, the back joins the extra.
+    expect(convertFields('basic', 'image_occlusion', ['Q', `A ${img}`, 'X'])).toEqual([
+      img,
+      '',
+      'Q',
+      'A <br>X',
+    ])
+    expect(convertFields('basic', 'image_occlusion', [`Où ? ${img}`, '', ''])).toEqual([
+      img,
+      '',
+      'Où ? ',
+      '',
+    ])
+    expect(convertFields('cloze', 'image_occlusion', ['{{c1::a}}', 'X'])).toEqual([
+      '',
+      '',
+      '{{c1::a}}',
+      'X',
+    ])
+    // Back from occlusion: header and image make the front.
+    expect(convertFields('image_occlusion', 'basic', note.fields)).toEqual([
+      `Villes<br>${img}`,
+      '',
+      'Extra',
+    ])
+    expect(convertFields('image_occlusion', 'cloze', note.fields)).toEqual([
+      `Villes<br>${img}`,
+      'Extra',
+    ])
+    expect(convertFields('image_occlusion', 'basic', [img, '', '', ''])).toEqual([img, '', ''])
+    expect(convertFields('image_occlusion', 'image_occlusion', ['a'])).toEqual(['a', '', '', ''])
+  })
+})

@@ -168,7 +168,8 @@ describe('planApkgImport', () => {
     const review = plan.cards.find((c) => c.noteId === byGuid.get('aB3dE5fG7h')?.id)
     expect(review).toMatchObject({
       state: 2,
-      due: (CRT + 5 * 86_400) * 1000,
+      // Day 0 = local date of crt (2023-11-14), + 5 calendar days, at the 04:00 day start.
+      due: new Date(2023, 10, 19, 4).getTime(),
       scheduledDays: 10,
       stability: 10,
       difficulty: 6,
@@ -308,6 +309,44 @@ describe('planApkgImport', () => {
     ])
     expect(plan.notes).toHaveLength(2)
     expect(plan.report).toMatchObject({ notesUpdated: 1, skipped: 1 })
+    // Same guid, other note type: the fields would not mean the same thing, nothing is written.
+    const other = await planApkgImport(
+      sample(),
+      options,
+      { ...empty, notes: [{ ...old, modelType: 'cloze', fields: ['{{c1::old}}', ''] }] },
+      now,
+      newId,
+    )
+    expect(other.updates).toEqual([])
+    expect(other.report.skipped).toBe(1)
+  })
+
+  it('matches a Recto note whose id is the Anki guid (package exported by Recto)', async () => {
+    const pkg = sample()
+    const [first, second] = pkg.notes
+    if (!first || !second) throw new Error('fixture')
+    const own: Note = {
+      id: first.guid,
+      deckId: 'd',
+      modelType: 'basic',
+      fields: ['old', '', ''],
+      tags: [],
+      createdAt: 0,
+      updatedAt: now,
+    }
+    // A note imported from Anki is only known by its sourceGuid, not by its id.
+    const imported: Note = { ...own, id: second.guid, sourceGuid: 'elsewhere' }
+    const plan = await planApkgImport(
+      pkg,
+      options,
+      { ...empty, notes: [own, imported] },
+      now,
+      newId,
+    )
+    expect(plan.updates).toEqual([])
+    expect(plan.notes.map((n) => n.sourceGuid)).not.toContain(first.guid)
+    expect(plan.notes.map((n) => n.sourceGuid)).toContain(second.guid)
+    expect(plan.report).toMatchObject({ notesCreated: 3, skipped: 1 })
   })
 
   it('renames media whose name is taken by another file and rewrites references', async () => {

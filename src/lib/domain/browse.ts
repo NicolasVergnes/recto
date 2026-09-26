@@ -22,14 +22,15 @@ export interface BrowserRow {
 
 export function buildRow(card: Card, note: Note, deckName: string): BrowserRow {
   const r = renderCard(note, card)
-  return {
-    card,
-    note,
-    deckName,
-    question: stripHtml(r.question),
-    answer: stripHtml(r.answerReplacesQuestion ? r.extra : r.answer),
-    status: cardStatus(card),
-  }
+  const occlusion = r.occlusion
+  // Occlusion: "header (or image) #group" and the mask labels (or the extra).
+  const question = occlusion
+    ? `${stripHtml(r.question) || occlusion.alt || occlusion.image} #${occlusion.target}`
+    : stripHtml(r.question)
+  const answer = occlusion
+    ? stripHtml(r.expected) || stripHtml(r.extra)
+    : stripHtml(r.answerReplacesQuestion ? r.extra : r.answer)
+  return { card, note, deckName, question, answer, status: cardStatus(card) }
 }
 
 export type StatusFilter = CardStatus | 'flagged' | ''

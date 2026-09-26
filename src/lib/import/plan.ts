@@ -1,7 +1,7 @@
 import type { Card, Deck, Note, Review } from '../domain/types'
 
 export type ImportErrorCode =
-  'emptyFront' | 'noCloze' | 'tooManyRows' | 'emptyFile' | 'unknownModel' | 'orphanCard'
+  'emptyFront' | 'noCloze' | 'noMask' | 'tooManyRows' | 'emptyFile' | 'unknownModel' | 'orphanCard'
 
 export interface ImportError {
   /** 1-based line (CSV) or Anki note id; 0 for the whole file. */
@@ -24,6 +24,10 @@ export interface ImportReport {
   remoteMedia: number
   /** Anki note types converted to `basic` (05 §2.3), with the number of merged fields. */
   convertedModels: { name: string; mergedFields: number }[]
+  /** Anki image occlusion shapes turned into rectangles (ellipses, polygons, rotations). */
+  shapesConverted: number
+  /** Anki image occlusion shapes left out (text, pixel coordinates, unreadable). */
+  shapesSkipped: number
   cancelled: boolean
 }
 
@@ -58,6 +62,8 @@ export function emptyReport(): ImportReport {
     missingMedia: [],
     remoteMedia: 0,
     convertedModels: [],
+    shapesConverted: 0,
+    shapesSkipped: 0,
     cancelled: false,
   }
 }

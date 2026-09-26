@@ -77,6 +77,7 @@ Une **note** porte le contenu ; une note génère une ou plusieurs **cartes** (c
 | `basic` | Recto, Verso, Extra (optionnel) | 1 : Recto → Verso |
 | `basic_reverse` | Recto, Verso, Extra | 2 : Recto → Verso et Verso → Recto |
 | `cloze` | Texte, Extra | 1 par index `{{cN::…}}` (syntaxe Anki, indice optionnel `{{c1::réponse::indice}}`) |
+| `image_occlusion` (V1) | Image, masques, En-tête, Extra | 1 par groupe de masques rectangulaires (02 §2.1) ; importé/exporté vers le type « Image Occlusion » d'Anki ≥ 23.10 |
 
 - Les champs sont du HTML restreint (gras, italique, listes, `<img src="nom">`, `[sound:nom]`, LaTeX inline `\( … \)` rendu par KaTeX en V1 seulement — en V0 affiché tel quel).
 - Tags libres (chaîne, séparés par des espaces), autocomplétion.
@@ -136,7 +137,7 @@ Une **note** porte le contenu ; une note génère une ou plusieurs **cartes** (c
 
 ## 7. Architecture cible (résumé)
 
-Svelte 5 (runes) + Vite 8 + TypeScript strict ; Dexie 4 (IndexedDB) ; `ts-fsrs` 5 (FSRS-6) ; `fsrs-browser` (WASM, optimiseur, V1) ; `vite-plugin-pwa` ; `sql.js` (lecture `.apkg`, chargé à la demande) ; `fflate` (zip) ; `papaparse` (CSV) ; `dompurify` (rendu HTML des champs). Aucun backend. Déploiement statique (GitHub Pages ou Cloudflare Pages). Détails et justification : 08-DECISIONS.
+Svelte 5 (runes) + Vite 8 + TypeScript strict ; Dexie 4 (IndexedDB) ; `ts-fsrs` 5 (FSRS-6) ; `fsrs-browser` (WASM, optimiseur, V1) ; `vite-plugin-pwa` ; `sql.js` (lecture et, en V1, écriture `.apkg`, chargé à la demande dans un worker) ; `katex` (formules, V1, chargé à la demande, ADR-009) ; `fflate` (zip) ; `papaparse` (CSV) ; `dompurify` (rendu HTML des champs). Aucun backend. Déploiement statique (GitHub Pages ou Cloudflare Pages). Détails et justification : 08-DECISIONS.
 
 ```
 src/
@@ -144,11 +145,12 @@ src/
   lib/
     config/app.ts            nom, version, constantes
     db/                      schéma Dexie, migrations, accès typés
-    domain/                  types métier (Deck, Note, Card, Review, Media)
+    domain/                  types métier (Deck, Note, Card, Review, Media), occlusion.ts, math.ts (V1)
     scheduler/               fsrs.ts (adaptateur ts-fsrs), leitner.ts, index.ts (interface commune)
     queue/                   construction de la file du jour
     import/ csv.ts apkg.ts backup.ts
-    export/ csv.ts backup.ts
+    export/ csv.ts backup.ts apkg.ts (V1)
+    math/                    rendu KaTeX, chargé à la demande (V1)
     media/                   redimensionnement, stockage, URL objets
     stats/                   calculs
     i18n/ fr.ts, t.ts

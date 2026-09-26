@@ -10,6 +10,7 @@
   const ERRORS: Record<ImportErrorCode, MessageKey> = {
     emptyFront: 'importReport.emptyFront',
     noCloze: 'importReport.noCloze',
+    noMask: 'importReport.noMask',
     tooManyRows: 'importReport.tooManyRows',
     emptyFile: 'importReport.emptyFile',
     unknownModel: 'importReport.unknownModel',
@@ -45,6 +46,12 @@
         {/each}
       </ul>
     </div>
+  {/if}
+  {#if report.shapesConverted > 0}
+    <p class="small">{t('importReport.shapesConverted', { n: report.shapesConverted })}</p>
+  {/if}
+  {#if report.shapesSkipped > 0}
+    <p class="small">{t('importReport.shapesSkipped', { n: report.shapesSkipped })}</p>
   {/if}
   {#if report.remoteMedia > 0}
     <p class="notice notice-warning small">{t('importReport.remote', { n: report.remoteMedia })}</p>

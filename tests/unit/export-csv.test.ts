@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { makeDeck } from '$lib/domain/defaults'
 import type { Note } from '$lib/domain/types'
-import { notesToCsv } from '$lib/export/csv'
+import { csvExportable, notesToCsv } from '$lib/export/csv'
 import { defaultMapping, parseCsv, planCsvImport } from '$lib/import/csv'
 
 const note = (
@@ -29,6 +29,14 @@ describe('CSV export', () => {
     { note: note('c', 'cloze', ['La {{c1::Lune}}', 'satellite']), deckPath: 'Astro' },
     { note: note('d', 'basic', ['<img src="flag-fr.svg">', 'France', '']), deckPath: 'Astro' },
   ]
+
+  it('leaves out image occlusion notes (no CSV form)', () => {
+    const io = note('e', 'image_occlusion', ['<img src="carte.png">', '{"masks":[]}', 'T', ''])
+    expect(csvExportable(io)).toBe(false)
+    expect(rows.every((r) => csvExportable(r.note))).toBe(true)
+    const csv = notesToCsv([...rows, { note: io, deckPath: 'Astro' }], ';')
+    expect(csv).toBe(notesToCsv(rows, ';'))
+  })
 
   it('writes a BOM, a header, CRLF and escaped quotes', () => {
     const csv = notesToCsv(rows, ';')

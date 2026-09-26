@@ -153,7 +153,12 @@ export function planCsvImport(
   }
   const resolver = new DeckResolver(existing.decks, now, newId)
   const known = new Map<string, Note>()
-  for (const note of existing.notes) known.set(duplicateKey(note.deckId, noteFront(note)), note)
+  for (const note of existing.notes) {
+    // A CSV row never matches an occlusion note: « update » would overwrite its masks.
+    if (note.modelType !== 'image_occlusion') {
+      known.set(duplicateKey(note.deckId, noteFront(note)), note)
+    }
+  }
   const createdHere = new Set<string>()
   const updated = new Map<string, Note>()
   const missing = new Set<string>()

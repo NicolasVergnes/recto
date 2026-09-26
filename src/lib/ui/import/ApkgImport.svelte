@@ -18,6 +18,7 @@
   import { toast } from '$lib/state/toast.svelte'
   import { errorMessage } from '../errors'
   import { formatBytes } from '../format'
+  import { MODEL_LABEL } from '../model-labels'
   import { ApkgReadError, readApkgFile, shrinkImages } from './apkg-client'
   import ImportReport from './ImportReport.svelte'
 
@@ -144,13 +145,7 @@
           {#each summary.models as m (m.name)}
             <li>
               {m.name} →
-              {t(
-                m.modelType === 'cloze'
-                  ? 'editor.cloze'
-                  : m.modelType === 'basic_reverse'
-                    ? 'editor.basicReverse'
-                    : 'editor.basic',
-              )}
+              {t(MODEL_LABEL[m.modelType])}
               {#if m.converted}<span class="warning-text">({t('apkg.converted')})</span>{/if}
             </li>
           {/each}

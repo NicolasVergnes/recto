@@ -1,12 +1,36 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-09-25 · Branche : claude/great-feynman-7vbb6d · **V0 livrée** (M0 à M5)
+Dernière mise à jour : 2026-09-25 · Branche : claude/compassionate-albattani-f8qn5u · **V1 (M6) livrée**, en attente de relecture et de fusion par Nicolas
 
 ## Jalon en cours
 
-Aucun : **V0 livrée**, en attente de relecture et de fusion par Nicolas. Suivant : M6 (V1, périmètre ouvert, docs/07-ROADMAP.md).
+Aucun : M6 (V1) est terminé, en attente de relecture et de fusion. Suivant : V2 (synchronisation par fichier, empaquetage Android — voir « Écarts »), et la dette ci-dessous.
 
 ## Terminé
+
+### M6 — V1 : occlusion d'image, export Anki, optimiseur FSRS, formules (2026-09-25)
+
+Périmètre retenu : celui de la SPEC (prioritaire sur la roadmap) — §8 « M6 (optimiseur, occlusion, export apkg) ouvre la V1 » et §5.2 « LaTeX … rendu par KaTeX en V1 ». La synchronisation par fichier et l'empaquetage Android, listés dans 07-ROADMAP M6, sont placés en **V2** par la SPEC (§2 et §3) : reportés, contradiction signalée ci-dessous (« Écarts »).
+
+Plan suivi (branches de travail `v1-*` relues chacune par deux relecteurs puis corrigées, fusionnées dans la branche de session, puis relecture adversariale de l'ensemble avec vérification indépendante des défauts graves) :
+
+1. Dette : `Review.svelte` (795 → 192 lignes) et `Editor.svelte` (373 → 196) découpés en composants de `src/lib/ui/review/` (contrôleur `ReviewController`, `Flashcard`, `AnswerBar`, `ReviewMenu`…, raccourcis purs `keys.ts`) et `src/lib/ui/editor/` (`NoteDraft`, emplacements de champs `slots.ts`, `NoteFields`…) ; paramètres de paquet découpés (`src/lib/ui/deck/`).
+2. KaTeX (ADR-009) : repérage pur `src/lib/domain/math.ts` (scanner linéaire), rendu à la demande `src/lib/math/katex.ts` dans `CardContent`, réponse tapée avec ou sans délimiteurs.
+3. Export `.apkg` legacy (05 §4) : `src/lib/export/apkg.ts` (pur, sql.js), worker, `src/lib/db/export-apkg.ts`, dialogue « Exporter (CSV, Anki) », export de la collection dans Paramètres ; réimport sans doublons ; `tests/interop/` (moteur d'Anki).
+4. Optimiseur FSRS (03 §2.4) : `src/lib/scheduler/optimizer.ts`, worker `fsrs-browser`, `src/lib/db/optimize.ts`, bloc « Paramètres de mémoire » (`src/lib/ui/deck/FsrsOptimizer.svelte`).
+5. Occlusion d'image : domaine `src/lib/domain/occlusion.ts` (masques, groupes, édition, syntaxe Anki), `notes.ts`, composants `src/lib/ui/occlusion/` (vue, éditeur, zone de dessin, liste de masques), intégration éditeur/aperçu/révision, sauvegarde (`schemaVersion` 2), CSV exclu, import et export Anki (type natif « Image Occlusion »).
+6. Relecture adversariale finale (4 angles + vérification), corrections, `npm run verify`, docs 01/02/03/04/05/08, README, CHANGELOG, STATUS.
+
+Critères (07-ROADMAP M6, périmètre SPEC) :
+
+- [x] Optimiseur FSRS dans le navigateur (`fsrs-browser` 6.6.0, worker à usage unique, seuil de 1 000 révisions utilisables, comparaison avant acceptation) : `tests/unit/scheduler/optimizer.test.ts`, `tests/unit/scheduler/fsrs-browser.test.ts` (WASM réel sous Node), `tests/unit/db/optimize.test.ts`, `tests/unit/optimizer-client.test.ts`, e2e `tests/e2e/optimizer.spec.ts` (1 440 révisions, Optimiser, Appliquer, 21 paramètres enregistrés ; message de seuil).
+- [x] Occlusion d'image (type `image_occlusion` : masques rectangulaires sur une image, **une carte par groupe de masques** — un masque par défaut, voir « Écarts ») : `tests/unit/domain/occlusion.test.ts`, `tests/unit/domain/notes.test.ts`, `tests/unit/db/repo.test.ts` › « reconciles occlusion cards by mask group… », `tests/unit/import/apkg-occlusion.test.ts` (fixture exportée par Anki), `tests/unit/export-apkg.test.ts` › « exports occlusion notes… », e2e `tests/e2e/occlusion.spec.ts` (pointeur, clavier seul, regroupement, Ctrl+Entrée, P1, réponse lisible, mode « une zone »).
+- [x] Export `.apkg` legacy : `tests/unit/export-apkg.test.ts` (SQL brut, aller-retour avec et sans historique, FSRS et Memory Box, heure d'été, occlusion), `tests/unit/db/export-apkg.test.ts`, e2e `tests/e2e/export-apkg.spec.ts` (export puis réimport) ; moteur d'Anki 26.9.3 : `tests/interop/README.md` (verdict OK, occlusion comprise).
+- [x] KaTeX pour les formules : `tests/unit/domain/math.test.ts`, `tests/unit/katex.test.ts`, `tests/unit/domain/typed.test.ts`, e2e `tests/e2e/math.spec.ts` (éditeur, révision, formule invalide, formule large sans défilement de la page, hors ligne).
+- [x] `npm run verify` vert : check 0 erreur 0 avertissement, lint, format, 308 tests unitaires (seuils de couverture tenus : scheduler, queue, import), build (bundle initial 166 Ko gzip, KaTeX 78 Ko et WASM hors bundle, précachés), E2E (bureau et mobile).
+
+Versions installées en M6 : `katex` 0.18.9 (ADR-009), `fsrs-browser` 6.6.0 épinglé exactement (prévu par l'ADR-007, BSD-3-Clause).
+
 
 ### M5 — Statistiques, finitions, V0 (2026-09-25)
 
@@ -132,11 +156,32 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## Reste à faire / dettes
 
-- M6 / V1 (docs/07-ROADMAP.md) : optimiseur FSRS, occlusion d'image, export `.apkg`, KaTeX, synchronisation par fichier, empaquetage Android.
-- Plusieurs écrans dépassent 200 lignes (Review, Editor, Cards, Settings, Deck, Stats) : extraire des sous-composants (non fait en M5 pour ne pas risquer de régression hors des critères du jalon).
-- Couverture globale ≈ 89 % (seuils de 90 % appliqués comme prévu au domaine : scheduler, queue, import) ; `db/` et `export/` sont couverts par les tests d'intégration mais sans seuil.
+- V2 (SPEC §2, §3) : synchronisation par fichier (dossier choisi par File System Access API, un fichier par appareil, et surtout des « pierres tombales » pour propager les suppressions : sans elles, une fusion ressuscite les notes supprimées ; étude faite en M6, non implémentée) et empaquetage Android (TWA ou Capacitor ; l'hébergement sous `/recto/` impose un `assetlinks.json` à la racine du domaine pour une TWA).
+- Composants de plus de 200 lignes restants : `Cards.svelte` (460), `Settings.svelte` (329), `Home.svelte` (307), `Deck.svelte` (298), `CsvImport.svelte` (295), `Stats.svelte` (275), `Heatmap.svelte` (271), `ApkgImport.svelte` (246), `ColumnChart.svelte` (210). Review, Editor et les paramètres de paquet ont été découpés en M6.
+- Réimport Anki d'une note dont les cartes changeraient (trou ou masque ajouté ou retiré dans Anki) : ignorée et comptée plutôt que réconciliée ; la réconciliation demanderait à `db/importer.ts` d'écrire aussi les cartes des notes mises à jour. Même limite pour la fusion de sauvegarde (mise à jour des champs sans les cartes), antérieure à M6.
+- Optimiseur : évaluation sur les révisions mêmes de l'entraînement (pas de validation croisée) ; Firefox et Safari non testés (mémoire WASM partagée : l'optimisation se déclare indisponible si le navigateur la refuse).
+- L'éditeur n'explique pas la syntaxe des formules ; les syntaxes Anki `[$]…[/$]`, `[$$]…[/$$]` et `[latex]` restent en source.
+- Couverture globale ≈ 91 % des lignes (seuils de 90 % appliqués au domaine : scheduler, queue, import) ; `db/`, `export/` et `domain/` couverts sans seuil.
 
 ## Décisions prises en session
+
+- 2026-09-25 (M6) : périmètre V1 = SPEC §8 et §5.2 (optimiseur, occlusion, export `.apkg`, KaTeX) ; synchronisation et empaquetage Android en V2 (voir « Écarts »).
+- 2026-09-25 (M6, occlusion) : quatre champs `[image, masques JSON, en-tête, extra]` (02 §2.1) ; coordonnées normalisées arrondies à 4 décimales, côté minimal 0,5 % ; **une carte par groupe** `n` (sémantique `cN` d'Anki, `ord = n − 1`) : chaque nouveau masque ouvre un groupe (une carte par masque par défaut), « Carte n° » permet d'en réunir plusieurs ; `n` n'est jamais renuméroté et un nouveau masque ne reprend jamais un groupe de la note telle qu'ouverte (sinon une nouvelle zone hériterait de l'échéance d'une carte existante). Alternative écartée : index = position du masque (supprimer un masque changerait l'identité des cartes suivantes).
+- 2026-09-25 (M6, occlusion) : mode « tout cacher, deviner une zone » par défaut (Anki `oi=1`) ; couleurs fixes d'Anki (les masques sont sur l'image, quel que soit le thème), cible distinguée aussi par un contour plus épais sur un halo blanc (lisible sur image sombre).
+- 2026-09-25 (M6, occlusion) : P1 — les réponses des masques ne sont pas dans le DOM avant la demande ; les pixels sous les masques le sont (image entière, comme Anki).
+- 2026-09-25 (M6, occlusion) : réponses de masque (texte simple, extension propre à Recto) : affichées après la demande, attendues en réponse tapée ; exportées vers Anki dans « Comments » (une ligne `n : réponse` par groupe) et relues au réimport (premier masque du groupe) ; tout autre contenu de Comments rejoint l'extra.
+- 2026-09-25 (M6, occlusion) : import Anki : type détecté par son modèle (`image-occlusion` dans la question), champs par position ; ellipses et polygones → rectangle englobant ; formes **tournées ignorées** (la rotation se fait en pixels, le rapport d'aspect de l'image est inconnu : aucun rectangle normalisé n'est sûr de couvrir la zone, P1), comme les formes texte et en pixels ; comptes dans le rapport pour les notes écrites.
+- 2026-09-25 (M6, occlusion) : pas d'avertissement de doublon pour l'occlusion (plusieurs notes sur une même image sont légitimes) ; une ligne CSV n'est jamais doublon d'une occlusion ; l'export CSV les laisse de côté et le dit (aucun fichier si le choix n'en contient que) ; type verrouillé à l'édition (comme le texte à trous) ; changer de type à la création garde recto/en-tête, verso et extra.
+- 2026-09-25 (M6, occlusion) : dans le navigateur de cartes, une carte d'occlusion s'intitule « en-tête (ou texte alternatif, ou nom de l'image) #n » : `#n` est un symbole, pas un texte à traduire (calculé dans le domaine pour la recherche et le tri).
+- 2026-09-25 (M6) : sauvegarde `schemaVersion` 2 sans nouvelle version Dexie (le stockage IndexedDB n'a pas changé) : une application V0 refuse une sauvegarde V1 au lieu de perdre les notes d'occlusion ; une sauvegarde V1 se restaure telle quelle.
+- 2026-09-25 (M6) : réponse tapée proposée seulement s'il y a un texte à taper (`canTypeAnswer`) : pas pour un verso image seule ni un masque sans réponse.
+- 2026-09-25 (M6) : annuler une réponse refuse de recréer une carte supprimée entre-temps par la modification de sa note (nouvelle erreur `undoGone`, l'entrée est oubliée) et garde le paquet actuel d'une note déplacée (invariants 1 et 2).
+- 2026-09-25 (M6, import Anki) : échéance d'une révision = début du jour d'étude situé `due` jours **calendaires** après la date locale de `crt` (au lieu de `crt + due × 86 400 s`, décalé d'un jour au changement d'heure près du début de journée) ; réimport : une note n'est mise à jour que si son type et ses cartes restent les mêmes, sinon ignorée et comptée.
+- 2026-09-25 (M6, KaTeX) : voir ADR-009 : repérage pur avant `sanitize()`, rendu KaTeX après `{@html}`, sortie de KaTeX seule exception à `sanitize()` (consignée aussi dans CLAUDE.md) ; `[latex]`, `[$]` et `[$$]` d'Anki laissés en source ; un `<` dans une formule n'est une balise que s'il en ouvre une complète ; retours à la ligne d'Anki dans une formule = espaces ; une formule trop large défile seule (conteneur `inline-block`, `.card-content { contain: inline-size }`) ; une formule invalide reste en source avec un message aussi lu par les lecteurs d'écran ; limite : une cloze dans une formule n'est pas surlignée (mettre la cloze autour de toute la formule).
+- 2026-09-25 (M6, export `.apkg`) : `collection.anki21` avec `conf.schedVer = 2` (sans lui, Anki réécrit les `ease` d'apprentissage) et `conf.creationOffset` ; guid = `sourceGuid ?? id` (réexporter ou réimporter met à jour au lieu de dupliquer, dans Anki comme dans Recto) ; quatre types de notes à identifiants fixes et noms distinctifs (« Recto · … », aucune copie « + ») dont une copie du type natif « Image Occlusion » ; cartes retirées exportées suspendues ; état mémoire FSRS dans `cards.data` pour les paquets FSRS seulement ; réglages de paquet, compartiments Memory Box et `source` non transmis ; annulable.
+- 2026-09-25 (M6, optimiseur) : seuil de 1 000 révisions **utilisables** (cartes suivies depuis l'état Nouvelle dans Recto, avec au moins une réponse un jour ultérieur), des cartes propres au paquet ; réponses Memory Box incluses (notes 1/3/4 valides en FSRS) ; historique coupé à la dernière réponse à l'état Nouvelle ; écarts en jours d'étude ; WASM mono-thread (jamais `initThreadPool` : ni COOP/COEP ni isolation), worker à usage unique, délai de 2 min, annulé si l'on quitte les paramètres ; « Appliquer » seulement si la perte logarithmique baisse, « pas assez de données » si fsrs-rs rend les valeurs par défaut ; les échéances existantes ne sont pas recalculées (s'appliquent à la prochaine réponse) ; `fsrs-browser` épinglé exactement (les paramètres dépendent de l'implémentation de l'entraînement).
+- 2026-09-25 (M6, découpage) : état et actions de la révision dans une classe `ReviewController` (effets créés à l'initialisation du composant) ; raccourcis en fonction pure `reviewKeyAction` ; `Flashcard.svelte` vue unique de la carte (point de branchement de l'occlusion) ; éditeur décrit par des emplacements `{ label, index }` par type (`slots.ts`, point de branchement de l'occlusion), médias et trous insérés seulement dans un champ affiché.
+- 2026-09-25 (M6) : les fonctions ont été développées en parallèle sur des branches `v1-*` (copies de travail isolées), chacune relue par deux relecteurs indépendants puis corrigée, puis fusionnées dans la branche de session ; ports E2E paramétrables (`PW_PORT`) pour faire tourner plusieurs suites côte à côte ; `.claude/` ignoré par ESLint et `.claude/worktrees/` par git.
 
 - 2026-09-25 (M5) : rétention réelle = réponses ≠ Encore / réponses données en état Révision, sur 7/30/90 **journées d'étude** ; cible = moyenne des `desiredRetention` des paquets FSRS pondérée par leurs cartes (pas de cible pour la Memory Box). Le temps du jour plafonne chaque réponse à 60 s (comme le journal).
 - 2026-09-25 (M5) : prévision : retards comptés aujourd'hui ; nouvelles, suspendues et retirées exclues. Heatmap : 365 journées d'étude, semaines commençant le lundi, 5 niveaux (0 + quartiles du jour le plus chargé). Pas de série de jours ni de record (pas de gamification, SPEC §2).
@@ -195,6 +240,11 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## Écarts par rapport aux docs
 
+- M6 : 07-ROADMAP dit « une carte par masque » ; Recto fait une carte par **groupe** de masques, un nouveau masque ouvrant son propre groupe (donc une carte par masque par défaut), comme `cN` dans Anki, pour pouvoir révéler plusieurs zones ensemble.
+- M6 : 05 §4 prévoyait `collection.anki2` ; l'export écrit `collection.anki21` avec `schedVer 2` (vérifié avec Anki ; 05 §4 mis à jour). 05 §2.2 décrivait une copie du `.wasm` de sql.js dans `public/sql/` : c'est un import `?url` depuis M4 (doc corrigée).
+- M6 : développement sur la branche imposée par la session cloud (`claude/compassionate-albattani-f8qn5u`) plutôt que `m6-<slug>`.
+- M6 : la vérification d'interopérabilité (`tests/interop/`) dépend du paquet Python `anki`, hors `npm run verify`.
+- M6 : 07-ROADMAP met la synchronisation par fichier et l'empaquetage Android (Capacitor/TWA) dans M6 (V1), alors que la SPEC, prioritaire, les place en V2 (§3 « synchronisation par fichier … envisagée en V2 », §2 « empaquetage TWA/Capacitor en V2 ») et limite la V1 à l'optimiseur, l'occlusion et l'export `.apkg` (§8) plus KaTeX (§5.2). M6 suit la SPEC ; les deux éléments restent à planifier en V2 (à confirmer par Nicolas).
 - TypeScript 6.0.3 au lieu de 7.x (ADR-002/007 disent « 5.9+/7 ») : `svelte-check` et `typescript-eslint` exigent TypeScript ≤ 6.0. Consigné en ADR-008.
 - `@vite-pwa/assets-generator` 1.0.4 au lieu de 2.0.0 : `vite-plugin-pwa` 1.3 déclare `^1.0.0` en dépendance paire.
 - Le manifeste déclare aussi l'icône `pwa-64x64.png` produite par le preset `minimal-2023`.
@@ -203,6 +253,14 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 - Chromium ne passe pas la requête du favicon SVG par le service worker : hors ligne, la console signale l'échec de `logo.svg` (sans effet sur l'application, les icônes du manifeste sont précachées).
 
 ## À vérifier manuellement par Nicolas
+
+- M6 — confirmer le report en V2 de la synchronisation par fichier et de l'empaquetage Android (SPEC prioritaire sur 07-ROADMAP) et mettre 07-ROADMAP à jour en conséquence.
+- M6 — occlusion sur téléphone : tracer et déplacer des masques au doigt, zoomer l'image en révision (pincement), réviser en thème sombre ; parcours au clavier seul et avec un lecteur d'écran (TalkBack ou NVDA).
+- M6 — Anki desktop : importer un `.apkg` exporté par Recto (Paramètres › « Exporter pour Anki ») contenant des occlusions : les masques doivent être dessinés par le script d'Anki et la note s'ouvrir dans son éditeur de masques ; « Outils › Vérifier la base de données » sans problème ; réimporter : aucune note ajoutée. Essayer aussi Anki 2.1.5x et AnkiDroid (seul le moteur d'Anki 26.9.3 a été vérifié).
+- M6 — Anki vers Recto : importer un vrai paquet contenant des occlusions faites dans Anki et des formules MathJax (`\( … \)`, `\[ … \]` avec `<br>`, `aligned` avec `&amp;`).
+- M6 — formules sur Android : rendu, formule large qui défile seule, thème sombre, lecture MathML par TalkBack ; en mode avion après une première visite.
+- M6 — optimiseur sur le téléphone avec un vrai paquet de plus de 1 000 révisions (durée, mémoire) ; Firefox et Safari si utilisés (message « indisponible » attendu au pire) ; relire la clarté du tableau de comparaison.
+- M6 — ouvrir une sauvegarde V1 sur une application V0 non mise à jour : elle doit être refusée (« version plus récente »).
 
 - M5 — publication : dans GitHub, _Settings → Pages → Source : GitHub Actions_, puis fusionner sur `main` ; le workflow « Pages » publie <https://nicolasvergnes.github.io/recto/>.
 - M5 — test Android hors ligne (à consigner ici avec le modèle du téléphone et la date) : ouvrir l'URL dans Chrome Android → menu ⋮ → « Installer l'application » ; ouvrir l'app installée, « Essayer avec un paquet d'exemple », Paramètres → Stockage → demander la persistance ; activer le mode avion ; fermer l'app (liste des apps récentes) et la rouvrir ; faire une séance, ajouter une note avec une photo, ouvrir Statistiques ; désactiver le mode avion, « Sauvegarder maintenant » et partager le fichier vers Drive.

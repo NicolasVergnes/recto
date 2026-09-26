@@ -51,6 +51,9 @@ export function parseSteps(text: string): string[] | null {
   return steps.every(isStep) ? steps : null
 }
 
+/** FSRS-6 default parameters, used while `params` is null. */
+export const DEFAULT_PARAMS: readonly number[] = default_w
+
 const cache = new Map<string, FSRS>()
 
 export function buildFsrs(s: FsrsSettings, fuzz = true): FSRS {

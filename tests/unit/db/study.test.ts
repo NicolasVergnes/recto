@@ -66,6 +66,29 @@ describe('recordReview / undoReview', () => {
     expect(await repo.getCard(cards[0].id)).toEqual(cards[0])
     await expect(undoReview(cards[0], first.id)).rejects.toBeInstanceOf(RepoError)
   })
+
+  it('never brings back a card deleted since, and keeps the deck of a moved note', async () => {
+    const { deck, note, cards } = await setup()
+    const answer = await recordReview(fsrs.answer(cards[1], 3, now, deck), 1000)
+    // The note becomes a plain basic note: its reverse card (ord 1) is deleted, log kept.
+    await repo.updateNote(
+      note.id,
+      { deckId: deck.id, modelType: 'basic', fields: ['a', 'b'], tags: [] },
+      now + 1,
+    )
+    await expect(undoReview(cards[1], answer.id)).rejects.toSatisfy(
+      (e: unknown) => e instanceof RepoError && e.code === 'undoGone',
+    )
+    expect(await repo.getCard(cards[1].id)).toBeUndefined()
+    expect(await cardReviews(cards[1].id)).toHaveLength(1)
+
+    const other = await repo.createDeck({ name: 'Autre' }, now)
+    const kept = await recordReview(fsrs.answer(cards[0], 3, now, deck), 1000)
+    await repo.moveNotes([note.id], other.id, now + 2)
+    const restored = await undoReview(cards[0], kept.id)
+    expect(restored).toEqual({ ...cards[0], deckId: other.id })
+    expect(await repo.getCard(cards[0].id)).toEqual(restored)
+  })
 })
 
 describe('daily queue from the database', () => {

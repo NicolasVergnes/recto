@@ -149,6 +149,62 @@ describe('notes and cards', () => {
     }
   })
 
+  it('reconciles occlusion cards by mask group and stores canonical masks', async () => {
+    const d = await repo.createDeck({ name: 'D' }, T0)
+    const masks = (list: object[]) => JSON.stringify({ v: 1, mode: 'hideAll', masks: list })
+    const image = '<img src="carte.webp">'
+    await expectCode(
+      repo.createNote(
+        { deckId: d.id, modelType: 'image_occlusion', fields: [image, masks([])], tags: [] },
+        T0,
+      ),
+      'noteNoMask',
+    )
+    const { note, cards } = await repo.createNote(
+      {
+        deckId: d.id,
+        modelType: 'image_occlusion',
+        fields: [
+          image,
+          masks([
+            { n: 1, x: 0.1, y: 0.1, w: 0.2, h: 0.2 },
+            { n: 2, x: 0.5, y: 0.5, w: 0.3333333, h: 0.9, label: ' B ' },
+          ]),
+        ],
+        tags: [],
+      },
+      T0,
+    )
+    expect(cards.map((c) => c.ord)).toEqual([0, 1])
+    expect(JSON.parse(note.fields[1] ?? '')).toEqual({
+      v: 1,
+      mode: 'hideAll',
+      masks: [
+        { n: 1, x: 0.1, y: 0.1, w: 0.2, h: 0.2 },
+        { n: 2, x: 0.5, y: 0.5, w: 0.3333, h: 0.5, label: 'B' },
+      ],
+    })
+    expect(note.fields).toHaveLength(4)
+    const [c1, c2] = cards
+    if (!c1 || !c2) throw new Error('missing card')
+    await env.db.reviews.add(fakeReview(c1.id, d.id, T0))
+    // Group 1 deleted, group 2 moved: the card of group 2 keeps its identity.
+    const res = await repo.updateNote(
+      note.id,
+      {
+        deckId: d.id,
+        modelType: 'image_occlusion',
+        fields: [image, masks([{ n: 2, x: 0, y: 0, w: 0.4, h: 0.4 }]), 'Titre', ''],
+        tags: [],
+      },
+      T0 + 10,
+    )
+    expect(res.removed).toEqual([c1.id])
+    expect(res.added).toEqual([])
+    expect((await repo.getCardsOfNote(note.id)).map((c) => c.id)).toEqual([c2.id])
+    expect(await env.db.reviews.where('cardId').equals(c1.id).count()).toBe(1)
+  })
+
   it('reconciles cloze cards on edit and keeps the review log of removed ones', async () => {
     const d = await repo.createDeck({ name: 'D' }, T0)
     const { note, cards } = await repo.createNote(

@@ -227,6 +227,22 @@ describe('planCsvImport', () => {
       newId,
     )
     expect(upd2.updates[0]?.fields).toEqual(['{{c1::chien}}', 'nouvel extra'])
+    // An occlusion note on the same image is never a CSV duplicate (its masks would be lost).
+    const occlusion: Note = {
+      ...existingNote,
+      modelType: 'image_occlusion',
+      fields: ['<img src="carte.png">', '{"v":1,"mode":"hideAll","masks":[]}', '', ''],
+    }
+    const data3 = parseCsv('<img src="carte.png">;Paris;')
+    const upd3 = planCsvImport(
+      data3,
+      { ...options(data3), duplicates: 'update' },
+      { ...empty, notes: [occlusion] },
+      now,
+      newId,
+    )
+    expect(upd3.updates).toEqual([])
+    expect(upd3.notes).toHaveLength(1)
   })
 
   it('reuses existing decks by path and counts remote images', () => {

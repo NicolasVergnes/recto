@@ -37,7 +37,7 @@ Règles de migration : chaque changement de schéma = nouvelle `version(n)` avec
 ```ts
 // src/lib/domain/types.ts
 export type SchedulerKind = 'fsrs' | 'leitner'
-export type ModelType = 'basic' | 'basic_reverse' | 'cloze'
+export type ModelType = 'basic' | 'basic_reverse' | 'cloze' | 'image_occlusion'   // image_occlusion : V1
 
 export interface Deck {
   id: string
@@ -79,10 +79,11 @@ export interface Note {
   id: string
   deckId: string
   modelType: ModelType
-  fields: string[]             // basic: [recto, verso, extra] ; cloze: [texte, extra]
+  fields: string[]             // basic: [recto, verso, extra] ; cloze: [texte, extra] ;
+                               // image_occlusion: [image, masques JSON, en-tête, extra] (§2.1)
   tags: string[]
   source?: string
-  sourceGuid?: string          // guid Anki à l'import (déduplication)
+  sourceGuid?: string          // guid Anki à l'import (déduplication : `sourceGuid ?? id`, guid écrit par l'export .apkg, 05 §4)
   createdAt: number
   updatedAt: number
 }
@@ -93,7 +94,7 @@ export interface Card {
   id: string
   noteId: string
   deckId: string               // dénormalisé (= note.deckId) pour les index
-  ord: number                  // 0: recto→verso, 1: verso→recto, cloze: index-1
+  ord: number                  // 0: recto→verso, 1: verso→recto, cloze: index-1, image_occlusion: groupe-1
   // Commun
   due: number                  // prochaine échéance (ms). Nouvelle carte : createdAt
   state: CardState
@@ -155,10 +156,26 @@ export interface Setting { key: string; value: unknown }
 
 Clés `settings` réservées : `dayStartHour` (4), `theme`, `fontScale`, `lastBackupAt`, `persistGranted`, `onboardingDone`, `globalReviewsPerDay` (500).
 
+### 2.1 Occlusion d'image (V1)
+
+Une note `image_occlusion` a quatre champs : `fields[0]` = `<img src="nom" alt="…">` (même forme qu'une image de champ, donc comptée par les utilitaires de médias), `fields[1]` = masques en JSON, `fields[2]` = en-tête (HTML, affiché des deux côtés), `fields[3]` = extra (après la réponse).
+
+```ts
+// src/lib/domain/occlusion.ts
+{ "v": 1, "mode": "hideAll" | "hideOne",
+  "masks": [{ "n": 1, "x": 0.1, "y": 0.2, "w": 0.3, "h": 0.25, "label": "Paris" }] }
+```
+
+- Coordonnées normalisées (0–1, origine en haut à gauche) : elles survivent au redimensionnement de l'image ; arrondies à 4 décimales, bornées à l'image, côté minimal 0,5 %.
+- `n` = groupe (≥ 1) : une carte par groupe distinct, `ord = n − 1` (comme `cN` d'Anki). Les masques d'un même groupe sont révélés ensemble. `n` n'est jamais recalculé depuis l'ordre des masques : supprimer un masque ne change pas l'identité des autres cartes.
+- `label` (facultatif) : réponse affichée après la demande (P1) et attendue en réponse tapée.
+- `hideAll` (défaut) : tous les masques cachent leur zone, celui de la carte est mis en évidence ; `hideOne` : seul le masque de la carte est dessiné.
+- Le JSON est relu avec tolérance (`parseOcclusion`) et réécrit sous forme canonique à l'enregistrement (`serializeOcclusion`).
+
 ## 3. Invariants (à tester)
 
 1. `card.deckId === note.deckId` pour toute carte (mise à jour en transaction lors d'un déplacement de note).
-2. Une note `basic` a exactement une carte `ord=0` ; `basic_reverse` exactement `ord=0` et `ord=1` ; `cloze` une carte par index distinct présent dans le texte (les cartes des index supprimés sont supprimées avec leur journal conservé).
+2. Une note `basic` a exactement une carte `ord=0` ; `basic_reverse` exactement `ord=0` et `ord=1` ; `cloze` une carte par index distinct présent dans le texte ; `image_occlusion` une carte par groupe de masques distinct (les cartes des index ou groupes supprimés sont supprimées avec leur journal conservé).
 3. `reviews` est *append-only* : aucune fonction ne modifie ni ne supprime une ligne, sauf `rollback` de la dernière révision d'une carte (suppression de cette seule ligne) et la suppression explicite d'une carte/note par l'utilisateur.
 4. Une carte `retired` ou `suspended` n'apparaît jamais dans la file.
 5. Tout `Media.name` référencé dans un champ existe dans `media` (vérifié à l'import ; un utilitaire « médias orphelins » liste les entrées non référencées).
@@ -175,10 +192,12 @@ Clés `settings` réservées : `dayStartHour` (4), `theme`, `fontScale`, `lastBa
 ## 5. Sauvegarde `.recto.zip`
 
 ```
-manifest.json   { "format": "recto-backup", "schemaVersion": 1, "appVersion": "0.x", "exportedAt": ms, "device": "<navigator.userAgent tronqué à 120 car.>", "counts": {...} }
+manifest.json   { "format": "recto-backup", "schemaVersion": 2, "appVersion": "0.x", "exportedAt": ms, "device": "<navigator.userAgent tronqué à 120 car.>", "counts": {...} }
 data.json       { "decks": [...], "notes": [...], "cards": [...], "reviews": [...], "settings": [...],
                   "media": [{ "name", "mime", "size", "sha256", "createdAt" }] }   // sans blobs
 media/<name>    fichiers binaires
 ```
+
+`schemaVersion` : 2 depuis la V1 (ajout du type `image_occlusion` ; une sauvegarde de version 1 se restaure telle quelle, une version plus récente que l'application est refusée). Le schéma IndexedDB (`version(1)`) n'a pas changé.
 
 Restauration « remplacer » : vide la base puis importe ; « fusionner » : les entités sont identifiées par `id` (et `sourceGuid` pour les notes) ; en cas de conflit, la version la plus récente (`updatedAt`) gagne, les journaux sont unionnés par `id`.

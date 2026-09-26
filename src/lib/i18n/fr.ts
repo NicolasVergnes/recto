@@ -226,6 +226,32 @@ export const fr = {
     added: 'Note ajoutée ({n} carte)|Note ajoutée ({n} cartes)',
     saved: 'Note enregistrée',
     noDeck: 'Créez d’abord un paquet.',
+    imageOcclusion: 'Occlusion d’image',
+    header: 'En-tête',
+    previewQuestion: 'Question',
+    previewAnswer: 'Réponse',
+  },
+  occlusion: {
+    noImage: 'Aucune image : choisissez-en une.',
+    chooseImage: 'Choisir une image',
+    changeImage: 'Changer d’image',
+    drawHelp:
+      'Tracez un rectangle sur chaque zone à cacher ; faites glisser un masque pour le déplacer.',
+    keyboardHelp:
+      'Sur un masque : flèches pour le déplacer, Maj + flèches pour le redimensionner, Suppr pour le supprimer.',
+    masks: 'Masques',
+    cardCount: '{n} carte|{n} cartes',
+    noMask: 'Dessinez au moins un masque sur l’image, ou ajoutez-en un.',
+    addMask: 'Ajouter un masque',
+    mask: 'Masque {i} · carte {n}',
+    ofMask: 'masque {n}',
+    group: 'Carte n°',
+    label: 'Réponse (facultative)',
+    delete: 'Supprimer le masque {n}',
+    mode: 'Pendant la révision',
+    hideAll: 'Tout cacher, deviner une zone',
+    hideOne: 'Ne cacher que la zone à deviner',
+    target: 'Zone {n} sur {total} à deviner',
   },
   scheduler: {
     fsrs: 'FSRS (recommandé)',
@@ -352,6 +378,9 @@ export const fr = {
     missing: 'Média manquant : {name}',
     remoteBlocked: 'Image distante non chargée : {name}',
   },
+  math: {
+    invalid: 'Formule LaTeX invalide',
+  },
   errors: {
     unexpected: 'Une erreur inattendue est survenue.',
     deckNameEmpty: 'Donnez un nom au paquet.',
@@ -361,6 +390,9 @@ export const fr = {
     deckMergeSelf: 'Choisissez un autre paquet que celui-ci ou ses sous-paquets.',
     noteNotFound: 'Note introuvable',
     noteNoCloze: 'Ajoutez au moins un trou {{c1::…}}.',
+    noteNoMask: 'Dessinez au moins un masque sur l’image.',
+    undoGone:
+      'Cette carte a été supprimée en modifiant sa note : sa réponse ne peut plus être annulée.',
     mediaType: 'Type de fichier non pris en charge.',
     mediaTooLarge: 'Fichier trop volumineux (600 Ko par image, 3 Mo par son).',
     mediaUnreadable: 'Image illisible.',
@@ -435,6 +467,49 @@ export const fr = {
     saved: 'Paramètres enregistrés',
     invalid: 'Paramètres invalides.',
   },
+  optimizer: {
+    title: 'Paramètres de mémoire',
+    intro:
+      'FSRS prévoit quand vous risquez d’oublier une carte. Il utilise pour cela 21 paramètres. Ceux par défaut viennent de millions de révisions. L’optimisation les adapte à votre historique dans ce paquet.',
+    statusDefault: 'Paramètres par défaut',
+    statusCustom: 'Paramètres personnalisés',
+    threshold: 'Optimisation possible à partir de {min} révisions ({n} actuellement).',
+    reviews: '{n} révision utilisable dans ce paquet.|{n} révisions utilisables dans ce paquet.',
+    ignored: '{n} autre révision ne compte pas.|{n} autres révisions ne comptent pas.',
+    ignoredWhy:
+      'Ne comptent que les cartes suivies dans Recto depuis l’état « nouvelle », puis revues un autre jour. Une carte importée sans son historique ne compte pas.',
+    optimize: 'Optimiser',
+    running: 'Optimisation en cours…',
+    help: 'Le calcul se fait sur cet appareil. Rien n’est envoyé. Les échéances déjà fixées ne changent pas. Les nouveaux paramètres s’appliquent à chaque carte lors de sa prochaine réponse.',
+    caption: 'Comparaison sur vos révisions passées',
+    metric: 'Mesure',
+    current: 'Actuels',
+    proposed: 'Proposés',
+    rmse: 'Erreur du modèle',
+    logLoss: 'Pénalité des erreurs',
+    predicted: 'Réussite prédite',
+    observed: 'réussite réelle : {pct}',
+    intervals: 'Intervalles d’une nouvelle carte toujours réussie',
+    days: '{n}\u00a0j',
+    explain:
+      'L’erreur du modèle est l’écart moyen entre la réussite prédite et vos résultats réels. La pénalité des erreurs (perte logarithmique) pèse surtout sur les prédictions très sûres qui se trompent. Plus ces nombres sont bas, meilleures sont les prédictions.',
+    values: 'Voir les 21 valeurs',
+    better: 'Les paramètres proposés prédisent mieux vos révisions passées.',
+    notBetter: 'Vos paramètres actuels conviennent déjà.',
+    apply: 'Appliquer',
+    applied: 'Nouveaux paramètres appliqués',
+    reset: 'Revenir aux paramètres par défaut',
+    resetMessage:
+      'Les paramètres personnalisés de ce paquet seront remplacés par ceux par défaut. Les échéances déjà fixées ne changent pas.',
+    resetDone: 'Paramètres par défaut rétablis',
+    errors: {
+      unsupported: 'L’optimisation n’est pas disponible dans ce navigateur.',
+      notEnoughData:
+        'Pas assez de données pour ajuster les paramètres. Vos paramètres n’ont pas changé.',
+      failed: 'L’optimisation a échoué. Vos paramètres n’ont pas changé.',
+      timeout: 'L’optimisation a pris trop de temps et a été interrompue.',
+    },
+  },
   csv: {
     help: 'Séparateur détecté automatiquement (virgule, point-virgule, tabulation, barre verticale), UTF-8.',
     detected: '{n} ligne à importer, séparateur {sep}.|{n} lignes à importer, séparateur {sep}.',
@@ -479,12 +554,17 @@ export const fr = {
     line: 'Ligne {n} :',
     emptyFront: 'recto vide.',
     noCloze: 'texte à trous sans {{c1::…}}.',
+    noMask: 'occlusion d’image sans masque lisible.',
     tooManyRows: 'fichier trop long (50 000 lignes au maximum).',
     emptyFile: 'fichier vide.',
     unknownModel: 'modèle inconnu.',
     orphanCard: 'carte sans note.',
     convertedModel:
       '« {name} » converti en Basique ({n} champ fusionné dans Extra)|« {name} » converti en Basique ({n} champs fusionnés dans Extra)',
+    shapesConverted:
+      'Occlusion d’image : {n} forme (ellipse ou polygone) remplacée par un rectangle.|Occlusion d’image : {n} formes (ellipses ou polygones) remplacées par des rectangles.',
+    shapesSkipped:
+      'Occlusion d’image : {n} forme ignorée (texte, forme tournée ou coordonnées en pixels).|Occlusion d’image : {n} formes ignorées (texte, formes tournées ou coordonnées en pixels).',
   },
   missingMedia: {
     intro:
@@ -520,15 +600,18 @@ export const fr = {
       'Ajoutés : paquets {decks}, notes {notes}, cartes {cards}, révisions {reviews}, médias {media} ; notes mises à jour : {updated}.',
     missingFiles: '{n} média absent de l’archive.|{n} médias absents de l’archive.',
   },
+  // `button`, `title` and `export` belong to the export dialog of both formats (CSV and Anki).
   exportCsv: {
-    button: 'Exporter en CSV',
-    title: 'Exporter en CSV',
+    button: 'Exporter (CSV, Anki)',
+    title: 'Exporter',
     help: 'Colonnes : Recto, Verso, Extra, Tags, Paquet, Type. Les médias ne sont pas inclus (leurs noms de fichiers sont conservés) : pour tout garder, utilisez « Sauvegarder maintenant ».',
     delimiter: 'Séparateur',
     semicolon: 'Point-virgule (Excel en français)',
     tab: 'Tabulation',
     export: 'Exporter',
     done: '{n} note exportée|{n} notes exportées',
+    leftOut:
+      '{n} note d’occlusion d’image non exportée : le CSV ne peut pas la décrire (utilisez le format Anki ou la sauvegarde).|{n} notes d’occlusion d’image non exportées : le CSV ne peut pas les décrire (utilisez le format Anki ou la sauvegarde).',
   },
   apkg: {
     help: 'Paquets Anki au format « ancien » (collection.anki21 ou collection.anki2). Tout reste sur cet appareil.',
@@ -552,6 +635,28 @@ export const fr = {
     missingMedia:
       '{n} média référencé est absent du paquet.|{n} médias référencés sont absents du paquet.',
     duration: 'Durée : {s} s',
+  },
+  exportApkg: {
+    format: 'Format',
+    csv: 'CSV (tableur)',
+    apkg: 'Paquet Anki (.apkg)',
+    help: 'Notes, cartes, planification, historique de révisions et médias, pour Anki (Fichier › Importer). Les réglages des paquets et les compartiments Memory Box ne sont pas transmis.',
+    collection: 'Exporter pour Anki (.apkg)',
+    collectionHelp:
+      'Toute la collection au format Anki. Ce n’est pas une sauvegarde : pour tout garder, utilisez « Sauvegarder maintenant ».',
+    exporting: 'Export en cours…',
+    done: 'Paquet Anki exporté',
+    notes: '{n} note|{n} notes',
+    cards: '{n} carte|{n} cartes',
+    reviews: '{n} révision|{n} révisions',
+    media: '{n} média|{n} médias',
+    retired:
+      '{n} carte retirée exportée comme suspendue (Anki n’a pas d’équivalent).|{n} cartes retirées exportées comme suspendues (Anki n’a pas d’équivalent).',
+    missingMedia: '{n} média introuvable, non inclus :|{n} médias introuvables, non inclus :',
+    missingCount: '{n} média introuvable, non inclus.|{n} médias introuvables, non inclus.',
+    more: '… et {n} autre|… et {n} autres',
+    announce: 'Paquet Anki exporté : {notes}, {cards}, {reviews}, {media}.',
+    failed: 'L’export Anki a échoué.',
   },
   common: {
     cancel: 'Annuler',

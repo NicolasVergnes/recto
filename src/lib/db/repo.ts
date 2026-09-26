@@ -6,6 +6,7 @@ import { buildRow, type BrowserRow } from '../domain/browse'
 import { deckPath } from '../domain/decks'
 import { makeCard, makeDeck, resetScheduling, type NewDeckInput } from '../domain/defaults'
 import { cardOrds, normalizeFields, noteFront } from '../domain/notes'
+import { parseOcclusion, serializeOcclusion } from '../domain/occlusion'
 import { frontKey, normalizeText } from '../domain/text'
 import type { Card, Deck, DeckSettings, Flag, ModelType, Note } from '../domain/types'
 import { RepoError } from './errors'
@@ -176,8 +177,14 @@ export interface NoteInput {
 
 function buildNoteFields(input: NoteInput): { fields: string[]; ords: number[] } {
   const fields = normalizeFields(input.modelType, input.fields)
+  // Occlusion masks are stored in their canonical form (clamped, rounded, invalid ones dropped).
+  if (input.modelType === 'image_occlusion') {
+    fields[1] = serializeOcclusion(parseOcclusion(fields[1] ?? ''))
+  }
   const ords = cardOrds(input.modelType, fields)
-  if (ords.length === 0) throw new RepoError('noteNoCloze')
+  if (ords.length === 0) {
+    throw new RepoError(input.modelType === 'image_occlusion' ? 'noteNoMask' : 'noteNoCloze')
+  }
   return { fields, ords }
 }
 

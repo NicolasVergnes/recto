@@ -3,11 +3,13 @@
  */
 import { makeCard } from '../domain/defaults'
 import { cardOrds } from '../domain/notes'
+import { labelsFromAnkiComments, occlusionFromAnki, serializeOcclusion } from '../domain/occlusion'
 import { mediaRefs, renameMediaRefs } from '../domain/text'
 import type { Card, Deck, ModelType, Note, Rating, Review, SchedulerKind } from '../domain/types'
 import { sha256Hex } from '../media/hash'
 import { mediaKind, mimeFromName } from '../media/mime'
 import { getScheduler } from '../scheduler'
+import { addDays, startOfDate, studyDate } from '../scheduler/day'
 import { boxFromStability } from '../scheduler/leitner'
 import type { ApkgCard, ApkgModel, ApkgPackage } from './apkg-read'
 import { DeckResolver } from './decks'
@@ -15,7 +17,6 @@ import { emptyReport, type ImportMedia, type ImportPlan } from './plan'
 
 export * from './apkg-read'
 
-const DAY_MS = 86_400_000
 const MAX_DURATION_MS = 60_000
 
 export type ApkgTarget =
@@ -52,12 +53,36 @@ const joinRest = (fields: readonly string[], from: number) =>
     .join('<br>')
 
 /**
- * Note types (05 §2.3): cloze → [Texte, Extra + rest]; standard with one template → basic;
- * with two templates whose second asks the second field → basic_reverse; otherwise basic and
- * reported. Model CSS is ignored.
+ * Anki 23.10+ « Image Occlusion » note type: a cloze type whose template draws the masks
+ * (`image-occlusion` in the question). Its field names are localised, so detection and field
+ * order ([Occlusion, Image, Header, Back Extra, Comments]) rely on the template, not the names.
+ */
+export function isAnkiImageOcclusion(model: ApkgModel): boolean {
+  return model.type === 1 && model.templates.some((t) => t.qfmt.includes('image-occlusion'))
+}
+
+/**
+ * Note types (05 §2.3): image occlusion → [Image, masks, Header, Back Extra + Comments];
+ * cloze → [Texte, Extra + rest]; standard with one template → basic; with two templates whose
+ * second asks the second field → basic_reverse; otherwise basic and reported. Model CSS is
+ * ignored.
  */
 export function convertModel(model: ApkgModel): ModelConversion {
   const n = model.fields.length
+  if (isAnkiImageOcclusion(model)) {
+    return {
+      modelType: 'image_occlusion',
+      mergedFields: Math.max(0, n - 4),
+      converted: false,
+      map: (f) => {
+        const shapes = occlusionFromAnki(f[0] ?? '').occlusion
+        // Answers exported by Recto come back from Comments; any other comment joins the extra.
+        const labelled = labelsFromAnkiComments(shapes, f[4] ?? '')
+        const extra = labelled ? joinRest([f[3] ?? '', ...f.slice(5)], 0) : joinRest(f, 3)
+        return [f[1] ?? '', serializeOcclusion(labelled ?? shapes), f[2] ?? '', extra]
+      },
+    }
+  }
   if (model.type === 1) {
     const merged = Math.max(0, n - 2)
     return {
@@ -81,19 +106,30 @@ export function convertModel(model: ApkgModel): ModelConversion {
   }
 }
 
-/** Card state without history (05 §2.3). */
-function convertCardState(ac: ApkgCard, base: Card, crt: number, now: number, deck: Deck): Card {
+/**
+ * Card state without history (05 §2.3). A review `due` counts days from the collection's day 0,
+ * the local date of `crt`: calendar days are added to that date (a count of 86 400 s would move
+ * the due by an hour across a daylight-saving change, a whole study day near the day start).
+ */
+function convertCardState(
+  ac: ApkgCard,
+  base: Card,
+  crt: number,
+  now: number,
+  deck: Deck,
+  dayStartHour: number,
+): Card {
   const card: Card = { ...base, suspended: ac.queue === -1, reps: ac.reps, lapses: ac.lapses }
   if (ac.type === 2) {
     const ivl = Math.max(1, ac.ivl)
-    const due = (crt + ac.due * 86_400) * 1000
+    const day0 = studyDate(crt * 1000, 0)
     const stability = ivl
     card.state = 2
-    card.due = due
+    card.due = startOfDate(addDays(day0, ac.due), dayStartHour)
     card.scheduledDays = ivl
     card.stability = stability
     card.difficulty = Math.min(10, Math.max(1, 11 - (ac.factor / 1000) * 2))
-    card.lastReview = due - ivl * DAY_MS
+    card.lastReview = startOfDate(addDays(day0, ac.due - ivl), dayStartHour)
     if (deck.scheduler === 'leitner') card.box = boxFromStability(stability)
   } else if (ac.type === 1 || ac.type === 3) {
     // Learning: due now; FSRS treats an empty memory state as a first review.
@@ -140,7 +176,8 @@ export async function planApkgImport(
     fsrs: getScheduler('fsrs', { dayStartHour: options.dayStartHour }),
     leitner: getScheduler('leitner', { dayStartHour: options.dayStartHour }),
   }
-  const byGuid = new Map(existing.notes.filter((n) => n.sourceGuid).map((n) => [n.sourceGuid, n]))
+  // The guid a Recto export writes (05 §4): the Anki guid of imported notes, else the note id.
+  const byGuid = new Map(existing.notes.map((n) => [n.sourceGuid ?? n.id, n]))
   const cardsByNote = new Map<number, ApkgCard[]>()
   for (const c of pkg.cards) cardsByNote.set(c.nid, [...(cardsByNote.get(c.nid) ?? []), c])
   const revlogByCard = new Map<number, { id: number; ease: number; time: number }[]>()
@@ -174,13 +211,26 @@ export async function planApkgImport(
       report.convertedModels.push({ name: model.name, mergedFields: conversion.mergedFields })
     }
     const fields = conversion.map(an.fields)
+    // Occlusion shapes converted or left out, counted for the notes written (created or updated).
+    const countShapes = () => {
+      if (conversion.modelType !== 'image_occlusion') return
+      const shapes = occlusionFromAnki(an.fields[0] ?? '')
+      report.shapesConverted += shapes.converted
+      report.shapesSkipped += shapes.skipped
+    }
     const updatedAt = an.mod * 1000
     const known = byGuid.get(an.guid)
     if (known) {
-      // Re-import (05 §2.3): update the fields when Anki's copy is more recent.
-      if (updatedAt > known.updatedAt)
+      // Re-import (05 §2.3): update the fields when Anki's copy is more recent, unless that would
+      // change the note's cards (other note type, cloze added or removed): an update keeps the
+      // cards as they are (invariant 2), so such a note is left untouched and counted as skipped.
+      const sameCards =
+        conversion.modelType === known.modelType &&
+        cardOrds(known.modelType, fields).join() === cardOrds(known.modelType, known.fields).join()
+      if (updatedAt > known.updatedAt && sameCards) {
         plan.updates.push({ ...known, fields, tags: an.tags, updatedAt })
-      else report.skipped++
+        countShapes()
+      } else report.skipped++
       continue
     }
     const ankiCards = (cardsByNote.get(an.id) ?? []).sort((a, b) => a.ord - b.ord)
@@ -191,9 +241,12 @@ export async function planApkgImport(
     }
     const ords = cardOrds(conversion.modelType, fields)
     if (ords.length === 0) {
-      report.errors.push({ line: an.id, code: 'noCloze' })
+      const code = conversion.modelType === 'image_occlusion' ? 'noMask' : 'noCloze'
+      report.errors.push({ line: an.id, code })
+      countShapes()
       continue
     }
+    countShapes()
     const note: Note = {
       id: newId(),
       deckId: deck.id,
@@ -217,7 +270,7 @@ export async function planApkgImport(
       }
       const history = options.importHistory ? (revlogByCard.get(ac.id) ?? []) : []
       if (history.length === 0) {
-        plan.cards.push(convertCardState(ac, base, pkg.crt, now, deck))
+        plan.cards.push(convertCardState(ac, base, pkg.crt, now, deck, options.dayStartHour))
         continue
       }
       // Replay: the same algorithm as ts-fsrs `reschedule` (replay = next) or Leitner answers.

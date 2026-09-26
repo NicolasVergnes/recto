@@ -6,6 +6,7 @@ import {
   putBack,
   removeCard,
   REINSERT_GAP,
+  remainingByState,
   takeDue,
 } from '$lib/queue/session'
 
@@ -74,5 +75,28 @@ describe('session queue (03 §5.7, §3.4)', () => {
     const q = { ids: ['a', 'b'], later: [{ id: 'c', due: now }] }
     expect(removeCard(q, 'c')).toEqual({ ids: ['a', 'b'], later: [] })
     expect(putBack(q, 'c')).toEqual({ ids: ['c', 'a', 'b'], later: [] })
+  })
+
+  it('counts the cards left by state, learning cards set aside included', () => {
+    const cards = new Map([
+      ['n', { state: 0 as const }],
+      ['l', { state: 1 as const }],
+      ['r', { state: 2 as const }],
+      ['rl', { state: 3 as const }],
+      ['n2', { state: 0 as const }],
+    ])
+    const q = {
+      ids: ['n', 'r', 'n2', 'gone'],
+      later: [
+        { id: 'l', due: now + 600 },
+        { id: 'rl', due: now + 900 },
+      ],
+    }
+    expect(remainingByState(q, cards)).toEqual({ learning: 2, review: 1, new: 2 })
+    expect(remainingByState({ ids: [], later: [] }, cards)).toEqual({
+      learning: 0,
+      review: 0,
+      new: 0,
+    })
   })
 })

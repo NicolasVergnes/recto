@@ -32,13 +32,19 @@ export async function recordReview(outcome: SchedulerOutcome, durationMs: number
 /**
  * Undo (04-UI §2.2): restores the card snapshot taken before the answer and deletes that single
  * review row — the only deletion of a log row besides explicit card/note deletion (invariant 3).
+ * A card deleted since (its cloze or mask removed while editing) is not brought back
+ * (invariant 2); a card whose note moved keeps its new deck (invariant 1). Returns the card.
  */
-export async function undoReview(previous: Card, reviewId: string): Promise<void> {
-  await db.transaction('rw', db.cards, db.reviews, async () => {
+export async function undoReview(previous: Card, reviewId: string): Promise<Card> {
+  return db.transaction('rw', db.cards, db.reviews, async () => {
     const row = await db.reviews.get(reviewId)
     if (!row || row.cardId !== previous.id) throw new RepoError('noteNotFound')
-    await db.cards.put(previous)
+    const current = await db.cards.get(previous.id)
+    if (!current) throw new RepoError('undoGone')
+    const restored: Card = { ...previous, deckId: current.deckId }
+    await db.cards.put(restored)
     await db.reviews.delete(reviewId)
+    return restored
   })
 }
 

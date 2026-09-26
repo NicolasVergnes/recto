@@ -43,14 +43,24 @@ export async function generateCollection(db: RectoDB, seed: string) {
   const cards: Card[] = []
   const reviews: Review[] = []
   for (let i = 0; i < 5 + int(20); i++) {
-    const modelType = pick<ModelType>(['basic', 'basic_reverse', 'cloze'])
+    const modelType = pick<ModelType>(['basic', 'basic_reverse', 'cloze', 'image_occlusion'])
     const deck = pick(decks)
     const img =
       media.length > 0 && random() < 0.3 ? `<img src="${pick(media).name}" alt="a « b »">` : ''
+    const masks = JSON.stringify({
+      v: 1,
+      mode: pick(['hideAll', 'hideOne']),
+      masks: [
+        { n: 1, x: 0.1, y: 0.1, w: 0.2, h: 0.3, label: `L${i} « é »` },
+        { n: 2, x: 0.5, y: 0.25, w: 0.125, h: 0.5 },
+      ],
+    })
     const fields =
       modelType === 'cloze'
         ? [`Texte {{c1::a${i}}} et {{c2::b}} ${img}`, 'extra; "quoted"']
-        : [`Q${i} ${img}`, `R${i}\nligne`, '']
+        : modelType === 'image_occlusion'
+          ? [img, masks, `Titre ${i}`, 'extra']
+          : [`Q${i} ${img}`, `R${i}\nligne`, '']
     const note: Note = {
       id: id(),
       deckId: deck.id,
