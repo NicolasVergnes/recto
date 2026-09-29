@@ -2,10 +2,19 @@
   import { SvelteSet } from 'svelte/reactivity'
   import { live } from '$lib/db/live.svelte'
   import * as repo from '$lib/db/repo'
-  import { filterRows, sortRows, type SortKey, type StatusFilter } from '$lib/domain/browse'
+  import type { BrowserView } from '$lib/db/settings'
+  import {
+    filterRows,
+    sortRows,
+    type Sort,
+    type SortKey,
+    type StatusFilter,
+  } from '$lib/domain/browse'
   import { t, type MessageKey } from '$lib/i18n'
   import { href, type RouteProps } from '$lib/router.svelte'
+  import { prefs, setBrowserView } from '$lib/state/prefs.svelte'
   import BulkActions from '$lib/ui/browser/BulkActions.svelte'
+  import CardMosaic from '$lib/ui/browser/CardMosaic.svelte'
   import CardTable from '$lib/ui/browser/CardTable.svelte'
   import DeckSelect from '$lib/ui/DeckSelect.svelte'
   import Icon from '$lib/ui/Icon.svelte'
@@ -21,6 +30,11 @@
     { value: 'suspended', label: 'states.suspended' },
     { value: 'retired', label: 'states.retired' },
     { value: 'flagged', label: 'browser.flagged' },
+  ]
+  const VIEWS: { value: BrowserView; label: MessageKey }[] = [
+    { value: 'list', label: 'browser.viewList' },
+    { value: 'flip', label: 'browser.viewFlip' },
+    { value: 'both', label: 'browser.viewBoth' },
   ]
 
   // svelte-ignore state_referenced_locally
@@ -59,12 +73,18 @@
     if (location.hash !== url) history.replaceState(history.state, '', url)
   })
 
+  /** Table header: the same column again flips the direction. */
   function sortBy(key: SortKey) {
     if (sortKey === key) sortDir = sortDir === 1 ? -1 : 1
     else {
       sortKey = key
       sortDir = 1
     }
+  }
+
+  function setSort(sort: Sort) {
+    sortKey = sort.key
+    sortDir = sort.dir
   }
 
   function toggle(id: string, on: boolean) {
@@ -116,6 +136,23 @@
       {t('browser.count', { n: rows.length })}
       {#if selected.size > 0}· {t('browser.selectedCount', { n: selected.size })}{/if}
     </p>
+    <fieldset class="view">
+      <legend class="visually-hidden">{t('browser.view')}</legend>
+      <div class="row">
+        {#each VIEWS as view (view.value)}
+          <label class="check small">
+            <input
+              type="radio"
+              name="browser-view"
+              value={view.value}
+              checked={prefs.browserView === view.value}
+              onchange={() => setBrowserView(view.value)}
+            />
+            {t(view.label)}
+          </label>
+        {/each}
+      </div>
+    </fieldset>
     <a class="btn btn-sm" href={href('/notes/new', { deck: deckFilter })}>
       <Icon name="plus" />
       {t('home.addNote')}
@@ -123,16 +160,31 @@
   </div>
 
   <BulkActions {selected} {selectedRows} {selectedNoteIds} decks={decks.value} />
-  <CardTable
-    {rows}
-    loaded={allRows.loaded}
-    {selected}
-    sort={{ key: sortKey, dir: sortDir }}
-    {allVisibleSelected}
-    onsort={sortBy}
-    ontoggle={toggle}
-    onselectall={selectAllVisible}
-  />
+  {#if prefs.browserView === 'list'}
+    <CardTable
+      {rows}
+      loaded={allRows.loaded}
+      {selected}
+      sort={{ key: sortKey, dir: sortDir }}
+      {allVisibleSelected}
+      onsort={sortBy}
+      ontoggle={toggle}
+      onselectall={selectAllVisible}
+    />
+  {:else}
+    <CardMosaic
+      {rows}
+      loaded={allRows.loaded}
+      {selected}
+      mode={prefs.browserView}
+      flipStyle={prefs.flipStyle}
+      sort={{ key: sortKey, dir: sortDir }}
+      {allVisibleSelected}
+      onsort={setSort}
+      ontoggle={toggle}
+      onselectall={selectAllVisible}
+    />
+  {/if}
 </section>
 
 <style>
@@ -157,5 +209,11 @@
 
   .toolbar p {
     margin: 0;
+  }
+
+  .view {
+    margin: 0;
+    padding: 0;
+    border: none;
   }
 </style>
