@@ -2,6 +2,10 @@ import { DEFAULT_DAY_START_HOUR, DEFAULT_GLOBAL_REVIEWS_PER_DAY } from '../confi
 import { db } from './schema'
 
 export type Theme = 'system' | 'light' | 'dark'
+/** Card browser layout (SPEC §5.2): table, tiles showing one face, tiles showing both faces. */
+export type BrowserView = 'list' | 'flip' | 'both'
+/** Flip transition of the browser tiles (04-UI §4); `none` is always available. */
+export type FlipStyle = 'none' | 'horizontal' | 'vertical' | 'fade' | 'slide'
 
 /** Typed view of the `settings` table (02-DATA-MODEL §2, reserved keys + session additions). */
 export interface SettingsMap {
@@ -18,6 +22,10 @@ export interface SettingsMap {
   sleepTipDay: string | null
   /** Swipe gestures in review (04-UI §2.2), off by default. */
   swipeGestures: boolean
+  /** Card browser layout, remembered silently like `lastDeckId`. */
+  browserView: BrowserView
+  /** Flip animation of the browser tiles (Settings › Affichage). */
+  flipStyle: FlipStyle
 }
 
 export const DEFAULT_SETTINGS: SettingsMap = {
@@ -31,11 +39,15 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   lastDeckId: null,
   sleepTipDay: null,
   swipeGestures: false,
+  browserView: 'list',
+  flipStyle: 'horizontal',
 }
 
 export type SettingKey = keyof SettingsMap
 
 const THEMES: readonly string[] = ['system', 'light', 'dark']
+const BROWSER_VIEWS: readonly string[] = ['list', 'flip', 'both']
+const FLIP_STYLES: readonly string[] = ['none', 'horizontal', 'vertical', 'fade', 'slide']
 
 /** Runtime validation: settings come from IndexedDB or backups (`unknown`). */
 function isValid<K extends SettingKey>(key: K, value: unknown): value is SettingsMap[K] {
@@ -58,6 +70,10 @@ function isValid<K extends SettingKey>(key: K, value: unknown): value is Setting
     case 'lastDeckId':
     case 'sleepTipDay':
       return value === null || typeof value === 'string'
+    case 'browserView':
+      return typeof value === 'string' && BROWSER_VIEWS.includes(value)
+    case 'flipStyle':
+      return typeof value === 'string' && FLIP_STYLES.includes(value)
     default:
       return false
   }

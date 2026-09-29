@@ -3,7 +3,7 @@
   import * as repo from '$lib/db/repo'
   import { getSetting, setSetting } from '$lib/db/settings'
   import { requestPersistence, storageInfo, usageRatio, type StorageInfo } from '$lib/db/storage'
-  import type { Theme } from '$lib/db/settings'
+  import type { FlipStyle, Theme } from '$lib/db/settings'
   import { BACKUP_EXTENSION, createBackup } from '$lib/export/backup'
   import { shareOrDownload, timestampedName } from '$lib/export/download'
   import { t, type MessageKey } from '$lib/i18n'
@@ -14,6 +14,7 @@
   import {
     prefs,
     setDayStartHour,
+    setFlipStyle,
     setFontScale,
     setSwipeGestures,
     setTheme,
@@ -31,6 +32,13 @@
     { value: 'system', label: 'settings.themeSystem' },
     { value: 'light', label: 'settings.themeLight' },
     { value: 'dark', label: 'settings.themeDark' },
+  ]
+  const FLIP_STYLES: { value: FlipStyle; label: MessageKey }[] = [
+    { value: 'none', label: 'settings.flipNone' },
+    { value: 'horizontal', label: 'settings.flipHorizontal' },
+    { value: 'vertical', label: 'settings.flipVertical' },
+    { value: 'fade', label: 'settings.flipFade' },
+    { value: 'slide', label: 'settings.flipSlide' },
   ]
 
   let info = $state<StorageInfo | null>(null)
@@ -198,6 +206,24 @@
       />
       {t('settings.swipe')}
     </label>
+    <fieldset>
+      <legend>{t('settings.flipStyle')}</legend>
+      <div class="row">
+        {#each FLIP_STYLES as style (style.value)}
+          <label class="check">
+            <input
+              type="radio"
+              name="flip-style"
+              value={style.value}
+              checked={prefs.flipStyle === style.value}
+              onchange={() => setFlipStyle(style.value)}
+            />
+            {t(style.label)}
+          </label>
+        {/each}
+      </div>
+      <p class="muted small">{t('settings.flipStyleHelp')}</p>
+    </fieldset>
     <p class="muted small">{t('settings.language')}</p>
   </section>
 

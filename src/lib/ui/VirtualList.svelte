@@ -8,8 +8,10 @@
     row: Snippet<[T, number]>
     label: string
     overscan?: number
+    /** `rowgroup` inside a table, `list` for a grid of tiles (ARIA parent rules). */
+    role?: 'rowgroup' | 'list'
   }
-  let { items, rowHeight, key, row, label, overscan = 10 }: Props = $props()
+  let { items, rowHeight, key, row, label, overscan = 10, role = 'rowgroup' }: Props = $props()
 
   let scrollTop = $state(0)
   let viewport = $state(600)
@@ -23,7 +25,7 @@
 <!-- Only the visible rows are in the DOM (SPEC §6: browser virtualised, ≥ 5 000 rows). -->
 <div
   class="viewport"
-  role="rowgroup"
+  {role}
   aria-label={label}
   bind:clientHeight={viewport}
   onscroll={(e) => (scrollTop = e.currentTarget.scrollTop)}

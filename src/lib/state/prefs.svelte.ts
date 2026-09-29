@@ -1,4 +1,11 @@
-import { getAllSettings, setSetting, type SettingsMap, type Theme } from '../db/settings'
+import {
+  getAllSettings,
+  setSetting,
+  type BrowserView,
+  type FlipStyle,
+  type SettingsMap,
+  type Theme,
+} from '../db/settings'
 
 const THEME_KEY = 'recto.theme'
 
@@ -7,6 +14,8 @@ interface Prefs {
   fontScale: number
   dayStartHour: number
   swipeGestures: boolean
+  browserView: BrowserView
+  flipStyle: FlipStyle
   loaded: boolean
 }
 
@@ -16,6 +25,8 @@ export const prefs = $state<Prefs>({
   fontScale: 1,
   dayStartHour: 4,
   swipeGestures: false,
+  browserView: 'list',
+  flipStyle: 'horizontal',
   loaded: false,
 })
 
@@ -47,6 +58,8 @@ export async function loadPrefs(): Promise<SettingsMap> {
   prefs.fontScale = all.fontScale
   prefs.dayStartHour = all.dayStartHour
   prefs.swipeGestures = all.swipeGestures
+  prefs.browserView = all.browserView
+  prefs.flipStyle = all.flipStyle
   prefs.loaded = true
   apply()
   return all
@@ -72,4 +85,14 @@ export async function setDayStartHour(hour: number): Promise<void> {
 export async function setSwipeGestures(on: boolean): Promise<void> {
   prefs.swipeGestures = on
   await setSetting('swipeGestures', on)
+}
+
+export async function setBrowserView(view: BrowserView): Promise<void> {
+  prefs.browserView = view
+  await setSetting('browserView', view)
+}
+
+export async function setFlipStyle(style: FlipStyle): Promise<void> {
+  prefs.flipStyle = style
+  await setSetting('flipStyle', style)
 }
