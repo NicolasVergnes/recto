@@ -4,6 +4,10 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 ## [Unreleased]
 
+### Outillage
+
+- `.gitattributes` force les fins de ligne LF : `npm run verify` passe aussi sous Windows avec `core.autocrlf=true`.
+
 ### M6 — V1 : occlusion d'image, export Anki, optimiseur FSRS, formules
 
 #### Added

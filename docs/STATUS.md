@@ -1,10 +1,10 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-09-25 · Branche : claude/compassionate-albattani-f8qn5u · **V1 (M6) livrée**, en attente de relecture et de fusion par Nicolas
+Dernière mise à jour : 2026-09-30 · Branche : main · **V1 (M6) livrée** et fusionnée (PR #1)
 
 ## Jalon en cours
 
-Aucun : M6 (V1) est terminé, en attente de relecture et de fusion. Suivant : V2 (synchronisation par fichier, empaquetage Android — voir « Écarts »), et la dette ci-dessous.
+Aucun : M6 (V1) est terminé et fusionné. Suivant : V2 (synchronisation par fichier, empaquetage Android — voir « Écarts »), et la dette ci-dessous.
 
 ## Terminé
 
@@ -237,6 +237,7 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 - 2026-09-25 : navigation basse mobile à 4 entrées (Accueil, Cartes, Statistiques, Paramètres) ; la barre latérale ≥ 900 px ajoute « Ajouter » et « Importer » (création surtout sur PC, SPEC §3).
 - 2026-09-25 : `t()` applique automatiquement les espaces insécables françaises (avant « : ; ! ? % » et dans les guillemets) pour que `fr.ts` reste lisible.
 - 2026-09-25 : les fonctions pures du routeur sont dans `src/lib/url.ts` (testées) ; `router.svelte.ts` ne contient que l'état réactif.
+- 2026-09-30 : `.gitattributes` (`* text=auto eol=lf`) : fins de ligne LF dans la copie de travail quel que soit `core.autocrlf` ; sous Windows, `format:check` échouait sur tous les fichiers (CRLF). Node local ≥ 22.14 (des dépendances de test l'exigent).
 
 ## Écarts par rapport aux docs
 
