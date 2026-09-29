@@ -40,7 +40,7 @@ export async function recordReview(outcome: SchedulerOutcome, durationMs: number
 
 - Table `media` : `name` = nom de fichier unique (`<8 hex>-<slug>.<ext>`), `blob`, `mime`, `size`, `sha256`.
 - Avant stockage : type MIME vérifié par liste blanche (image/jpeg, png, webp, gif, svg+xml ; audio/mpeg, ogg, webm, mp4, x-m4a) ; images redimensionnées via `createImageBitmap` + `OffscreenCanvas` (fallback `<canvas>`), SVG assainis par dompurify.
-- Lecture : `URL.createObjectURL(blob)` dans un helper qui révoque l'URL au démontage ; cache LRU de 50 URLs pendant une séance.
+- Lecture : `URL.createObjectURL(blob)` dans un helper qui révoque l'URL au démontage ; cache LRU de 200 URLs pendant une séance (la mosaïque du navigateur peut afficher ≈ 80 faces).
 - Orphelins : utilitaire qui liste les `media.name` non référencés dans `notes.fields` (regex `src="([^"]+)"` et `\[sound:([^\]]+)\]`).
 
 ## 5. Persistance, quota, sauvegardes

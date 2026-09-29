@@ -10,7 +10,7 @@ export const STACKED_TILE_HEIGHT_REM = 21
 
 /** Tiles that fit in `width` px with `gap` px between them, at least 1. */
 export function columnsFor(width: number, minTile: number, gap: number): number {
-  if (!(minTile > 0)) return 1
+  if (!(minTile > 0) || !Number.isFinite(width) || !Number.isFinite(gap)) return 1
   return Math.max(1, Math.floor((width + gap) / (minTile + gap)))
 }
 
@@ -20,7 +20,7 @@ export function tileHeightRem(mode: MosaicMode, columns: number): number {
 
 /** Splits `items` into rows of `size` (the last one may be shorter); never an empty row. */
 export function chunk<T>(items: readonly T[], size: number): T[][] {
-  const n = Math.max(1, Math.floor(size))
+  const n = Number.isFinite(size) && size >= 1 ? Math.floor(size) : 1
   const rows: T[][] = []
   for (let i = 0; i < items.length; i += n) rows.push(items.slice(i, i + n))
   return rows

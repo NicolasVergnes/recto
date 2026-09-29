@@ -13,10 +13,12 @@
   }
   let { flipped, style, backMounted, front, back, onflip }: Props = $props()
 
-  /** Buttons and links inside a face (sound playback…) keep their own click. */
+  /** Buttons and links inside a face (sound playback…) keep their own click; so does a
+   * text selection ending on the face. */
   function onclick(e: MouseEvent) {
     if (e.target instanceof Element && e.target.closest('button, a, input, select, textarea'))
       return
+    if (getSelection()?.toString()) return
     onflip()
   }
 </script>
@@ -45,11 +47,11 @@
     inset: 0;
   }
 
-  /* Only the faces scroll: `overflow` on .inner or .faces would flatten the 3D rotation. */
+  /* The content inside a face scrolls (TileFace); `overflow` on .inner or .faces would
+     flatten the 3D rotation. */
   .face {
     position: absolute;
     inset: 0;
-    overflow: auto;
   }
 
   /* none: instant swap. */

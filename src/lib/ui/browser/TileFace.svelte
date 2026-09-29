@@ -16,13 +16,16 @@
   {#if side === 'front'}
     {#if rendered.question}<CardContent html={rendered.question} />{/if}
     {#if rendered.occlusion}<OcclusionView occlusion={rendered.occlusion} revealed={false} />{/if}
+    {#if !rendered.question && !rendered.occlusion}<p class="muted">—</p>{/if}
   {:else}
     {#if rendered.occlusion}
       <OcclusionView occlusion={rendered.occlusion} revealed={true} />
       {#if rendered.answer}<CardContent html={rendered.answer} />{/if}
-    {:else}
+    {:else if rendered.answer}
       <!-- Cloze: the whole text with the gap revealed; basic: the verso alone. -->
       <CardContent html={rendered.answer} />
+    {:else}
+      <p class="muted">—</p>
     {/if}
     {#if rendered.extra}
       <div class="extra"><CardContent html={rendered.extra} /></div>

@@ -160,7 +160,9 @@
   </div>
 
   <BulkActions {selected} {selectedRows} {selectedNoteIds} decks={decks.value} />
-  {#if prefs.browserView === 'list'}
+  {#if !prefs.loaded}
+    <!-- The remembered view arrives with the preferences: no table flashing before the mosaic. -->
+  {:else if prefs.browserView === 'list'}
     <CardTable
       {rows}
       loaded={allRows.loaded}

@@ -1,7 +1,8 @@
 import { db } from '../db/schema'
 
-/** Object URLs for stored media: LRU of 50, revoked on eviction (dexie-local-first §4). */
-const MAX_URLS = 50
+/** Object URLs for stored media, revoked on eviction (dexie-local-first §4). The mosaic of the
+ * card browser can show up to ≈ 80 faces at once on a large screen: the cap stays well above. */
+const MAX_URLS = 200
 const cache = new Map<string, string>()
 const pending = new Map<string, Promise<string | null>>()
 

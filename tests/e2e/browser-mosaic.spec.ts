@@ -25,6 +25,7 @@ test('mosaic: tiles render the card HTML, flip on demand, sort, select and persi
     ['<b>Capitale</b> de la France', 'Paris'],
     ['Chien', 'Dog'],
     ['Zèbre', 'Zebra'],
+    ['Longue question ' + 'lorem ipsum dolor sit amet '.repeat(40), 'Ligne<br>'.repeat(40)],
   ])
   await page.goto('/#/cards')
   // The table stays the default view.
@@ -47,6 +48,16 @@ test('mosaic: tiles render the card HTML, flip on demand, sort, select and persi
   await expect(tile.locator('.face.front')).toHaveAttribute('inert', '')
   // A click on the face flips it back.
   await tile.locator('.faces').click({ position: { x: 10, y: 10 } })
+  await expect(tile).toHaveAttribute('data-flipped', 'false')
+
+  // Keyboard: Tab reaches « Retourner », Enter flips, the focus stays on the button.
+  await tile.getByRole('checkbox').focus()
+  await page.keyboard.press('Tab')
+  await expect(flip).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(tile).toHaveAttribute('data-flipped', 'true')
+  await expect(flip).toBeFocused()
+  await page.keyboard.press('Space')
   await expect(tile).toHaveAttribute('data-flipped', 'false')
 
   // Columns: 1 on a phone, at least 3 on the desktop project (1 280 px wide).
@@ -79,10 +90,20 @@ test('mosaic: tiles render the card HTML, flip on demand, sort, select and persi
   await expect(both.getByText('Paris')).toBeVisible()
   await expect(both.getByRole('button', { name: 'Retourner' })).toHaveCount(0)
   await expect(both.getByRole('link', { name: 'Modifier' })).toBeVisible()
+  // A long card never grows past its row: its faces scroll inside the tile.
+  const long = grid(page).getByRole('listitem').filter({ hasText: 'Longue question' })
+  await long.scrollIntoViewIfNeeded()
+  const sizes = await long.evaluate((el) => ({
+    tile: el.getBoundingClientRect().height,
+    row: el.parentElement?.getBoundingClientRect().height ?? 0,
+    stacked: !!el.querySelector('.both.stacked'),
+  }))
+  expect(sizes.tile).toBeLessThan(sizes.row)
+  expect(sizes.stacked).toBe(testInfo.project.name === 'mobile')
 
   // Back to the table.
   await page.getByRole('radio', { name: 'Liste', exact: true }).check()
-  await expect(page.getByRole('row')).toHaveCount(4)
+  await expect(page.getByRole('row')).toHaveCount(5)
 })
 
 test('mosaic: the flip style is chosen in Settings and reduced motion disables it', async ({
@@ -114,7 +135,7 @@ test('mosaic: the flip style is chosen in Settings and reduced motion disables i
   await expect(faces).toHaveAttribute('data-flip-style', 'slide')
   // Cloze cards render the gap on the front and the revealed text on the back.
   await page.getByLabel('Rechercher').fill('tourne')
-  const cloze = grid(page).getByRole('listitem').filter({ hasText: 'tourne' })
+  const cloze = grid(page).getByRole('listitem').filter({ hasText: 'autour' })
   await expect(cloze.locator('.cloze')).toContainText('[')
   await cloze.getByRole('button', { name: 'Retourner' }).click()
   await expect(cloze.locator('.face.back .cloze')).not.toContainText('[')

@@ -163,7 +163,6 @@ export const fr = {
     viewFlip: 'Mosaïque',
     viewBoth: 'Mosaïque recto-verso',
     flip: 'Retourner',
-    edit: 'Modifier',
     sortBy: 'Trier par',
     created: 'Date de création',
     order: 'Ordre',

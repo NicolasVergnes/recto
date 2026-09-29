@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { untrack } from 'svelte'
   import { SvelteSet } from 'svelte/reactivity'
   import type { FlipStyle } from '$lib/db/settings'
   import type { BrowserRow, Sort, SortKey } from '$lib/domain/browse'
@@ -57,11 +56,12 @@
   const rowHeight = $derived((tileHeightRem(mode, columns) + GAP_REM) * rem)
   const gridRows = $derived(chunk(rows, columns))
 
-  // Flipped card ids live here so that a tile scrolled out of the window keeps its face.
+  // Flipped card ids live here so that a tile scrolled out of the window keeps its face;
+  // a mode change turns every tile back (the effect also runs once at mount, on an empty set).
   const flipped = new SvelteSet<string>()
   $effect(() => {
     void mode
-    untrack(() => flipped.clear())
+    flipped.clear()
   })
 
   function toggleFlip(id: string) {
@@ -104,25 +104,27 @@
   </div>
   {#if loaded && rows.length === 0}
     <p class="empty muted">{t('browser.empty')}</p>
-  {:else}
+  {:else if width > 0}
     <VirtualList
       items={gridRows}
       {rowHeight}
       overscan={1}
       role="list"
-      key={(r) => r[0]?.card.id ?? ''}
+      key={(_, i) => String(i)}
       label={t('browser.tiles')}
     >
-      {#snippet row(cards: BrowserRow[])}
+      {#snippet row(cards: BrowserRow[], index: number)}
         <div
           class="grid-row"
           role="presentation"
           style:height={`${rowHeight}px`}
           style:grid-template-columns={`repeat(${columns}, minmax(0, 1fr))`}
         >
-          {#each cards as r (r.card.id)}
+          {#each cards as r, i (r.card.id)}
             <CardTile
               row={r}
+              position={index * columns + i + 1}
+              total={rows.length}
               {mode}
               {flipStyle}
               {stacked}
@@ -165,8 +167,10 @@
     width: auto;
   }
 
+  /* One fixed track: a tile never grows with its content (its faces scroll instead). */
   .grid-row {
     display: grid;
+    grid-auto-rows: minmax(0, 1fr);
     box-sizing: border-box;
     gap: var(--space-3);
     padding: 0 var(--space-1) var(--space-3);

@@ -69,7 +69,7 @@
               type="checkbox"
               checked={selected.has(r.card.id)}
               onchange={(e) => ontoggle(r.card.id, e.currentTarget.checked)}
-              aria-label={t('browser.selectCard', { q: r.question })}
+              aria-label={t('browser.selectCard', { q: r.question || '—' })}
             />
           </span>
           <span class="cell question" role="cell">
@@ -78,7 +78,9 @@
           <span class="cell answer" role="cell">{r.answer}</span>
           <span class="cell deck" role="cell">{r.deckName}</span>
           <span class="cell status" role="cell">
-            {t(`states.${r.status}`)}{#if r.card.flag}&nbsp;<Icon name="flag" size={14} />{/if}
+            {t(`states.${r.status}`)}{#if r.card.flag}&nbsp;<Icon name="flag" size={14} /><span
+                class="visually-hidden">{t('review.flag')}</span
+              >{/if}
           </span>
           <span class="cell due tabular" role="cell">{formatDue(r.card, Date.now())}</span>
         </div>

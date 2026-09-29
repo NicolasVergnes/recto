@@ -4,7 +4,7 @@
   interface Props {
     items: readonly T[]
     rowHeight: number
-    key: (item: T) => string
+    key: (item: T, index: number) => string
     row: Snippet<[T, number]>
     label: string
     overscan?: number
@@ -32,7 +32,7 @@
 >
   <div class="spacer" style:height={`${items.length * rowHeight}px`}>
     <div class="window" style:transform={`translateY(${start * rowHeight}px)`}>
-      {#each visible as item, i (key(item))}
+      {#each visible as item, i (key(item, start + i))}
         {@render row(item, start + i)}
       {/each}
     </div>

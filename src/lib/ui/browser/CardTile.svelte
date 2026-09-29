@@ -11,6 +11,9 @@
 
   interface Props {
     row: BrowserRow
+    /** 1-based rank and total, for the virtualised list (aria-posinset / aria-setsize). */
+    position: number
+    total: number
     mode: MosaicMode
     flipStyle: FlipStyle
     /** « both » in a single column: faces one above the other. */
@@ -20,15 +23,29 @@
     ontoggle: (on: boolean) => void
     onflip: () => void
   }
-  let { row, mode, flipStyle, stacked, selected, flipped, ontoggle, onflip }: Props = $props()
+  let {
+    row,
+    position,
+    total,
+    mode,
+    flipStyle,
+    stacked,
+    selected,
+    flipped,
+    ontoggle,
+    onflip,
+  }: Props = $props()
 
   // The browser shows the canonical sides (no Leitner swap), like the table does.
   const rendered = $derived(renderCard(row.note, row.card))
   let root: HTMLElement | undefined = $state()
+  let flipButton: HTMLButtonElement | undefined = $state()
   /** The back face is mounted at the first flip only, then stays for the return animation. */
   let backSeen = $state(false)
 
   async function flip() {
+    // A control inside the face about to become inert would drop the focus on <main>.
+    if (root?.querySelector('.faces')?.contains(document.activeElement)) flipButton?.focus()
     if (!backSeen) {
       backSeen = true
       await tick()
@@ -42,6 +59,8 @@
   class="tile card-surface"
   class:selected
   role="listitem"
+  aria-posinset={position}
+  aria-setsize={total}
   bind:this={root}
   data-flipped={mode === 'flip' ? flipped : undefined}
 >
@@ -49,7 +68,7 @@
     {row.deckName} · {t(`states.${row.status}`)}{#if row.card.flag}&nbsp;<Icon
         name="flag"
         size={14}
-      />{/if}
+      /><span class="visually-hidden">{t('review.flag')}</span>{/if}
   </p>
   {#if mode === 'flip'}
     <FlipFaces {flipped} style={flipStyle} backMounted={backSeen || flipped} onflip={flip}>
@@ -68,18 +87,24 @@
         type="checkbox"
         checked={selected}
         onchange={(e) => ontoggle(e.currentTarget.checked)}
-        aria-label={t('browser.selectCard', { q: row.question })}
+        aria-label={t('browser.selectCard', { q: row.question || '—' })}
       />
     </label>
     {#if mode === 'flip'}
-      <button class="btn btn-sm btn-ghost" type="button" aria-pressed={flipped} onclick={flip}>
+      <button
+        class="btn btn-sm btn-ghost"
+        type="button"
+        aria-pressed={flipped}
+        bind:this={flipButton}
+        onclick={flip}
+      >
         <Icon name="swap" />
         {t('browser.flip')}
       </button>
     {/if}
     <a class="btn btn-sm btn-ghost" href={`#/notes/${row.note.id}`}>
       <Icon name="edit" />
-      {t('browser.edit')}
+      {t('review.edit')}
     </a>
   </footer>
 </article>
@@ -104,6 +129,7 @@
     flex: 1;
     min-height: 0;
     grid-template-columns: 1fr 1fr;
+    grid-auto-rows: minmax(0, 1fr);
     gap: var(--space-2);
   }
 

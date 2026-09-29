@@ -163,13 +163,13 @@ describe('media storage', () => {
 })
 
 describe('media object URLs', () => {
-  it('caches up to 50 URLs and revokes evicted ones', async () => {
+  it('caches up to 200 URLs and revokes evicted ones', async () => {
     const create = vi
       .spyOn(URL, 'createObjectURL')
       .mockImplementation(() => `blob:${crypto.randomUUID()}`)
     const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
     const names: string[] = []
-    for (let i = 0; i < 52; i++) {
+    for (let i = 0; i < 202; i++) {
       const m = await addMediaFile(new Blob([`s${i}`], { type: 'audio/mpeg' }), `s${i}.mp3`, T0)
       names.push(m.name)
     }
@@ -177,14 +177,14 @@ describe('media object URLs', () => {
     expect(first).toMatch(/^blob:/)
     expect(await mediaUrl(names[0] ?? '')).toBe(first)
     for (const name of names.slice(1)) await mediaUrl(name)
-    expect(cachedUrlCount()).toBe(50)
+    expect(cachedUrlCount()).toBe(200)
     expect(revoke).toHaveBeenCalledTimes(2)
     expect(await mediaUrl('missing.png')).toBeNull()
-    forgetMediaUrl(names[51] ?? '')
-    expect(cachedUrlCount()).toBe(49)
+    forgetMediaUrl(names[201] ?? '')
+    expect(cachedUrlCount()).toBe(199)
     clearMediaUrls()
     expect(cachedUrlCount()).toBe(0)
-    expect(create).toHaveBeenCalledTimes(52)
+    expect(create).toHaveBeenCalledTimes(202)
     create.mockRestore()
     revoke.mockRestore()
   })

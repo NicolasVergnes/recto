@@ -12,12 +12,16 @@ describe('mosaic grid', () => {
     expect(columnsFor(1120, 384, 12)).toBe(2)
     expect(columnsFor(500, 0, 12)).toBe(1)
     expect(columnsFor(500, Number.NaN, 12)).toBe(1)
+    expect(columnsFor(500, 224, Number.NaN)).toBe(1)
+    expect(columnsFor(Number.NaN, 224, 12)).toBe(1)
+    expect(columnsFor(-100, 224, 12)).toBe(1)
   })
 
   it('chunks rows without empty rows and without losing items', () => {
     expect(chunk([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]])
     expect(chunk([], 3)).toEqual([])
     expect(chunk([1], 0)).toEqual([[1]])
+    expect(chunk([1], Number.NaN)).toEqual([[1]])
     expect(chunk([1, 2, 3], 2.9)).toEqual([[1, 2], [3]])
     const items = Array.from({ length: 23 }, (_, i) => i)
     const rows = chunk(items, 4)
