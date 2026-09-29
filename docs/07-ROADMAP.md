@@ -61,3 +61,15 @@ Critères d'acceptation : chaque ligne « ✔ » doit être vérifiable par un t
 - KaTeX pour les formules.
 - Synchronisation par fichier (export/import automatique vers un dossier via File System Access API) ou document CRDT.
 - Empaquetage Android (Capacitor ou TWA) sans changer le code applicatif.
+
+## M7 — Vue mosaïque du navigateur (demande de Nicolas, 2026-09-29)
+
+Hors roadmap initiale. Dans « Cartes », afficher les cartes en liste (existant) ou en mosaïque de tuiles montrant le rendu réel : une face retournable au clic, ou recto et verso côte à côte. Style de retournement choisi dans Paramètres.
+
+Critères d'acceptation :
+- [ ] Contrôle « Affichage » (Liste, Mosaïque, Mosaïque recto-verso) mémorisé (`browserView`).
+- [ ] Tuile : contenu rendu (HTML, formules, images, occlusion), case de sélection, « Retourner », « Modifier » ; verso hors du DOM avant le premier retournement.
+- [ ] Barre de la mosaïque : « Tout sélectionner », « Trier par », « Ordre ».
+- [ ] 5 styles de retournement dont « Sans animation » (`flipStyle`), ≤ 400 ms, instantané avec `prefers-reduced-motion`.
+- [ ] Mosaïque virtualisée : 5 000 cartes gardent un DOM borné ; 1 colonne sur mobile (recto-verso empilé).
+- [ ] `Cards.svelte` découpé (CardTable, BulkActions) sans changement de comportement ; tests E2E bureau et mobile.

@@ -84,7 +84,7 @@ Une **note** porte le contenu ; une note génère une ou plusieurs **cartes** (c
 - Champ « Source » optionnel (URL ou référence) sur la note.
 - Médias : images (JPEG/PNG/WebP/GIF/SVG), audio (MP3/OGG/WebM/M4A). À l'ajout, les images sont redimensionnées côté client (côté max 1 280 px, WebP qualité 0,82 si supporté, sinon JPEG 0,85) ; taille max après traitement 600 Ko pour une image, 3 Mo pour un audio. Les médias sont stockés dans IndexedDB, référencés par nom de fichier unique (voir 02-DATA-MODEL).
 - Éditeur : formulaire simple (pas d'éditeur riche en V0), aperçu de la carte, ajout d'image par fichier, collage ou glisser-déposer, enregistrement audio par micro (MediaRecorder) ou fichier. Raccourci Ctrl+Entrée = « Ajouter » (vide le formulaire, garde le focus sur Recto).
-- Navigateur de cartes : tableau filtrable (paquet, tag, état, texte), tri, sélection multiple, actions groupées (déplacer, taguer, suspendre, supprimer, réinitialiser la planification — remet les cartes à l'état « nouvelle » sans toucher au journal de révisions — avec double confirmation).
+- Navigateur de cartes : tableau filtrable (paquet, tag, état, texte), tri, sélection multiple, actions groupées (déplacer, taguer, suspendre, supprimer, réinitialiser la planification — remet les cartes à l'état « nouvelle » sans toucher au journal de révisions — avec double confirmation) ; affichage en liste ou en mosaïque de tuiles (une face retournable au clic, ou recto et verso côte à côte) pour vérifier le rendu des cartes.
 - Détection de doublons à la création (même Recto normalisé dans le même paquet) : avertissement non bloquant.
 
 ### 5.3 Révision
@@ -120,7 +120,7 @@ Une **note** porte le contenu ; une note génère une ou plusieurs **cartes** (c
 
 ### 5.7 Paramètres
 
-- Heure de début de journée, thème (système/clair/sombre), taille du texte, langue (fr seul en V0, structure prête), raccourcis affichés.
+- Heure de début de journée, thème (système/clair/sombre), taille du texte, animation de retournement des tuiles de la mosaïque (sans animation, rotation horizontale ou verticale, fondu, glissement), langue (fr seul en V0, structure prête), raccourcis affichés.
 - Stockage : espace utilisé (`navigator.storage.estimate()`), état de persistance, bouton « Demander la persistance », bouton « Vider le cache des médias orphelins ».
 - Danger : tout effacer (double confirmation, export préalable proposé).
 - À propos : version, licence, liens vers les sources scientifiques.

@@ -154,7 +154,7 @@ export interface Media {
 export interface Setting { key: string; value: unknown }
 ```
 
-Clés `settings` réservées : `dayStartHour` (4), `theme`, `fontScale`, `lastBackupAt`, `persistGranted`, `onboardingDone`, `globalReviewsPerDay` (500).
+Clés `settings` réservées : `dayStartHour` (4), `theme`, `fontScale`, `lastBackupAt`, `persistGranted`, `onboardingDone`, `globalReviewsPerDay` (500), `lastDeckId` (null), `sleepTipDay` (null), `swipeGestures` (false), `browserView` (`list`), `flipStyle` (`horizontal`).
 
 ### 2.1 Occlusion d'image (V1)
 

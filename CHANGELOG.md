@@ -4,6 +4,18 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 ## [Unreleased]
 
+### M7 — Vue mosaïque du navigateur
+
+#### Added
+
+- **Vue mosaïque** du navigateur de cartes (01 §5.2, 04 §2) : contrôle « Affichage » (Liste, Mosaïque, Mosaïque recto-verso) mémorisé ; tuiles au rendu réel des cartes (HTML, formules, images, occlusion) avec case de sélection, « Retourner » et « Modifier » ; barre « Tout sélectionner », « Trier par », « Ordre » ; mosaïque virtualisée (5 000 cartes, 1 colonne sur mobile).
+- **Style de retournement** dans Paramètres › Affichage (01 §5.7) : sans animation, rotation horizontale (défaut), rotation verticale, fondu, glissement ; ≤ 400 ms, instantané avec `prefers-reduced-motion`.
+
+#### Changed
+
+- `Cards.svelte` découpé en `CardTable` et `BulkActions` (aucun changement de comportement) ; `VirtualList` accepte un rôle ARIA (`rowgroup` ou `list`).
+- Réglages : nouvelles clés `browserView` et `flipStyle` (02 §2), sauvegardées et restaurées comme les autres.
+
 ### M6 — V1 : occlusion d'image, export Anki, optimiseur FSRS, formules
 
 #### Added
