@@ -1,12 +1,25 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-09-25 · Branche : claude/compassionate-albattani-f8qn5u · **V1 (M6) livrée**, en attente de relecture et de fusion par Nicolas
+Dernière mise à jour : 2026-09-29 · Branche : claude/compassionate-albattani-f8qn5u · **V1 (M6) fusionnée sur `main` (PR #1)** · **M7 (vue mosaïque du navigateur) livré**, en attente de relecture et de fusion par Nicolas
 
 ## Jalon en cours
 
-Aucun : M6 (V1) est terminé, en attente de relecture et de fusion. Suivant : V2 (synchronisation par fichier, empaquetage Android — voir « Écarts »), et la dette ci-dessous.
+Aucun : M7 est terminé, en attente de relecture et de fusion. Suivant : V2 (synchronisation par fichier, empaquetage Android — voir « Écarts »), et la dette ci-dessous.
 
 ## Terminé
+
+### M7 — Vue mosaïque du navigateur (2026-09-29)
+
+Demande de Nicolas du 2026-09-29, hors roadmap initiale (07-ROADMAP « M7 »). Plan suivi : 1) réglages `browserView` et `flipStyle` + écran Paramètres ; 2) découpage de `Cards.svelte` (`CardTable`, `BulkActions`) sans changement de comportement ; 3) helpers purs `grid.ts` + composants `CardMosaic`, `CardTile`, `TileFace`, `FlipFaces` ; 4) intégration du contrôle « Affichage » ; 5) E2E ; 6) docs ; 7) relecture croisée et `npm run verify`.
+
+Critères (07-ROADMAP M7) :
+
+- ✔ Contrôle « Affichage » (Liste, Mosaïque, Mosaïque recto-verso) mémorisé (`browserView`) — `tests/e2e/browser-mosaic.spec.ts` (rechargement), `tests/unit/db/settings.test.ts`.
+- ✔ Tuile : contenu rendu par `CardContent`/`OcclusionView` (HTML nettoyé, formules, images, occlusion), case de sélection, « Retourner », « Modifier » ; verso hors du DOM avant le premier retournement — E2E (`<b>` rendu, réponse absente puis visible, `inert` sur la face cachée, cloze révélé au verso).
+- ✔ Barre de la mosaïque : « Tout sélectionner », « Trier par », « Ordre » — E2E (tri par question décroissant).
+- ✔ 5 styles de retournement dont « Sans animation » (`flipStyle`), ≤ 400 ms, instantané avec `prefers-reduced-motion` — E2E (choix dans Paramètres persistant, `data-flip-style`, `transitionDuration` = 0 s).
+- ✔ Mosaïque virtualisée : 5 000 cartes gardent un DOM borné (`tests/e2e/media-and-browser.spec.ts`) ; 1 colonne sur mobile, recto-verso empilé — E2E projet `mobile`, `tests/unit/browser-grid.test.ts`.
+- ✔ `Cards.svelte` découpé (460 → 219 lignes) sans changement de comportement ; E2E existants inchangés et verts ; `npm run verify` vert.
 
 ### M6 — V1 : occlusion d'image, export Anki, optimiseur FSRS, formules (2026-09-25)
 
@@ -157,13 +170,19 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 ## Reste à faire / dettes
 
 - V2 (SPEC §2, §3) : synchronisation par fichier (dossier choisi par File System Access API, un fichier par appareil, et surtout des « pierres tombales » pour propager les suppressions : sans elles, une fusion ressuscite les notes supprimées ; étude faite en M6, non implémentée) et empaquetage Android (TWA ou Capacitor ; l'hébergement sous `/recto/` impose un `assetlinks.json` à la racine du domaine pour une TWA).
-- Composants de plus de 200 lignes restants : `Cards.svelte` (460), `Settings.svelte` (329), `Home.svelte` (307), `Deck.svelte` (298), `CsvImport.svelte` (295), `Stats.svelte` (275), `Heatmap.svelte` (271), `ApkgImport.svelte` (246), `ColumnChart.svelte` (210). Review, Editor et les paramètres de paquet ont été découpés en M6.
+- Composants de plus de 200 lignes restants : `Settings.svelte` (352), `Cards.svelte` (219, découpé en M7), `Home.svelte` (307), `Deck.svelte` (298), `CsvImport.svelte` (295), `Stats.svelte` (275), `Heatmap.svelte` (271), `ApkgImport.svelte` (246), `ColumnChart.svelte` (210). Review, Editor et les paramètres de paquet ont été découpés en M6.
 - Réimport Anki d'une note dont les cartes changeraient (trou ou masque ajouté ou retiré dans Anki) : ignorée et comptée plutôt que réconciliée ; la réconciliation demanderait à `db/importer.ts` d'écrire aussi les cartes des notes mises à jour. Même limite pour la fusion de sauvegarde (mise à jour des champs sans les cartes), antérieure à M6.
 - Optimiseur : évaluation sur les révisions mêmes de l'entraînement (pas de validation croisée) ; Firefox et Safari non testés (mémoire WASM partagée : l'optimisation se déclare indisponible si le navigateur la refuse).
 - L'éditeur n'explique pas la syntaxe des formules ; les syntaxes Anki `[$]…[/$]`, `[$$]…[/$$]` et `[latex]` restent en source.
 - Couverture globale ≈ 91 % des lignes (seuils de 90 % appliqués au domaine : scheduler, queue, import) ; `db/`, `export/` et `domain/` couverts sans seuil.
 
 ## Décisions prises en session
+
+- 2026-09-29 (M7) : un seul contrôle « Affichage » à trois positions (Liste, Mosaïque, Mosaïque recto-verso) plutôt que deux niveaux ; `browserView` mémorisé en silence (comme `lastDeckId`), `flipStyle` réglé dans Paramètres › Affichage, défaut « Rotation horizontale » (choix de Nicolas). Deux clés `settings` de plus, sans changement de `schemaVersion` (la sauvegarde exporte les lignes telles quelles).
+- 2026-09-29 (M7) : la mosaïque réutilise `VirtualList` avec des lignes de N tuiles de hauteur fixe (15 rem ; 21 rem pour une tuile recto-verso seule sur sa ligne, faces empilées), N calculé depuis la largeur du conteneur (`columnsFor`, largeur minimale 18 rem / 26 rem) ; `overscan` 1 ligne pour rester sous les 50 URL d'objets du cache média. `VirtualList` reçoit un rôle ARIA (`list` hors tableau : un `rowgroup` sans `table` est invalide). Alternative écartée : grille CSS avec `content-visibility` (5 000 `CardContent` montés).
+- 2026-09-29 (M7) : le verso d'une tuile n'est monté qu'au premier retournement (moitié moins de `CardContent` à l'écran), puis reste monté pour l'animation de retour ; les identifiants retournés vivent dans `CardMosaic` pour survivre à la virtualisation ; la face cachée est `inert`. Le clic sur la face retourne la tuile sauf sur un bouton ou un lien interne (sons) ; le contrôle accessible est le bouton « Retourner » (`aria-pressed`).
+- 2026-09-29 (M7) : le navigateur montre les faces canoniques (`renderCard` sans inversion Leitner), comme le tableau ; en mosaïque, le tri se règle par deux listes (« Trier par », « Ordre ») pilotant l'état de tri partagé avec le tableau (choix de Nicolas).
+- 2026-09-29 (M7) : retournement en CSS pur (`data-flip-style`, 400 ms) ; la règle globale `prefers-reduced-motion` de `app.css` annule la transition, donc pas de helper `motionOk()`.
 
 - 2026-09-25 (M6) : périmètre V1 = SPEC §8 et §5.2 (optimiseur, occlusion, export `.apkg`, KaTeX) ; synchronisation et empaquetage Android en V2 (voir « Écarts »).
 - 2026-09-25 (M6, occlusion) : quatre champs `[image, masques JSON, en-tête, extra]` (02 §2.1) ; coordonnées normalisées arrondies à 4 décimales, côté minimal 0,5 % ; **une carte par groupe** `n` (sémantique `cN` d'Anki, `ord = n − 1`) : chaque nouveau masque ouvre un groupe (une carte par masque par défaut), « Carte n° » permet d'en réunir plusieurs ; `n` n'est jamais renuméroté et un nouveau masque ne reprend jamais un groupe de la note telle qu'ouverte (sinon une nouvelle zone hériterait de l'échéance d'une carte existante). Alternative écartée : index = position du masque (supprimer un masque changerait l'identité des cartes suivantes).
@@ -240,6 +259,8 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## Écarts par rapport aux docs
 
+- M7 : 04-UI §4 limitait les transitions à 150 ms sans animation décorative ; le retournement d'une tuile (≤ 400 ms, style réglable, « Sans animation » disponible) est une demande explicite de Nicolas — 04-UI §4 mis à jour.
+- M7 : jalon hors 07-ROADMAP initiale (ajouté comme « M7 ») ; développé sur la branche de session après la fusion de la PR #1 sur `main`.
 - M6 : 07-ROADMAP dit « une carte par masque » ; Recto fait une carte par **groupe** de masques, un nouveau masque ouvrant son propre groupe (donc une carte par masque par défaut), comme `cN` dans Anki, pour pouvoir révéler plusieurs zones ensemble.
 - M6 : 05 §4 prévoyait `collection.anki2` ; l'export écrit `collection.anki21` avec `schedVer 2` (vérifié avec Anki ; 05 §4 mis à jour). 05 §2.2 décrivait une copie du `.wasm` de sql.js dans `public/sql/` : c'est un import `?url` depuis M4 (doc corrigée).
 - M6 : développement sur la branche imposée par la session cloud (`claude/compassionate-albattani-f8qn5u`) plutôt que `m6-<slug>`.
@@ -254,6 +275,7 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## À vérifier manuellement par Nicolas
 
+- M7 — essayer les cinq styles de retournement (Paramètres › Affichage) sur bureau et téléphone, en thème sombre, puis dire lesquels retirer ; retournement au clavier (Tab jusqu'à « Retourner », Entrée) ; tuiles avec images, sons (le bouton de lecture ne retourne pas la tuile), formules, occlusion ; « Mosaïque recto-verso » sur téléphone (faces empilées) ; actions groupées depuis la mosaïque ; ajuster au besoin la taille des tuiles (constantes de `src/lib/ui/browser/grid.ts`).
 - M6 — confirmer le report en V2 de la synchronisation par fichier et de l'empaquetage Android (SPEC prioritaire sur 07-ROADMAP) et mettre 07-ROADMAP à jour en conséquence.
 - M6 — occlusion sur téléphone : tracer et déplacer des masques au doigt, zoomer l'image en révision (pincement), réviser en thème sombre ; parcours au clavier seul et avec un lecteur d'écran (TalkBack ou NVDA).
 - M6 — Anki desktop : importer un `.apkg` exporté par Recto (Paramètres › « Exporter pour Anki ») contenant des occlusions : les masques doivent être dessinés par le script d'Anki et la note s'ouvrir dans son éditeur de masques ; « Outils › Vérifier la base de données » sans problème ; réimporter : aucune note ajoutée. Essayer aussi Anki 2.1.5x et AnkiDroid (seul le moteur d'Anki 26.9.3 a été vérifié).
