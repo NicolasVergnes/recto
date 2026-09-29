@@ -256,6 +256,7 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 - 2026-09-25 : navigation basse mobile à 4 entrées (Accueil, Cartes, Statistiques, Paramètres) ; la barre latérale ≥ 900 px ajoute « Ajouter » et « Importer » (création surtout sur PC, SPEC §3).
 - 2026-09-25 : `t()` applique automatiquement les espaces insécables françaises (avant « : ; ! ? % » et dans les guillemets) pour que `fr.ts` reste lisible.
 - 2026-09-25 : les fonctions pures du routeur sont dans `src/lib/url.ts` (testées) ; `router.svelte.ts` ne contient que l'état réactif.
+- 2026-09-30 : `.gitattributes` (`* text=auto eol=lf`) : fins de ligne LF dans la copie de travail quel que soit `core.autocrlf` ; sous Windows, `format:check` échouait sur tous les fichiers (CRLF). Node local ≥ 22.14 (des dépendances de test l'exigent).
 
 ## Écarts par rapport aux docs
 

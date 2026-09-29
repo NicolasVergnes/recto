@@ -16,6 +16,10 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 - `Cards.svelte` découpé en `CardTable` et `BulkActions` (aucun changement de comportement) ; `VirtualList` accepte un rôle ARIA (`rowgroup` ou `list`).
 - Réglages : nouvelles clés `browserView` et `flipStyle` (02 §2), sauvegardées et restaurées comme les autres.
 
+### Outillage
+
+- `.gitattributes` force les fins de ligne LF : `npm run verify` passe aussi sous Windows avec `core.autocrlf=true`.
+
 ### M6 — V1 : occlusion d'image, export Anki, optimiseur FSRS, formules
 
 #### Added
