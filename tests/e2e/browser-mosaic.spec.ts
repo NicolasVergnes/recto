@@ -18,6 +18,31 @@ async function deckWithNotes(page: Page, name: string, notes: [string, string][]
 
 const grid = (page: Page) => page.getByRole('list', { name: 'Mosaïque des cartes' })
 
+// A preference is shown at once and written to IndexedDB afterwards: wait for the write
+// before a reload, or the reload may read the previous value.
+async function savedSetting(page: Page, key: string, value: string) {
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (key) =>
+          new Promise((resolve, reject) => {
+            const open = indexedDB.open('recto')
+            open.onerror = () => reject(new Error('open failed'))
+            open.onsuccess = () => {
+              const db = open.result
+              const req = db.transaction('settings').objectStore('settings').get(key)
+              req.onsuccess = () => {
+                db.close()
+                resolve((req.result as { value: unknown } | undefined)?.value)
+              }
+            }
+          }),
+        key,
+      ),
+    )
+    .toBe(value)
+}
+
 test('mosaic: tiles render the card HTML, flip on demand, sort, select and persist', async ({
   page,
 }, testInfo) => {
@@ -79,6 +104,7 @@ test('mosaic: tiles render the card HTML, flip on demand, sort, select and persi
   await expect(grid(page).getByRole('listitem').first()).toContainText('Capitale')
 
   // The view is remembered.
+  await savedSetting(page, 'browserView', 'flip')
   await page.reload()
   await expect(grid(page)).toBeVisible()
   await expect(page.getByRole('radio', { name: 'Mosaïque', exact: true })).toBeChecked()
@@ -91,8 +117,10 @@ test('mosaic: tiles render the card HTML, flip on demand, sort, select and persi
   await expect(both.getByRole('button', { name: 'Retourner' })).toHaveCount(0)
   await expect(both.getByRole('link', { name: 'Modifier' })).toBeVisible()
   // A long card never grows past its row: its faces scroll inside the tile.
+  // Only the rows in view are rendered (one tall tile per row on a phone): search for it.
+  await page.getByLabel('Rechercher').fill('Longue')
   const long = grid(page).getByRole('listitem').filter({ hasText: 'Longue question' })
-  await long.scrollIntoViewIfNeeded()
+  await expect(long).toBeVisible()
   const sizes = await long.evaluate((el) => ({
     tile: el.getBoundingClientRect().height,
     row: el.parentElement?.getBoundingClientRect().height ?? 0,
@@ -102,6 +130,7 @@ test('mosaic: tiles render the card HTML, flip on demand, sort, select and persi
   expect(sizes.stacked).toBe(testInfo.project.name === 'mobile')
 
   // Back to the table.
+  await page.getByLabel('Rechercher').fill('')
   await page.getByRole('radio', { name: 'Liste', exact: true }).check()
   await expect(page.getByRole('row')).toHaveCount(5)
 })
@@ -121,6 +150,7 @@ test('mosaic: the flip style is chosen in Settings and reduced motion disables i
   await page.goto('/#/settings')
   await expect(page.getByRole('radio', { name: 'Rotation horizontale' })).toBeChecked()
   await page.getByRole('radio', { name: 'Sans animation' }).check()
+  await savedSetting(page, 'flipStyle', 'none')
   await page.reload()
   await expect(page.getByRole('radio', { name: 'Sans animation' })).toBeChecked()
 

@@ -257,6 +257,7 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 - 2026-09-25 : `t()` applique automatiquement les espaces insécables françaises (avant « : ; ! ? % » et dans les guillemets) pour que `fr.ts` reste lisible.
 - 2026-09-25 : les fonctions pures du routeur sont dans `src/lib/url.ts` (testées) ; `router.svelte.ts` ne contient que l'état réactif.
 - 2026-09-30 : `.gitattributes` (`* text=auto eol=lf`) : fins de ligne LF dans la copie de travail quel que soit `core.autocrlf` ; sous Windows, `format:check` échouait sur tous les fichiers (CRLF). Node local ≥ 22.14 (des dépendances de test l'exigent).
+- 2026-09-30 (M7) : e2e mosaïque — la mosaïque est virtualisée, donc une tuile hors de la vue n'existe pas dans le DOM : le test cherche la carte longue au lieu de la faire défiler (sur mobile, une tuile recto-verso occupe toute une rangée). Un réglage s'affiche aussitôt et s'écrit ensuite : les tests attendent l'écriture dans IndexedDB avant `reload()`.
 
 ## Écarts par rapport aux docs
 
