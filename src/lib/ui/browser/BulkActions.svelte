@@ -12,6 +12,7 @@
   import ExportDialog from '$lib/ui/ExportDialog.svelte'
   import { errorMessage } from '$lib/ui/errors'
   import Icon from '$lib/ui/Icon.svelte'
+  import NewDeckDialog from '$lib/ui/NewDeckDialog.svelte'
 
   interface Props {
     selected: SvelteSet<string>
@@ -24,6 +25,7 @@
   let exporting = $state(false)
   let moving = $state(false)
   let moveTarget = $state('')
+  let creatingDeck = $state(false)
   let tagging = $state(false)
   let tagText = $state('')
 
@@ -138,6 +140,10 @@
     <label for="move-deck">{t('editor.deck')}</label>
     <DeckSelect id="move-deck" {decks} bind:value={moveTarget} noneLabel="—" />
   </div>
+  <button class="btn btn-sm" type="button" onclick={() => (creatingDeck = true)}>
+    <Icon name="plus" />
+    {t('browser.newDeck')}
+  </button>
   {#snippet actions()}
     <button class="btn" type="button" onclick={() => (moving = false)}>{t('common.cancel')}</button>
     <button class="btn btn-primary" type="button" disabled={!moveTarget} onclick={move}>
@@ -145,6 +151,9 @@
     </button>
   {/snippet}
 </Dialog>
+
+<!-- Opens over the move dialog; the new deck becomes the destination. -->
+<NewDeckDialog bind:open={creatingDeck} {decks} oncreated={(deck) => (moveTarget = deck.id)} />
 
 <Dialog
   open={tagging}

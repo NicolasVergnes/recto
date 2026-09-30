@@ -69,8 +69,9 @@ test('mosaic: tiles render the card HTML, flip on demand, sort, select and persi
   await expect(tile).toHaveAttribute('data-flipped', 'true')
   await expect(flip).toHaveAttribute('aria-pressed', 'true')
   await expect(tile.getByText('Paris')).toBeVisible()
-  // The hidden face is inert: its content is not reachable.
+  // The hidden face is inert, and not painted: no mirrored question through the answer.
   await expect(tile.locator('.face.front')).toHaveAttribute('inert', '')
+  await expect(tile.locator('.face.front')).toBeHidden()
   // A click on the face flips it back.
   await tile.locator('.faces').click({ position: { x: 10, y: 10 } })
   await expect(tile).toHaveAttribute('data-flipped', 'false')
@@ -86,9 +87,15 @@ test('mosaic: tiles render the card HTML, flip on demand, sort, select and persi
   await expect(tile).toHaveAttribute('data-flipped', 'false')
 
   // Columns: 1 on a phone, at least 3 on the desktop project (1 280 px wide).
-  const perRow = await grid(page).locator('.grid-row').first().getByRole('listitem').count()
-  if (testInfo.project.name === 'mobile') expect(perRow).toBe(1)
-  else expect(perRow).toBeGreaterThanOrEqual(3)
+  const perRow = () => grid(page).locator('.grid-row').first().getByRole('listitem').count()
+  if (testInfo.project.name === 'mobile') expect(await perRow()).toBe(1)
+  else expect(await perRow()).toBeGreaterThanOrEqual(3)
+  // Small tiles: two on a phone, more on the desktop; the size is remembered.
+  const medium = await perRow()
+  await page.getByLabel('Taille').selectOption({ label: 'Petites' })
+  await expect.poll(perRow).toBeGreaterThan(medium)
+  if (testInfo.project.name === 'mobile') expect(await perRow()).toBe(2)
+  await savedSetting(page, 'tileSize', 'small')
 
   // Selection and bulk actions work from a tile.
   await tile.getByRole('checkbox', { name: /Sélectionner « Capitale/ }).check()
@@ -108,6 +115,8 @@ test('mosaic: tiles render the card HTML, flip on demand, sort, select and persi
   await page.reload()
   await expect(grid(page)).toBeVisible()
   await expect(page.getByRole('radio', { name: 'Mosaïque', exact: true })).toBeChecked()
+  await expect(page.getByLabel('Taille')).toHaveValue('small')
+  await page.getByLabel('Taille').selectOption({ label: 'Moyennes' })
 
   // Both faces side by side: no flip button, both texts visible.
   await page.getByRole('radio', { name: 'Mosaïque recto-verso' }).check()
@@ -133,6 +142,49 @@ test('mosaic: tiles render the card HTML, flip on demand, sort, select and persi
   await page.getByLabel('Rechercher').fill('')
   await page.getByRole('radio', { name: 'Liste', exact: true }).check()
   await expect(page.getByRole('row')).toHaveCount(5)
+})
+
+test('mosaic: short cards fit their tile without a scrollbar, at every size', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Essayer avec un paquet d’exemple' }).click()
+  await expect(page.getByText('101 cartes')).toBeVisible()
+  await page.goto('/#/cards')
+  for (const view of ['Mosaïque', 'Mosaïque recto-verso']) {
+    await page.getByRole('radio', { name: view, exact: true }).check()
+    for (const size of ['Petites', 'Moyennes', 'Grandes']) {
+      await page.getByLabel('Taille').selectOption({ label: size })
+      await expect(grid(page).getByRole('listitem').first()).toBeVisible()
+      await expect
+        .poll(() =>
+          grid(page)
+            .locator('.side')
+            .evaluateAll(
+              (faces) => faces.filter((f) => f.scrollHeight > f.clientHeight + 1).length,
+            ),
+        )
+        .toBe(0)
+    }
+  }
+})
+
+test('move: a new deck is created from the move dialog', async ({ page }) => {
+  await deckWithNotes(page, 'Départ', [['Chien', 'Dog']])
+  await page.goto('/#/cards')
+  await page.getByRole('radio', { name: 'Liste', exact: true }).check()
+  await page.getByRole('checkbox', { name: /Sélectionner « Chien/ }).check()
+  await page.getByRole('button', { name: 'Déplacer' }).click()
+  const move = page.getByRole('dialog', { name: 'Déplacer 1 note' })
+  await move.getByRole('button', { name: 'Nouveau paquet' }).click()
+  const create = page.getByRole('dialog', { name: 'Nouveau paquet' })
+  await create.getByLabel('Nom').fill('Animaux')
+  await create.getByRole('button', { name: 'Créer' }).click()
+  await expect(create).toBeHidden()
+  // The new deck is the destination, the move dialog is still open.
+  await expect(move.getByLabel('Paquet')).toHaveValue(/.+/)
+  await expect(move.getByLabel('Paquet').locator('option:checked')).toHaveText(/Animaux/)
+  await move.getByRole('button', { name: 'Déplacer' }).click()
+  await expect(page.getByText('Notes déplacées')).toBeVisible()
+  await expect(page.getByRole('row').filter({ hasText: 'Chien' })).toContainText('Animaux')
 })
 
 test('mosaic: the flip style is chosen in Settings and reduced motion disables it', async ({

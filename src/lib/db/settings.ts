@@ -6,6 +6,8 @@ export type Theme = 'system' | 'light' | 'dark'
 export type BrowserView = 'list' | 'flip' | 'both'
 /** Flip transition of the browser tiles (04-UI §4); `none` is always available. */
 export type FlipStyle = 'none' | 'horizontal' | 'vertical' | 'fade' | 'slide'
+/** Tile size of the browser mosaic (« Taille » in the mosaic bar). */
+export type TileSize = 'small' | 'medium' | 'large'
 
 /** Typed view of the `settings` table (02-DATA-MODEL §2, reserved keys + session additions). */
 export interface SettingsMap {
@@ -26,6 +28,8 @@ export interface SettingsMap {
   browserView: BrowserView
   /** Flip animation of the browser tiles (Settings › Affichage). */
   flipStyle: FlipStyle
+  /** Mosaic tile size, remembered silently like `browserView`. */
+  tileSize: TileSize
 }
 
 export const DEFAULT_SETTINGS: SettingsMap = {
@@ -41,6 +45,7 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   swipeGestures: false,
   browserView: 'list',
   flipStyle: 'horizontal',
+  tileSize: 'medium',
 }
 
 export type SettingKey = keyof SettingsMap
@@ -48,6 +53,7 @@ export type SettingKey = keyof SettingsMap
 const THEMES: readonly string[] = ['system', 'light', 'dark']
 const BROWSER_VIEWS: readonly string[] = ['list', 'flip', 'both']
 const FLIP_STYLES: readonly string[] = ['none', 'horizontal', 'vertical', 'fade', 'slide']
+const TILE_SIZES: readonly string[] = ['small', 'medium', 'large']
 
 /** Runtime validation: settings come from IndexedDB or backups (`unknown`). */
 function isValid<K extends SettingKey>(key: K, value: unknown): value is SettingsMap[K] {
@@ -74,6 +80,8 @@ function isValid<K extends SettingKey>(key: K, value: unknown): value is Setting
       return typeof value === 'string' && BROWSER_VIEWS.includes(value)
     case 'flipStyle':
       return typeof value === 'string' && FLIP_STYLES.includes(value)
+    case 'tileSize':
+      return typeof value === 'string' && TILE_SIZES.includes(value)
     default:
       return false
   }

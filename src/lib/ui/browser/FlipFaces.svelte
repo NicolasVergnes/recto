@@ -84,6 +84,17 @@
   [data-flip-style='vertical'] .face {
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
+    /* backface-visibility alone is not enough: browsers paint some descendants (a scrolling
+       face, images, zoomed content) through it, mirrored. The face turned away is also
+       hidden, from mid-flip, when it is edge-on. */
+    transition: visibility 0s linear calc(var(--flip-duration) / 2);
+  }
+
+  [data-flip-style='horizontal'].flipped .front,
+  [data-flip-style='horizontal']:not(.flipped) .back,
+  [data-flip-style='vertical'].flipped .front,
+  [data-flip-style='vertical']:not(.flipped) .back {
+    visibility: hidden;
   }
 
   [data-flip-style='horizontal'] .back {

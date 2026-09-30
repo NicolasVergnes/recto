@@ -18,6 +18,8 @@
     flipStyle: FlipStyle
     /** « both » in a single column: faces one above the other. */
     stacked: boolean
+    /** Small tiles: icon-only buttons (the text stays for screen readers). */
+    compact: boolean
     selected: boolean
     flipped: boolean
     ontoggle: (on: boolean) => void
@@ -30,6 +32,7 @@
     mode,
     flipStyle,
     stacked,
+    compact,
     selected,
     flipped,
     ontoggle,
@@ -99,12 +102,12 @@
         onclick={flip}
       >
         <Icon name="swap" />
-        {t('browser.flip')}
+        <span class:visually-hidden={compact}>{t('browser.flip')}</span>
       </button>
     {/if}
     <a class="btn btn-sm btn-ghost" href={`#/notes/${row.note.id}`}>
       <Icon name="edit" />
-      {t('review.edit')}
+      <span class:visually-hidden={compact}>{t('review.edit')}</span>
     </a>
   </footer>
 </article>

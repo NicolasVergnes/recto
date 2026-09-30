@@ -1,6 +1,6 @@
 <script lang="ts">
   import { SvelteSet } from 'svelte/reactivity'
-  import type { FlipStyle } from '$lib/db/settings'
+  import type { FlipStyle, TileSize } from '$lib/db/settings'
   import type { BrowserRow, Sort, SortKey } from '$lib/domain/browse'
   import { t, type MessageKey } from '$lib/i18n'
   import VirtualList from '../VirtualList.svelte'
@@ -9,8 +9,8 @@
     chunk,
     columnsFor,
     GAP_REM,
-    TILE_MIN_WIDTH_REM,
     tileHeightRem,
+    tileMinWidthRem,
     type MosaicMode,
   } from './grid'
 
@@ -20,9 +20,11 @@
     selected: SvelteSet<string>
     mode: MosaicMode
     flipStyle: FlipStyle
+    size: TileSize
     sort: Sort
     allVisibleSelected: boolean
     onsort: (sort: Sort) => void
+    onsize: (size: TileSize) => void
     ontoggle: (id: string, on: boolean) => void
     onselectall: (on: boolean) => void
   }
@@ -32,9 +34,11 @@
     selected,
     mode,
     flipStyle,
+    size,
     sort,
     allVisibleSelected,
     onsort,
+    onsize,
     ontoggle,
     onselectall,
   }: Props = $props()
@@ -48,12 +52,17 @@
     { key: 'status', label: 'browser.status' },
     { key: 'due', label: 'browser.due' },
   ]
+  const SIZES: { value: TileSize; label: MessageKey }[] = [
+    { value: 'small', label: 'browser.sizeSmall' },
+    { value: 'medium', label: 'browser.sizeMedium' },
+    { value: 'large', label: 'browser.sizeLarge' },
+  ]
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
 
   let width = $state(0)
-  const columns = $derived(columnsFor(width, TILE_MIN_WIDTH_REM[mode] * rem, GAP_REM * rem))
+  const columns = $derived(columnsFor(width, tileMinWidthRem(mode, size) * rem, GAP_REM * rem))
   const stacked = $derived(mode === 'both' && columns === 1)
-  const rowHeight = $derived((tileHeightRem(mode, columns) + GAP_REM) * rem)
+  const rowHeight = $derived((tileHeightRem(mode, columns, size) + GAP_REM) * rem)
   const gridRows = $derived(chunk(rows, columns))
 
   // Flipped card ids live here so that a tile scrolled out of the window keeps its face;
@@ -71,6 +80,11 @@
   function sortKey(value: string) {
     const found = SORT_KEYS.find((s) => s.key === value)
     if (found) onsort({ key: found.key, dir: sort.dir })
+  }
+
+  function sizeValue(value: string) {
+    const found = SIZES.find((s) => s.value === value)
+    if (found) onsize(found.value)
   }
 </script>
 
@@ -101,6 +115,12 @@
         <option value="desc">{t('browser.descending')}</option>
       </select>
     </span>
+    <span class="control">
+      <label class="small" for="{uid}-size">{t('browser.tileSize')}</label>
+      <select id="{uid}-size" value={size} onchange={(e) => sizeValue(e.currentTarget.value)}>
+        {#each SIZES as s (s.value)}<option value={s.value}>{t(s.label)}</option>{/each}
+      </select>
+    </span>
   </div>
   {#if loaded && rows.length === 0}
     <p class="empty muted">{t('browser.empty')}</p>
@@ -128,6 +148,7 @@
               {mode}
               {flipStyle}
               {stacked}
+              compact={size === 'small'}
               selected={selected.has(r.card.id)}
               flipped={flipped.has(r.card.id)}
               ontoggle={(on) => ontoggle(r.card.id, on)}

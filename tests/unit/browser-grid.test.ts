@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { chunk, columnsFor, tileHeightRem } from '$lib/ui/browser/grid'
+import {
+  chunk,
+  columnsFor,
+  fitZoom,
+  MIN_FIT_ZOOM,
+  tileHeightRem,
+  tileMinWidthRem,
+} from '$lib/ui/browser/grid'
 
 describe('mosaic grid', () => {
   it('counts the tiles that fit, at least one', () => {
@@ -30,8 +37,38 @@ describe('mosaic grid', () => {
   })
 
   it('stacks the two faces when a « both » tile is alone on its row', () => {
-    expect(tileHeightRem('both', 1)).toBe(21)
-    expect(tileHeightRem('both', 2)).toBe(15)
-    expect(tileHeightRem('flip', 1)).toBe(15)
+    expect(tileHeightRem('both', 1, 'medium')).toBe(21)
+    expect(tileHeightRem('both', 2, 'medium')).toBe(15)
+    expect(tileHeightRem('flip', 1, 'medium')).toBe(15)
+  })
+
+  it('grows with the tile size; small tiles give two columns on a phone', () => {
+    for (const mode of ['flip', 'both'] as const) {
+      expect(tileMinWidthRem(mode, 'small')).toBeLessThan(tileMinWidthRem(mode, 'medium'))
+      expect(tileMinWidthRem(mode, 'medium')).toBeLessThan(tileMinWidthRem(mode, 'large'))
+      for (const columns of [1, 2]) {
+        expect(tileHeightRem(mode, columns, 'small')).toBeLessThan(
+          tileHeightRem(mode, columns, 'medium'),
+        )
+        expect(tileHeightRem(mode, columns, 'medium')).toBeLessThan(
+          tileHeightRem(mode, columns, 'large'),
+        )
+      }
+    }
+    // Pixel 7: 412 px wide, about 380 px for the mosaic.
+    expect(columnsFor(380, tileMinWidthRem('flip', 'small') * 16, 12)).toBe(2)
+    expect(columnsFor(380, tileMinWidthRem('flip', 'medium') * 16, 12)).toBe(1)
+  })
+
+  it('zooms content out to fit its face, down to a floor', () => {
+    expect(fitZoom(100, 200)).toBe(1)
+    expect(fitZoom(200, 200)).toBe(1)
+    expect(fitZoom(300, 200)).toBe(0.66)
+    expect(fitZoom(1000, 200)).toBe(MIN_FIT_ZOOM)
+    expect(fitZoom(0, 200)).toBe(1)
+    expect(fitZoom(300, 0)).toBe(1)
+    expect(fitZoom(Number.NaN, 200)).toBe(1)
+    // Never rounds up past the available height.
+    expect(fitZoom(3, 2) * 3).toBeLessThanOrEqual(2)
   })
 })

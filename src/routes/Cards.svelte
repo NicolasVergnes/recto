@@ -12,7 +12,7 @@
   } from '$lib/domain/browse'
   import { t, type MessageKey } from '$lib/i18n'
   import { href, type RouteProps } from '$lib/router.svelte'
-  import { prefs, setBrowserView } from '$lib/state/prefs.svelte'
+  import { prefs, setBrowserView, setTileSize } from '$lib/state/prefs.svelte'
   import BulkActions from '$lib/ui/browser/BulkActions.svelte'
   import CardMosaic from '$lib/ui/browser/CardMosaic.svelte'
   import CardTable from '$lib/ui/browser/CardTable.svelte'
@@ -180,9 +180,11 @@
       {selected}
       mode={prefs.browserView}
       flipStyle={prefs.flipStyle}
+      size={prefs.tileSize}
       sort={{ key: sortKey, dir: sortDir }}
       {allVisibleSelected}
       onsort={setSort}
+      onsize={setTileSize}
       ontoggle={toggle}
       onselectall={selectAllVisible}
     />

@@ -22,6 +22,10 @@ describe('settings', () => {
     // Browser view and flip style: enumerations, anything else falls back to the default.
     expect(await getSetting('browserView')).toBe('list')
     expect(await getSetting('flipStyle')).toBe('horizontal')
+    expect(await getSetting('tileSize')).toBe('medium')
+    await setSetting('tileSize', 'small')
+    expect(await getSetting('tileSize')).toBe('small')
+    await env.db.settings.put({ key: 'tileSize', value: 'huge' })
     await setSetting('flipStyle', 'none')
     await env.db.settings.put({ key: 'browserView', value: 'grid' })
     expect(await getSetting('browserView')).toBe('list')

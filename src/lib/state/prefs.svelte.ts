@@ -5,6 +5,7 @@ import {
   type FlipStyle,
   type SettingsMap,
   type Theme,
+  type TileSize,
 } from '../db/settings'
 
 const THEME_KEY = 'recto.theme'
@@ -16,6 +17,7 @@ interface Prefs {
   swipeGestures: boolean
   browserView: BrowserView
   flipStyle: FlipStyle
+  tileSize: TileSize
   loaded: boolean
 }
 
@@ -27,6 +29,7 @@ export const prefs = $state<Prefs>({
   swipeGestures: false,
   browserView: 'list',
   flipStyle: 'horizontal',
+  tileSize: 'medium',
   loaded: false,
 })
 
@@ -60,6 +63,7 @@ export async function loadPrefs(): Promise<SettingsMap> {
   prefs.swipeGestures = all.swipeGestures
   prefs.browserView = all.browserView
   prefs.flipStyle = all.flipStyle
+  prefs.tileSize = all.tileSize
   prefs.loaded = true
   apply()
   return all
@@ -95,4 +99,9 @@ export async function setBrowserView(view: BrowserView): Promise<void> {
 export async function setFlipStyle(style: FlipStyle): Promise<void> {
   prefs.flipStyle = style
   await setSetting('flipStyle', style)
+}
+
+export async function setTileSize(size: TileSize): Promise<void> {
+  prefs.tileSize = size
+  await setSetting('tileSize', size)
 }

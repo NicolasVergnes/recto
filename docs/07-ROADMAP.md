@@ -73,3 +73,8 @@ Critères d'acceptation :
 - [ ] 5 styles de retournement dont « Sans animation » (`flipStyle`), ≤ 400 ms, instantané avec `prefers-reduced-motion`.
 - [ ] Mosaïque virtualisée : 5 000 cartes gardent un DOM borné ; 1 colonne sur mobile (recto-verso empilé).
 - [ ] `Cards.svelte` découpé (CardTable, BulkActions) sans changement de comportement ; tests E2E bureau et mobile.
+
+Retours de Nicolas (2026-09-30) :
+- [ ] Rotation : la question ne transparaît jamais en miroir derrière la réponse.
+- [ ] Le contenu d'une tuile tient sans barre de défilement (réduit si besoin) ; « Taille » des tuiles (petites, moyennes, grandes) mémorisée (`tileSize`).
+- [ ] « Déplacer » : bouton « Nouveau paquet » dans la fenêtre.

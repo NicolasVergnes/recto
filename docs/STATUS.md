@@ -1,6 +1,6 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-09-29 · Branche : claude/compassionate-albattani-f8qn5u · **V1 (M6) fusionnée sur `main` (PR #1)** · **M7 (vue mosaïque du navigateur) livré**, en attente de relecture et de fusion par Nicolas
+Dernière mise à jour : 2026-09-30 · Branche : claude/compassionate-albattani-f8qn5u · **V1 (M6) fusionnée sur `main` (PR #1)** · **M7 (vue mosaïque du navigateur) livré**, en attente de relecture et de fusion par Nicolas
 
 ## Jalon en cours
 
@@ -20,6 +20,13 @@ Critères (07-ROADMAP M7) :
 - ✔ 5 styles de retournement dont « Sans animation » (`flipStyle`), ≤ 400 ms, instantané avec `prefers-reduced-motion` — E2E (choix dans Paramètres persistant, `data-flip-style`, `transitionDuration` = 0 s).
 - ✔ Mosaïque virtualisée : 5 000 cartes gardent un DOM borné (`tests/e2e/media-and-browser.spec.ts`) ; 1 colonne sur mobile, recto-verso empilé — E2E projet `mobile`, `tests/unit/browser-grid.test.ts`.
 - ✔ `Cards.svelte` découpé (460 → 219 lignes) sans changement de comportement ; E2E existants inchangés et verts ; `npm run verify` vert.
+
+Retours de Nicolas (2026-09-30), traités sur la même branche :
+
+- ✔ Rotation : la question ne transparaît plus en miroir derrière la réponse — `FlipFaces.svelte` masque la face détournée à mi-rotation en plus de `backface-visibility` ; E2E (`.face.front` masquée après retournement). Défaut non reproduit dans Chromium sans interface : à confirmer sur l'appareil de Nicolas (voir plus bas).
+- ✔ Contenu ajusté sans barre de défilement : `fit.ts` réduit le contenu d'une face (`zoom`, jusqu'à 50 %) et les images sont plafonnées à la hauteur de la face (`100cqh`) ; E2E (paquet d'exemple, 2 vues × 3 tailles, aucune face ne défile), `tests/unit/browser-grid.test.ts` (`fitZoom`).
+- ✔ « Taille » (petites, moyennes, grandes) dans la barre de la mosaïque, mémorisée (`tileSize`) ; petites = 2 colonnes sur téléphone, boutons en icône seule — E2E (colonnes, rechargement), `tests/unit/db/settings.test.ts`.
+- ✔ « Déplacer » : bouton « Nouveau paquet » (réutilise `NewDeckDialog`, ouvert par-dessus ; le paquet créé devient la destination) — E2E `move: a new deck is created from the move dialog`.
 
 ### M6 — V1 : occlusion d'image, export Anki, optimiseur FSRS, formules (2026-09-25)
 
@@ -257,6 +264,9 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 - 2026-09-25 : `t()` applique automatiquement les espaces insécables françaises (avant « : ; ! ? % » et dans les guillemets) pour que `fr.ts` reste lisible.
 - 2026-09-25 : les fonctions pures du routeur sont dans `src/lib/url.ts` (testées) ; `router.svelte.ts` ne contient que l'état réactif.
 - 2026-09-30 : `.gitattributes` (`* text=auto eol=lf`) : fins de ligne LF dans la copie de travail quel que soit `core.autocrlf` ; sous Windows, `format:check` échouait sur tous les fichiers (CRLF). Node local ≥ 22.14 (des dépendances de test l'exigent).
+- 2026-09-30 (M7) : contenu des tuiles réduit par la propriété CSS `zoom` (le texte se réorganise sur toute la largeur, contrairement à `transform: scale`) ; plancher de 50 % pour rester lisible, au-delà la face défile ; images plafonnées à la hauteur de la face par une unité de conteneur (`container-type: size`, `100cqh`) pour qu'elles rétrécissent avec le texte.
+- 2026-09-30 (M7) : tailles des tuiles (rem, largeur mini une face / deux faces, hauteur, hauteur empilée) : petites 11 / 20 / 12 / 17, moyennes 18 / 26 / 15 / 21 (celles de M7), grandes 24 / 34 / 20 / 28. « Taille » dans la barre de la mosaïque (comme « Trier par »), pas dans Paramètres ; mémorisée en silence comme `browserView`.
+- 2026-09-30 (M7) : « Nouveau paquet » dans « Déplacer » ouvre le dialogue de création existant par-dessus la fenêtre (paquet parent possible) ; créer et déplacer restent deux actions, chacune dans sa transaction, pour que l'utilisateur voie la destination avant de confirmer.
 - 2026-09-30 (M7) : e2e mosaïque — la mosaïque est virtualisée, donc une tuile hors de la vue n'existe pas dans le DOM : le test cherche la carte longue au lieu de la faire défiler (sur mobile, une tuile recto-verso occupe toute une rangée). Un réglage s'affiche aussitôt et s'écrit ensuite : les tests attendent l'écriture dans IndexedDB avant `reload()`.
 
 ## Écarts par rapport aux docs
@@ -277,6 +287,7 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## À vérifier manuellement par Nicolas
 
+- M7 (retours du 2026-09-30) — sur le navigateur où le reflet apparaissait : retourner des tuiles en rotation horizontale et verticale, avec et sans images, et confirmer que la question ne transparaît plus ; essayer les trois tailles avec le paquet qui avait des barres de défilement.
 - M7 — essayer les cinq styles de retournement (Paramètres › Affichage) sur bureau et téléphone, en thème sombre, puis dire lesquels retirer ; retournement au clavier (Tab jusqu'à « Retourner », Entrée) ; tuiles avec images, sons (le bouton de lecture ne retourne pas la tuile), formules, occlusion ; « Mosaïque recto-verso » sur téléphone (faces empilées) ; actions groupées depuis la mosaïque ; ajuster au besoin la taille des tuiles (constantes de `src/lib/ui/browser/grid.ts`).
 - M6 — confirmer le report en V2 de la synchronisation par fichier et de l'empaquetage Android (SPEC prioritaire sur 07-ROADMAP) et mettre 07-ROADMAP à jour en conséquence.
 - M6 — occlusion sur téléphone : tracer et déplacer des masques au doigt, zoomer l'image en révision (pincement), réviser en thème sombre ; parcours au clavier seul et avec un lecteur d'écran (TalkBack ou NVDA).

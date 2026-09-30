@@ -3,6 +3,7 @@
   import { t } from '$lib/i18n'
   import CardContent from '../CardContent.svelte'
   import OcclusionView from '../occlusion/OcclusionView.svelte'
+  import { fitContent } from './fit'
 
   interface Props {
     rendered: RenderedCard
@@ -11,44 +12,45 @@
   let { rendered, side }: Props = $props()
 </script>
 
-<div class="side">
-  <p class="visually-hidden">{t(side === 'front' ? 'browser.question' : 'browser.answer')}</p>
-  {#if side === 'front'}
-    {#if rendered.question}<CardContent html={rendered.question} />{/if}
-    {#if rendered.occlusion}<OcclusionView occlusion={rendered.occlusion} revealed={false} />{/if}
-    {#if !rendered.question && !rendered.occlusion}<p class="muted">—</p>{/if}
-  {:else}
-    {#if rendered.occlusion}
-      <OcclusionView occlusion={rendered.occlusion} revealed={true} />
-      {#if rendered.answer}<CardContent html={rendered.answer} />{/if}
-    {:else if rendered.answer}
-      <!-- Cloze: the whole text with the gap revealed; basic: the verso alone. -->
-      <CardContent html={rendered.answer} />
+<div class="side" {@attach fitContent}>
+  <div class="fit">
+    <p class="visually-hidden">{t(side === 'front' ? 'browser.question' : 'browser.answer')}</p>
+    {#if side === 'front'}
+      {#if rendered.question}<CardContent html={rendered.question} />{/if}
+      {#if rendered.occlusion}<OcclusionView occlusion={rendered.occlusion} revealed={false} />{/if}
+      {#if !rendered.question && !rendered.occlusion}<p class="muted">—</p>{/if}
     {:else}
-      <p class="muted">—</p>
+      {#if rendered.occlusion}
+        <OcclusionView occlusion={rendered.occlusion} revealed={true} />
+        {#if rendered.answer}<CardContent html={rendered.answer} />{/if}
+      {:else if rendered.answer}
+        <!-- Cloze: the whole text with the gap revealed; basic: the verso alone. -->
+        <CardContent html={rendered.answer} />
+      {:else}
+        <p class="muted">—</p>
+      {/if}
+      {#if rendered.extra}
+        <div class="extra"><CardContent html={rendered.extra} /></div>
+      {/if}
     {/if}
-    {#if rendered.extra}
-      <div class="extra"><CardContent html={rendered.extra} /></div>
-    {/if}
-  {/if}
+  </div>
 </div>
 
 <style>
+  /* Fixed height (the tile's); the content is zoomed out to fit it (fit.ts). */
   .side {
-    min-height: 0;
-    max-height: 100%;
+    box-sizing: border-box;
+    height: 100%;
     padding: var(--space-1);
     overflow: auto;
+    container-type: size;
   }
 
-  /* Media are capped to the tile, whatever the global card rules say. */
-  .side :global(.card-content img) {
-    max-height: 6rem;
-    margin: var(--space-1) auto;
-  }
-
+  /* An image never exceeds the face, so that zooming out shrinks it with the text. */
+  .side :global(.card-content img),
   .side :global(.occlusion img) {
-    max-height: 7rem;
+    max-height: 100cqh;
+    margin: 0 auto;
   }
 
   .extra {
