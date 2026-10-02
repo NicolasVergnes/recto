@@ -2,8 +2,7 @@
   import { cardOrds, renderCard } from '$lib/domain/notes'
   import type { ModelType } from '$lib/domain/types'
   import { t } from '$lib/i18n'
-  import CardContent from '../CardContent.svelte'
-  import OcclusionView from '../occlusion/OcclusionView.svelte'
+  import TileFace from '../browser/TileFace.svelte'
 
   interface Props {
     modelType: ModelType
@@ -18,56 +17,58 @@
   )
 </script>
 
+<!-- Each card as the mosaic shows it: question and answer in two faces of the same size. -->
 <section class="stack" aria-labelledby="preview-title">
   <h2 id="preview-title">{t('editor.preview', { n: cards.length })}</h2>
   {#each cards as card, i (i)}
-    <article class="card-surface preview">
+    <article class="preview">
       <p class="muted small">{t('editor.cardN', { n: i + 1 })}</p>
-      {#if card.occlusion}
-        <CardContent html={card.question} />
-        <div class="sides">
-          <div>
-            <p class="muted small">{t('editor.previewQuestion')}</p>
-            <OcclusionView occlusion={card.occlusion} revealed={false} />
-          </div>
-          <div>
-            <p class="muted small">{t('editor.previewAnswer')}</p>
-            <OcclusionView occlusion={card.occlusion} revealed={true} />
-          </div>
+      <div class="faces">
+        <div class="card-surface face">
+          <p class="muted small label" aria-hidden="true">{t('editor.previewQuestion')}</p>
+          <div class="body"><TileFace rendered={card} side="front" /></div>
         </div>
-        {#if card.answer}<CardContent html={card.answer} />{/if}
-      {:else}
-        <CardContent html={card.question} />
-        <hr />
-        <CardContent html={card.answer} />
-      {/if}
-      {#if card.extra}
-        <div class="extra"><CardContent html={card.extra} /></div>
-      {/if}
+        <div class="card-surface face">
+          <p class="muted small label" aria-hidden="true">{t('editor.previewAnswer')}</p>
+          <div class="body"><TileFace rendered={card} side="back" /></div>
+        </div>
+      </div>
     </article>
   {/each}
 </section>
 
 <style>
   .preview {
-    --card-font: 1.05rem;
+    display: grid;
+    gap: var(--space-1);
   }
 
-  .sides {
+  .preview > p {
+    margin: 0;
+  }
+
+  .faces {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
     gap: var(--space-2);
   }
 
-  hr {
-    border: none;
-    border-top: 1px solid var(--border);
-    margin: var(--space-3) 0;
+  .face {
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    height: 15rem;
+    padding: var(--space-2) var(--space-3);
+    gap: var(--space-1);
+    --card-font: 1.05rem;
   }
 
-  .extra {
-    color: var(--text-2);
-    --card-font: 0.95rem;
-    margin-top: var(--space-2);
+  .label {
+    margin: 0;
+  }
+
+  .body {
+    flex: 1;
+    min-height: 0;
   }
 </style>

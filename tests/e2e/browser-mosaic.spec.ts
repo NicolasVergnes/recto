@@ -18,6 +18,25 @@ async function deckWithNotes(page: Page, name: string, notes: [string, string][]
 
 const grid = (page: Page) => page.getByRole('list', { name: 'Mosaïque des cartes' })
 
+/** Faces whose content is taller than the face (a tile face never scrolls). */
+const overflowing = (faces: Element[]) =>
+  faces.filter((f) => f.scrollHeight > f.clientHeight + 1).length
+
+/** A 900 × 1 600 PNG drawn by the browser (resized to 720 × 1 280 when added). */
+function tallPng(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 900
+    canvas.height = 1600
+    const ctx = canvas.getContext('2d')
+    if (ctx) {
+      ctx.fillStyle = '#0e6f66'
+      ctx.fillRect(0, 0, 900, 1600)
+    }
+    return canvas.toDataURL('image/png').split(',')[1] ?? ''
+  })
+}
+
 // A preference is shown at once and written to IndexedDB afterwards: wait for the write
 // before a reload, or the reload may read the previous value.
 async function savedSetting(page: Page, key: string, value: string) {
@@ -125,7 +144,7 @@ test('mosaic: tiles render the card HTML, flip on demand, sort, select and persi
   await expect(both.getByText('Paris')).toBeVisible()
   await expect(both.getByRole('button', { name: 'Retourner' })).toHaveCount(0)
   await expect(both.getByRole('link', { name: 'Modifier' })).toBeVisible()
-  // A long card never grows past its row: its faces scroll inside the tile.
+  // A long card never grows past its row: its content shrinks until it fits, no scrollbar.
   // Only the rows in view are rendered (one tall tile per row on a phone): search for it.
   await page.getByLabel('Rechercher').fill('Longue')
   const long = grid(page).getByRole('listitem').filter({ hasText: 'Longue question' })
@@ -137,6 +156,7 @@ test('mosaic: tiles render the card HTML, flip on demand, sort, select and persi
   }))
   expect(sizes.tile).toBeLessThan(sizes.row)
   expect(sizes.stacked).toBe(testInfo.project.name === 'mobile')
+  await expect.poll(() => long.locator('.side').evaluateAll(overflowing)).toBe(0)
 
   // Back to the table.
   await page.getByLabel('Rechercher').fill('')
@@ -144,27 +164,53 @@ test('mosaic: tiles render the card HTML, flip on demand, sort, select and persi
   await expect(page.getByRole('row')).toHaveCount(5)
 })
 
-test('mosaic: short cards fit their tile without a scrollbar, at every size', async ({ page }) => {
+test('mosaic: cards fit their tile, centred, a large image shrinking first', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Essayer avec un paquet d’exemple' }).click()
   await expect(page.getByText('101 cartes')).toBeVisible()
+  // A tall map with a question, as in the Anki « départements » deck.
+  await page.goto('/#/notes/new')
+  await page.getByLabel('Recto').fill('Quel est ce département ? ')
+  await page.locator('input[type=file][accept^="image"]').setInputFiles({
+    name: 'carte.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(await tallPng(page), 'base64'),
+  })
+  await expect(page.locator('.preview img').first()).toHaveAttribute('src', /^blob:/)
+  await page.getByLabel('Verso', { exact: true }).fill('Ain')
+  await page.getByRole('button', { name: 'Ajouter', exact: true }).click()
+  await expect(page.getByLabel('Recto')).toHaveValue('')
+
   await page.goto('/#/cards')
   for (const view of ['Mosaïque', 'Mosaïque recto-verso']) {
     await page.getByRole('radio', { name: view, exact: true }).check()
+    await page.getByLabel('Ordre').selectOption({ label: 'Décroissant' })
     for (const size of ['Petites', 'Moyennes', 'Grandes']) {
       await page.getByLabel('Taille').selectOption({ label: size })
-      await expect(grid(page).getByRole('listitem').first()).toBeVisible()
+      const map = grid(page).getByRole('listitem').filter({ hasText: 'Quel est ce département' })
+      await expect(map.locator('img')).toHaveAttribute('src', /^blob:/)
+      await expect.poll(() => grid(page).locator('.side').evaluateAll(overflowing)).toBe(0)
+      // The image gave way to the text: the question keeps its full size.
+      const front = map.locator('.side').first()
       await expect
-        .poll(() =>
-          grid(page)
-            .locator('.side')
-            .evaluateAll(
-              (faces) => faces.filter((f) => f.scrollHeight > f.clientHeight + 1).length,
-            ),
-        )
-        .toBe(0)
+        .poll(() => front.locator('.fit').evaluate((el) => el.style.zoom || '1'))
+        .toBe('1')
+      await expect(front).toHaveCSS('text-align', 'center')
     }
   }
+})
+
+test('editor preview: question and answer in two faces of the same size', async ({ page }) => {
+  await deckWithNotes(page, 'Aperçu', [])
+  await page.getByLabel('Recto').fill('Capitale de la France')
+  await page.getByLabel('Verso', { exact: true }).fill('Paris ' + 'et sa région '.repeat(30))
+  const faces = page.getByRole('region', { name: /^Aperçu/ }).locator('.face')
+  await expect(faces).toHaveCount(2)
+  const [a, b] = await Promise.all([faces.nth(0).boundingBox(), faces.nth(1).boundingBox()])
+  expect(a && b && Math.round(a.width) === Math.round(b.width)).toBe(true)
+  expect(a && b && Math.round(a.height) === Math.round(b.height)).toBe(true)
+  await expect(faces.nth(0).locator('.side')).toHaveCSS('text-align', 'center')
+  await expect.poll(() => faces.locator('.side').evaluateAll(overflowing)).toBe(0)
 })
 
 test('move: a new deck is created from the move dialog', async ({ page }) => {

@@ -37,19 +37,21 @@
 </div>
 
 <style>
-  /* Fixed height (the tile's); the content is zoomed out to fit it (fit.ts). */
+  /* Fixed height (the tile's), centred like the review card; never a scrollbar: the images
+     shrink, then the content is zoomed out until it fits (fit.ts). */
   .side {
     box-sizing: border-box;
     height: 100%;
     padding: var(--space-1);
-    overflow: auto;
+    overflow: hidden;
     container-type: size;
+    text-align: center;
   }
 
-  /* An image never exceeds the face, so that zooming out shrinks it with the text. */
+  /* An image never exceeds the face, nor the room fit.ts leaves it beside the text. */
   .side :global(.card-content img),
   .side :global(.occlusion img) {
-    max-height: 100cqh;
+    max-height: var(--fit-img, 100cqh);
     margin: 0 auto;
   }
 

@@ -15,7 +15,8 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 - `Cards.svelte` découpé en `CardTable` et `BulkActions` (aucun changement de comportement) ; `VirtualList` accepte un rôle ARIA (`rowgroup` ou `list`).
 - Réglages : nouvelles clés `browserView` et `flipStyle` (02 §2), sauvegardées et restaurées comme les autres.
-- Mosaïque : le contenu d'une tuile est réduit pour tenir sans barre de défilement (jusqu'à 50 %), les images ne dépassent plus la tuile ; « Taille » des tuiles (petites, moyennes, grandes), mémorisée (`tileSize`) ; les petites tuiles tiennent à deux de front sur un téléphone.
+- Mosaïque : le contenu d'une tuile est centré et ne défile jamais (les images rétrécissent d'abord, puis le contenu est réduit autant qu'il faut) ; « Taille » des tuiles (petites, moyennes, grandes), mémorisée (`tileSize`) ; les petites tuiles tiennent à deux de front sur un téléphone.
+- Aperçu de l'éditeur : question et réponse de chaque carte dans deux faces de même taille, comme dans la mosaïque.
 - « Déplacer » (actions groupées) : bouton « Nouveau paquet » pour créer la destination sans passer par l'accueil.
 
 #### Fixed

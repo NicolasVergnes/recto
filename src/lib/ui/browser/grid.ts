@@ -20,8 +20,10 @@ export const TILE_DIMS_REM: Readonly<Record<TileSize, TileDims>> = {
   large: { minWidth: { flip: 24, both: 34 }, height: 20, stackedHeight: 28 },
 }
 
-/** Below this zoom a face scrolls instead of shrinking further (text stays readable). */
-export const MIN_FIT_ZOOM = 0.5
+/** Technical floor only: a face never scrolls, its content shrinks as much as needed. */
+export const MIN_FIT_ZOOM = 0.05
+/** Share of the face an image keeps at least when it makes room for the text. */
+export const MIN_IMAGE_SHARE = 0.2
 
 /** Tiles that fit in `width` px with `gap` px between them, at least 1. */
 export function columnsFor(width: number, minTile: number, gap: number): number {
@@ -46,6 +48,22 @@ export function tileHeightRem(mode: MosaicMode, columns: number, size: TileSize)
 export function fitZoom(natural: number, available: number): number {
   if (!(natural > 0) || !(available > 0) || natural <= available) return 1
   return Math.max(MIN_FIT_ZOOM, Math.floor((available / natural) * 100) / 100)
+}
+
+/**
+ * Height cap (px) of each image of a face, so that the text beside them fits in `available`:
+ * images shrink before anything else (they are assumed stacked). `content` and `images` are
+ * heights measured with the images uncapped; never below `MIN_IMAGE_SHARE` of the face.
+ */
+export function imageCap(
+  available: number,
+  content: number,
+  images: number,
+  count: number,
+): number {
+  if (!(available > 0) || !(count >= 1)) return Math.max(0, available)
+  const text = Math.max(0, content - images)
+  return Math.max(available * MIN_IMAGE_SHARE, (available - text) / count)
 }
 
 /** Splits `items` into rows of `size` (the last one may be shorter); never an empty row. */
