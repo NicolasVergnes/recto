@@ -78,3 +78,15 @@ Retours de Nicolas (2026-09-30) :
 - [ ] Rotation : la question ne transparaît jamais en miroir derrière la réponse.
 - [ ] Le contenu d'une tuile tient sans barre de défilement (réduit si besoin) ; « Taille » des tuiles (petites, moyennes, grandes) mémorisée (`tileSize`).
 - [ ] « Déplacer » : bouton « Nouveau paquet » dans la fenêtre.
+
+## M8 — Types de notes multi-cartes (demande de Nicolas, 2026-10-02)
+
+Hors roadmap initiale. Une note produit une carte par modèle de carte de son type, comme dans Anki ; l'import Anki conserve les types qui ne se ramènent pas à Basique / Basique + inverse ; un éditeur de types permet de créer et modifier champs et modèles.
+
+Critères d'acceptation :
+- [x] Type `custom` et table `noteTypes` (Dexie version 2, sauvegarde `schemaVersion` 3, sauvegardes 1 et 2 relues telles quelles).
+- [x] Modèles en syntaxe Anki (`{{Champ}}`, `{{FrontSide}}`, sections, `text:`, `type:`) ; une carte par modèle dont la question n'est pas vide.
+- [x] Import `.apkg` : `Les départements français` donne 1 type à 5 champs et 404 cartes ; réimport sans doublon ni nouveau type ; export `.apkg` du type tel quel.
+- [x] Écran « Types de notes » : créer, modifier (champs, cartes, aperçu, confirmation des cartes créées et supprimées), supprimer un type inutilisé.
+- [x] Éditeur de notes : types personnalisés, champs nommés, aperçu de toutes les cartes.
+- [x] Tests unitaires (gabarits, réconciliation, migration, sauvegarde, import, export) et E2E bureau et mobile.

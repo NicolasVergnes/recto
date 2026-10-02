@@ -1,12 +1,25 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-09-30 · Branche : claude/compassionate-albattani-f8qn5u · **V1 (M6) fusionnée sur `main` (PR #1)** · **M7 (vue mosaïque du navigateur) livré**, en attente de relecture et de fusion par Nicolas
+Dernière mise à jour : 2026-10-02 · Branche : m8-note-types (créée depuis la branche M7 `claude/compassionate-albattani-f8qn5u`, non fusionnée) · **V1 (M6) fusionnée sur `main` (PR #1)** · **M7 (vue mosaïque) et M8 (types de notes multi-cartes) livrés**, en attente de relecture et de fusion par Nicolas (M7 d'abord)
 
 ## Jalon en cours
 
-Aucun : M7 est terminé, en attente de relecture et de fusion. Suivant : V2 (synchronisation par fichier, empaquetage Android — voir « Écarts »), et la dette ci-dessous.
+Aucun : M8 est terminé, en attente de relecture et de fusion (après M7). Suivant : V2 (synchronisation par fichier, empaquetage Android — voir « Écarts »), et la dette ci-dessous.
 
 ## Terminé
+
+### M8 — Types de notes multi-cartes (2026-10-02)
+
+Demande de Nicolas du 2026-10-02 (07-ROADMAP « M8 », ADR-010) : une note produit plusieurs cartes comme dans Anki ; l'import du paquet « Les départements français » (5 champs, 4 modèles) ne fusionne plus rien dans Extra ; éditeur de types inclus (choix de Nicolas). Plan suivi : 1) domaine pur `templates.ts` (syntaxe Anki) et `note-types.ts` (validation, plan de modification) avec leurs tests ; 2) `notes.ts` (`custom`) ; 3) Dexie version 2 (`noteTypes`) et dépôt (notes, CRUD des types, réconciliation en une transaction) ; 4) révision, navigateur, éditeur de notes ; 5) import `.apkg` (types conservés, réimport), export `.apkg`, CSV, sauvegarde v3 ; 6) écrans « Types de notes » ; 7) fixture `multi-template.apkg`, E2E ; 8) vérification avec le vrai paquet, docs, `npm run verify`.
+
+Critères (07-ROADMAP M8) :
+
+- ✔ Type `custom`, table `noteTypes`, Dexie version 2, sauvegarde `schemaVersion` 3 — `tests/unit/db/migration.test.ts` (base version 1 ouverte en version 2), `tests/unit/import/backup.test.ts` (aller-retour avec types, sauvegarde v2 sans types, note orpheline rejetée).
+- ✔ Modèles en syntaxe Anki, une carte par modèle dont la question n'est pas vide — `tests/unit/domain/templates.test.ts`, `tests/unit/domain/note-types.test.ts`.
+- ✔ Import `.apkg` — `tests/unit/import/apkg.test.ts` › « multi-card note types » (fixture `multi-template.apkg` : 3 notes, 11 cartes) ; `tests/unit/export-apkg.test.ts` › « keeps a multi-card note type » (export, réimport, réimport sans doublon ni nouveau type). Vérifié avec le vrai `docs/Les_dpartements_franais.apkg` (non commité) : 101 notes, **404 cartes**, type « Departements » à 5 champs, 101 médias ; aucune face de tuile ne défile, dans les deux mosaïques et les trois tailles, bureau et mobile.
+- ✔ Écran « Types de notes » et éditeur de type — `tests/unit/db/note-types.test.ts` (réconciliation : modèle retiré avec décalage des `ord` et journal conservé, champ ajouté, suppression refusée), E2E `tests/e2e/note-types.spec.ts` › « a note type is created, used and given a second card ».
+- ✔ Éditeur de notes (types personnalisés, champs nommés, aperçu de toutes les cartes) — E2E `note-types.spec.ts` (les deux tests).
+- ✔ `npm run verify` vert.
 
 ### M7 — Vue mosaïque du navigateur (2026-09-29)
 
@@ -181,6 +194,8 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 - Réimport Anki d'une note dont les cartes changeraient (trou ou masque ajouté ou retiré dans Anki) : ignorée et comptée plutôt que réconciliée ; la réconciliation demanderait à `db/importer.ts` d'écrire aussi les cartes des notes mises à jour. Même limite pour la fusion de sauvegarde (mise à jour des champs sans les cartes), antérieure à M6.
 - Optimiseur : évaluation sur les révisions mêmes de l'entraînement (pas de validation croisée) ; Firefox et Safari non testés (mémoire WASM partagée : l'optimisation se déclare indisponible si le navigateur la refuse).
 - L'éditeur n'explique pas la syntaxe des formules ; les syntaxes Anki `[$]…[/$]`, `[$$]…[/$$]` et `[latex]` restent en source.
+- M8 : pas de réordonnancement des champs ni des modèles de cartes dans l'éditeur de types (ajout, renommage, suppression seulement) ; les filtres avancés d'Anki (`furigana:`, `tts:`…) rendent la valeur brute ; le CSS des types Anki est ignoré ; l'import CSV ne crée pas de note d'un type personnalisé.
+- M8 : `NoteTypeEditor.svelte` et `NoteTypes.svelte` restent sous 200 lignes ; `CardPreview` sert à la fois l'éditeur de notes et celui de types.
 - Couverture globale ≈ 91 % des lignes (seuils de 90 % appliqués au domaine : scheduler, queue, import) ; `db/`, `export/` et `domain/` couverts sans seuil.
 
 ## Décisions prises en session
@@ -266,11 +281,19 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 - 2026-09-30 : `.gitattributes` (`* text=auto eol=lf`) : fins de ligne LF dans la copie de travail quel que soit `core.autocrlf` ; sous Windows, `format:check` échouait sur tous les fichiers (CRLF). Node local ≥ 22.14 (des dépendances de test l'exigent).
 - 2026-09-30 (M7) : contenu des tuiles réduit par la propriété CSS `zoom` (le texte se réorganise sur toute la largeur, contrairement à `transform: scale`) ; images plafonnées à la hauteur de la face par une unité de conteneur (`container-type: size`, `100cqh`) pour qu'elles rétrécissent avec le texte.
 - 2026-10-02 (M7, retours de Nicolas) : une face de tuile ne défile jamais (`overflow: hidden`) et la réduction n'a plus de plancher de lisibilité (choix de Nicolas : « réduire sans limite ») ; avant la réduction, les images rétrécissent pour laisser la place au texte (`--fit-img`, au moins un cinquième de la face, `imageCap`). Contenu des tuiles centré comme en révision. L'aperçu de l'éditeur réutilise les faces de tuile (`TileFace`) : question et réponse dans deux boîtes de même taille (15rem), côte à côte ou empilées.
+- 2026-10-02 (M8) : un type Anki standard ne reste `basic`/`basic_reverse` que s'il a au plus 3 champs et des modèles qui demandent le 1er (puis le 2ᵉ) champ ; sinon type personnalisé (plutôt que de convertir tous les types : les types intégrés gardent leur éditeur, leurs avertissements et leur export CSV). Les types intégrés ne deviennent pas des types personnalisés (migration de toutes les notes écartée).
+- 2026-10-02 (M8) : règle de génération d'Anki (question rendue non vide et différente de la question à champs vides), appliquée à la création, à la modification d'une note et d'un type : une carte dont la question devient vide est supprimée (journal conservé), comme un trou retiré ; la confirmation de l'éditeur de types annonce ces suppressions.
+- 2026-10-02 (M8) : retirer un modèle de carte décale l'`ord` des cartes suivantes au lieu de les recréer, pour que planification et historique restent avec ce que la carte demande. Renommer un champ réécrit ses références dans les modèles (à la validation du champ, pas à chaque touche, pour ne jamais fusionner deux champs) ; un nom déjà pris n'est pas propagé et l'enregistrement le refuse.
+- 2026-10-02 (M8) : réponse d'une carte personnalisée = verso rendu, qui remplace la question en révision (il la reprend par `{{FrontSide}}`) ; dans le tableau du navigateur, la colonne Réponse retire ce qui précède `<hr id=answer>` (comme Anki). Réponse tapée seulement avec `{{type:Champ}}`. `<hr>` ajouté à la liste blanche de `sanitize()` ; les `style` en ligne des modèles Anki restent retirés.
+- 2026-10-02 (M8) : réimport : le type de même `sourceId` (id Anki) et mêmes noms de champs est réutilisé, sinon un nouveau « Nom (2) » ; l'export réutilise `sourceId` comme id de type Anki (le type importé est mis à jour dans Anki, pas copié). Fixture synthétique `data/samples/multi-template.apkg` plutôt que le paquet AnkiWeb (licence de son auteur, 6,4 Mo) ; ce dernier sert à la vérification manuelle seulement.
+- 2026-10-02 (M8) : supprimer un type utilisé est refusé avec l'explication (bouton actif, message) plutôt qu'un bouton désactivé sans raison.
 - 2026-09-30 (M7) : tailles des tuiles (rem, largeur mini une face / deux faces, hauteur, hauteur empilée) : petites 11 / 20 / 12 / 17, moyennes 18 / 26 / 15 / 21 (celles de M7), grandes 24 / 34 / 20 / 28. « Taille » dans la barre de la mosaïque (comme « Trier par »), pas dans Paramètres ; mémorisée en silence comme `browserView`.
 - 2026-09-30 (M7) : « Nouveau paquet » dans « Déplacer » ouvre le dialogue de création existant par-dessus la fenêtre (paquet parent possible) ; créer et déplacer restent deux actions, chacune dans sa transaction, pour que l'utilisateur voie la destination avant de confirmer.
 - 2026-09-30 (M7) : e2e mosaïque — la mosaïque est virtualisée, donc une tuile hors de la vue n'existe pas dans le DOM : le test cherche la carte longue au lieu de la faire défiler (sur mobile, une tuile recto-verso occupe toute une rangée). Un réglage s'affiche aussitôt et s'écrit ensuite : les tests attendent l'écriture dans IndexedDB avant `reload()`.
 
 ## Écarts par rapport aux docs
+
+- M8 : 05 §2.3 disait qu'un type Anki à plus de 3 champs ou aux modèles non basiques devient `basic` avec ses champs fusionnés dans Extra ; il devient désormais un type personnalisé (doc mise à jour, ADR-010). Le texte à trous Anki à plus de 2 champs garde la fusion.
 
 - M7 : 04-UI §4 limitait les transitions à 150 ms sans animation décorative ; le retournement d'une tuile (≤ 400 ms, style réglable, « Sans animation » disponible) est une demande explicite de Nicolas — 04-UI §4 mis à jour.
 - M7 : jalon hors 07-ROADMAP initiale (ajouté comme « M7 ») ; développé sur la branche de session après la fusion de la PR #1 sur `main`.
@@ -287,6 +310,8 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 - Chromium ne passe pas la requête du favicon SVG par le service worker : hors ligne, la console signale l'échec de `logo.svg` (sans effet sur l'application, les icônes du manifeste sont précachées).
 
 ## À vérifier manuellement par Nicolas
+
+- M8 — supprimer l'ancien paquet des départements (importé en Basique, champs dans Extra), réimporter `Les_dpartements_franais.apkg` : 404 cartes, une note s'ouvre avec ses 5 champs ; réviser quelques cartes des 4 sortes ; dans « Types de notes », ajouter une carte au type puis la retirer (confirmation des cartes créées et supprimées) ; exporter le paquet pour Anki et le rouvrir dans Anki (type « Departements » mis à jour, pas copié).
 
 - M7 (retours du 2026-09-30) — sur le navigateur où le reflet apparaissait : retourner des tuiles en rotation horizontale et verticale, avec et sans images, et confirmer que la question ne transparaît plus ; essayer les trois tailles avec le paquet qui avait des barres de défilement.
 - M7 — essayer les cinq styles de retournement (Paramètres › Affichage) sur bureau et téléphone, en thème sombre, puis dire lesquels retirer ; retournement au clavier (Tab jusqu'à « Retourner », Entrée) ; tuiles avec images, sons (le bouton de lecture ne retourne pas la tuile), formules, occlusion ; « Mosaïque recto-verso » sur téléphone (faces empilées) ; actions groupées depuis la mosaïque ; ajuster au besoin la taille des tuiles (constantes de `src/lib/ui/browser/grid.ts`).

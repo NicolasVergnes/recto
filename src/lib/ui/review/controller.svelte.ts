@@ -41,6 +41,9 @@ export class ReviewController {
   readonly card = $derived(this.currentId ? this.active?.cards.get(this.currentId) : undefined)
   readonly note = $derived(this.card ? this.active?.notes.get(this.card.noteId) : undefined)
   readonly deck = $derived(this.card ? this.active?.decks.get(this.card.deckId) : undefined)
+  readonly noteType = $derived(
+    this.note?.noteTypeId ? this.active?.noteTypes.get(this.note.noteTypeId) : undefined,
+  )
   readonly schedulers = $derived({
     fsrs: getScheduler('fsrs', { dayStartHour: this.active?.dayStartHour ?? 4 }),
     leitner: getScheduler('leitner', { dayStartHour: this.active?.dayStartHour ?? 4 }),
@@ -52,6 +55,7 @@ export class ReviewController {
           this.note,
           this.card,
           this.deck.scheduler === 'leitner' && this.deck.settings.leitner.alternateSides,
+          this.noteType,
         )
       : undefined,
   )

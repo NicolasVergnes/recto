@@ -3,7 +3,7 @@
  * Writing it back is `db/restore.ts`.
  */
 import { strFromU8, unzipSync } from 'fflate'
-import type { Card, Deck, Note, Review, Setting } from '../domain/types'
+import type { Card, Deck, Note, NoteType, Review, Setting } from '../domain/types'
 import type { BackupManifest } from '../export/backup'
 import {
   readAll,
@@ -11,6 +11,7 @@ import {
   readDeck,
   readMediaMeta,
   readNote,
+  readNoteType,
   readManifest,
   readObject,
   readReview,
@@ -29,6 +30,7 @@ export class BackupError extends Error {
 
 export interface BackupData {
   decks: Deck[]
+  noteTypes: NoteType[]
   notes: Note[]
   cards: Card[]
   reviews: Review[]
@@ -57,7 +59,8 @@ function json(entries: Record<string, Uint8Array>, name: string): unknown {
 
 /**
  * Older schema versions are migrated here with the same steps as the Dexie `upgrade()` functions
- * (05 §3). 1 → 2 only adds a note type: version 1 data is valid as is.
+ * (05 §3). 1 → 2 only adds a note type and 2 → 3 the `noteTypes` table (absent: none): older
+ * data is valid as is.
  */
 function migrate(data: Record<string, unknown>, _fromVersion: number): Record<string, unknown> {
   return data
@@ -77,7 +80,13 @@ export function parseBackup(bytes: Uint8Array, currentSchema: number): ParsedBac
   if (!raw) throw new BackupError('invalidData')
   const data = migrate(raw, m.schemaVersion)
   const decks = readAll(data.decks, readDeck)
-  const notes = readAll(data.notes, readNote)
+  const noteTypes = readAll(data.noteTypes, readNoteType)
+  // A custom note without its note type could not be rendered nor edited.
+  const typeIds = new Set(noteTypes.rows.map((t) => t.id))
+  const notes = readAll(data.notes, (x) => {
+    const note = readNote(x)
+    return note && (note.modelType !== 'custom' || typeIds.has(note.noteTypeId ?? '')) ? note : null
+  })
   const cards = readAll(data.cards, readCard)
   const reviews = readAll(data.reviews, readReview)
   const settings = readAll(data.settings, readSetting)
@@ -98,10 +107,12 @@ export function parseBackup(bytes: Uint8Array, currentSchema: number): ParsedBac
         reviews: reviews.rows.length,
         settings: settings.rows.length,
         media: media.rows.length,
+        noteTypes: noteTypes.rows.length,
       },
     },
     data: {
       decks: decks.rows,
+      noteTypes: noteTypes.rows,
       notes: notes.rows,
       cards: cards.rows,
       reviews: reviews.rows,
@@ -110,6 +121,7 @@ export function parseBackup(bytes: Uint8Array, currentSchema: number): ParsedBac
     },
     files,
     invalid:
+      noteTypes.invalid +
       decks.invalid +
       notes.invalid +
       cards.invalid +

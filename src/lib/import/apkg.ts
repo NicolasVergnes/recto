@@ -5,7 +5,16 @@ import { makeCard } from '../domain/defaults'
 import { cardOrds } from '../domain/notes'
 import { labelsFromAnkiComments, occlusionFromAnki, serializeOcclusion } from '../domain/occlusion'
 import { mediaRefs, renameMediaRefs } from '../domain/text'
-import type { Card, Deck, ModelType, Note, Rating, Review, SchedulerKind } from '../domain/types'
+import type {
+  Card,
+  Deck,
+  ModelType,
+  Note,
+  NoteType,
+  Rating,
+  Review,
+  SchedulerKind,
+} from '../domain/types'
 import { sha256Hex } from '../media/hash'
 import { mediaKind, mimeFromName } from '../media/mime'
 import { getScheduler } from '../scheduler'
@@ -34,6 +43,8 @@ export interface ApkgImportOptions {
 export interface ApkgExisting {
   decks: readonly Deck[]
   notes: readonly Note[]
+  /** Custom note types (a re-import reuses the one with the same Anki id and fields). */
+  noteTypes?: readonly NoteType[]
   /** Stored media: name → sha256. */
   media: ReadonlyMap<string, string>
 }
@@ -44,6 +55,8 @@ export interface ModelConversion {
   mergedFields: number
   converted: boolean
   map: (fields: readonly string[]) => string[]
+  /** custom: the note type to create (or reuse), as Anki defines it. */
+  noteType?: Pick<NoteType, 'name' | 'fields' | 'templates'>
 }
 
 const joinRest = (fields: readonly string[], from: number) =>
@@ -63,9 +76,10 @@ export function isAnkiImageOcclusion(model: ApkgModel): boolean {
 
 /**
  * Note types (05 §2.3): image occlusion → [Image, masks, Header, Back Extra + Comments];
- * cloze → [Texte, Extra + rest]; standard with one template → basic; with two templates whose
- * second asks the second field → basic_reverse; otherwise basic and reported. Model CSS is
- * ignored.
+ * cloze → [Texte, Extra + rest]. A standard note type with at most 3 fields becomes basic when
+ * its only template asks the first field, basic_reverse when its two templates ask the first
+ * and the second; any other standard note type is kept as a custom note type (M8): same fields,
+ * one card per template. Model CSS is ignored.
  */
 export function convertModel(model: ApkgModel): ModelConversion {
   const n = model.fields.length
@@ -92,18 +106,61 @@ export function convertModel(model: ApkgModel): ModelConversion {
       map: (f) => [f[0] ?? '', joinRest(f, 1)],
     }
   }
-  const second = model.fields[1]
-  const reverse =
-    model.templates.length === 2 &&
-    !!second &&
-    (model.templates[1]?.qfmt.includes(`{{${second}}}`) ?? false)
-  const merged = Math.max(0, n - 3)
-  return {
-    modelType: reverse ? 'basic_reverse' : 'basic',
-    mergedFields: merged,
-    converted: merged > 0 || (model.templates.length > 1 && !reverse),
-    map: (f) => [f[0] ?? '', f[1] ?? '', joinRest(f, 2)],
+  const asks = (ord: number, field: number) => {
+    const name = model.fields[field]
+    return !!name && (model.templates[ord]?.qfmt.includes(`{{${name}}}`) ?? false)
   }
+  const basic = model.templates.length === 1 && asks(0, 0)
+  const reverse = model.templates.length === 2 && asks(0, 0) && asks(1, 1)
+  if (n <= 3 && (basic || reverse)) {
+    return {
+      modelType: reverse ? 'basic_reverse' : 'basic',
+      mergedFields: 0,
+      converted: false,
+      map: (f) => [f[0] ?? '', f[1] ?? '', joinRest(f, 2)],
+    }
+  }
+  return {
+    modelType: 'custom',
+    mergedFields: 0,
+    converted: false,
+    map: (f) => model.fields.map((_, i) => f[i] ?? ''),
+    noteType: {
+      name: model.name || 'Anki',
+      fields: model.fields.map((name, i) => name.trim() || `Champ ${i + 1}`),
+      templates: model.templates.map((t, i) => ({
+        name: t.name || `Carte ${i + 1}`,
+        front: t.qfmt,
+        back: t.afmt,
+      })),
+    },
+  }
+}
+
+/**
+ * The note type of an imported custom model: the existing one with the same Anki id and the
+ * same fields (a re-import), or a new one, named apart from the existing types.
+ */
+function resolveNoteType(
+  ankiId: string,
+  shape: Pick<NoteType, 'name' | 'fields' | 'templates'>,
+  existing: readonly NoteType[],
+  created: NoteType[],
+  now: number,
+  newId: () => string,
+): NoteType {
+  const sourceId = Number(ankiId)
+  const same = [...existing, ...created].find(
+    (t) => t.sourceId === sourceId && t.fields.join('\u001f') === shape.fields.join('\u001f'),
+  )
+  if (same) return same
+  const taken = new Set([...existing, ...created].map((t) => t.name.toLowerCase()))
+  let name = shape.name
+  for (let i = 2; taken.has(name.toLowerCase()); i++) name = `${shape.name} (${i})`
+  const type: NoteType = { id: newId(), ...shape, name, createdAt: now, updatedAt: now }
+  if (Number.isSafeInteger(sourceId)) type.sourceId = sourceId
+  created.push(type)
+  return type
 }
 
 /**
@@ -199,6 +256,9 @@ export async function planApkgImport(
   }
 
   const converted = new Set<string>()
+  const noteTypes: NoteType[] = []
+  const typeById = new Map((existing.noteTypes ?? []).map((t) => [t.id, t]))
+  const typeOfModel = new Map<string, NoteType>()
   for (const an of pkg.notes) {
     const model = models.get(an.mid)
     const conversion = conversions.get(an.mid)
@@ -211,6 +271,15 @@ export async function planApkgImport(
       report.convertedModels.push({ name: model.name, mergedFields: conversion.mergedFields })
     }
     const fields = conversion.map(an.fields)
+    let noteType: NoteType | undefined
+    if (conversion.noteType) {
+      noteType = typeOfModel.get(model.id)
+      if (!noteType) {
+        const shape = conversion.noteType
+        noteType = resolveNoteType(model.id, shape, existing.noteTypes ?? [], noteTypes, now, newId)
+        typeOfModel.set(model.id, noteType)
+      }
+    }
     // Occlusion shapes converted or left out, counted for the notes written (created or updated).
     const countShapes = () => {
       if (conversion.modelType !== 'image_occlusion') return
@@ -224,9 +293,12 @@ export async function planApkgImport(
       // Re-import (05 §2.3): update the fields when Anki's copy is more recent, unless that would
       // change the note's cards (other note type, cloze added or removed): an update keeps the
       // cards as they are (invariant 2), so such a note is left untouched and counted as skipped.
+      const knownType = known.noteTypeId ? typeById.get(known.noteTypeId) : undefined
       const sameCards =
         conversion.modelType === known.modelType &&
-        cardOrds(known.modelType, fields).join() === cardOrds(known.modelType, known.fields).join()
+        known.noteTypeId === noteType?.id &&
+        cardOrds(known.modelType, fields, knownType).join() ===
+          cardOrds(known.modelType, known.fields, knownType).join()
       if (updatedAt > known.updatedAt && sameCards) {
         plan.updates.push({ ...known, fields, tags: an.tags, updatedAt })
         countShapes()
@@ -239,9 +311,14 @@ export async function planApkgImport(
       report.errors.push({ line: an.id, code: 'orphanCard' })
       continue
     }
-    const ords = cardOrds(conversion.modelType, fields)
+    const ords = cardOrds(conversion.modelType, fields, noteType)
     if (ords.length === 0) {
-      const code = conversion.modelType === 'image_occlusion' ? 'noMask' : 'noCloze'
+      const code =
+        conversion.modelType === 'image_occlusion'
+          ? 'noMask'
+          : conversion.modelType === 'custom'
+            ? 'emptyFront'
+            : 'noCloze'
       report.errors.push({ line: an.id, code })
       countShapes()
       continue
@@ -258,6 +335,7 @@ export async function planApkgImport(
       createdAt: an.id,
       updatedAt,
     }
+    if (noteType) note.noteTypeId = noteType.id
     plan.notes.push(note)
     report.skipped += ankiCards.filter((c) => !ords.includes(c.ord)).length
     const scheduler = schedulers[deck.scheduler]
@@ -338,6 +416,10 @@ export async function planApkgImport(
   }
 
   plan.decks = resolver.created
+  // Only the types of the notes actually created.
+  const used = new Set(plan.notes.map((n) => n.noteTypeId))
+  plan.noteTypes = noteTypes.filter((t) => used.has(t.id))
+  report.noteTypesCreated = plan.noteTypes.map((t) => t.name)
   report.decksCreated = resolver.created.map((d) => d.name)
   report.notesCreated = plan.notes.length
   report.cardsCreated = plan.cards.length

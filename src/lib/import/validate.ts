@@ -6,9 +6,11 @@ import { defaultDeckSettings } from '../domain/defaults'
 import {
   MODEL_TYPES,
   type Card,
+  type CardTemplate,
   type Deck,
   type DeckSettings,
   type Note,
+  type NoteType,
   type Review,
   type Setting,
 } from '../domain/types'
@@ -108,6 +110,10 @@ export function readNote(x: unknown): Note | null {
   }
   if (isStr(x.source)) note.source = x.source
   if (isStr(x.sourceGuid)) note.sourceGuid = x.sourceGuid
+  if (x.modelType === 'custom') {
+    if (!isStr(x.noteTypeId)) return null
+    note.noteTypeId = x.noteTypeId
+  }
   return note
 }
 
@@ -258,4 +264,26 @@ export function readManifest(x: unknown): ManifestFields | null {
 
 export function readObject(x: unknown): Record<string, unknown> | null {
   return isObj(x) ? x : null
+}
+
+/** A custom note type (02 §2.2): named fields and at least one template, each a string. */
+export function readNoteType(x: unknown): NoteType | null {
+  if (!isObj(x) || !isStr(x.id) || !isStr(x.name) || !isStrArray(x.fields)) return null
+  if (!isNum(x.createdAt) || !isNum(x.updatedAt) || !Array.isArray(x.templates)) return null
+  const templates: CardTemplate[] = []
+  for (const t of x.templates) {
+    if (!isObj(t) || !isStr(t.name) || !isStr(t.front) || !isStr(t.back)) return null
+    templates.push({ name: t.name, front: t.front, back: t.back })
+  }
+  if (x.fields.length === 0 || templates.length === 0) return null
+  const type: NoteType = {
+    id: x.id,
+    name: x.name,
+    fields: x.fields,
+    templates,
+    createdAt: x.createdAt,
+    updatedAt: x.updatedAt,
+  }
+  if (isNum(x.sourceId)) type.sourceId = x.sourceId
+  return type
 }

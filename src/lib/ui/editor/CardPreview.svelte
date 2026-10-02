@@ -1,28 +1,31 @@
 <script lang="ts">
-  import { cardOrds, renderCard } from '$lib/domain/notes'
+  import { cardOrds, renderCard, type TypeShape } from '$lib/domain/notes'
   import type { ModelType } from '$lib/domain/types'
   import { t } from '$lib/i18n'
   import TileFace from '../browser/TileFace.svelte'
 
   interface Props {
     modelType: ModelType
+    noteType?: TypeShape | undefined
     fields: string[]
   }
-  let { modelType, fields }: Props = $props()
+  let { modelType, noteType, fields }: Props = $props()
 
   const cards = $derived(
-    cardOrds(modelType, fields).map((ord) =>
-      renderCard({ modelType, fields }, { ord, sideFlipped: false }),
-    ),
+    cardOrds(modelType, fields, noteType).map((ord) => ({
+      ord,
+      name: noteType?.templates[ord]?.name,
+      rendered: renderCard({ modelType, fields }, { ord, sideFlipped: false }, false, noteType),
+    })),
   )
 </script>
 
 <!-- Each card as the mosaic shows it: question and answer in two faces of the same size. -->
 <section class="stack" aria-labelledby="preview-title">
   <h2 id="preview-title">{t('editor.preview', { n: cards.length })}</h2>
-  {#each cards as card, i (i)}
+  {#each cards as { ord, name, rendered: card }, i (ord)}
     <article class="preview">
-      <p class="muted small">{t('editor.cardN', { n: i + 1 })}</p>
+      <p class="muted small">{name ?? t('editor.cardN', { n: i + 1 })}</p>
       <div class="faces">
         <div class="card-surface face">
           <p class="muted small label" aria-hidden="true">{t('editor.previewQuestion')}</p>

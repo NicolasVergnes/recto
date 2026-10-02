@@ -4,6 +4,22 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 ## [Unreleased]
 
+### M8 — Types de notes multi-cartes
+
+#### Added
+
+- **Types de notes personnalisés** (ADR-010) : champs nommés et une carte par modèle de carte, comme dans Anki ; modèles en syntaxe Anki (`{{Champ}}`, `{{FrontSide}}`, `{{#Champ}}…{{/Champ}}`, `{{^Champ}}…{{/Champ}}`, `text:`, `type:`) ; une carte par modèle dont la question n'est pas vide.
+- Écran **« Types de notes »** (Paramètres, éditeur de notes) : créer, renommer, modifier les champs (les modèles suivent un renommage) et les cartes (recto, verso), aperçu avec une vraie note, confirmation des cartes créées et supprimées (journal conservé) ; supprimer un type inutilisé.
+- Éditeur de notes : types personnalisés dans le choix du type, un champ par champ nommé, aperçu de toutes les cartes.
+- Fixture `data/samples/multi-template.apkg` (5 champs, 4 modèles, 11 cartes).
+
+#### Changed
+
+- Import Anki : un type de note qui ne se ramène pas à Basique ou Basique + inverse est conservé tel quel (champs, modèles, une carte par carte Anki) au lieu d'être converti en Basique avec ses champs fusionnés dans Extra ; le paquet « Les départements français » donne 404 cartes au lieu de 101. Une réimportation réutilise le type.
+- Export Anki : les types personnalisés sont exportés tels quels (le type importé d'Anki est mis à jour dans Anki, pas copié). L'export CSV les laisse de côté et le dit, comme l'occlusion d'image.
+- Sauvegarde : `schemaVersion` 3 (table `noteTypes`) ; les sauvegardes 1 et 2 se restaurent telles quelles. Base IndexedDB : version 2 (nouvelle table, sans migration des données).
+- `<hr>` (séparateur des modèles Anki) est accepté dans le HTML des cartes.
+
 ### M7 — Vue mosaïque du navigateur
 
 #### Added

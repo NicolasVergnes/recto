@@ -1,9 +1,13 @@
-import type { ModelType } from '$lib/domain/types'
+import type { ModelType, NoteType } from '$lib/domain/types'
 import type { MessageKey } from '$lib/i18n'
 
-/** A text field of the form: its label and the index of the note field it edits. */
+/**
+ * A text field of the form: its label and the index of the note field it edits. A custom note
+ * type's field is labelled with its name (`text`); `label` then only marks it as a plain field.
+ */
 export interface FieldSlot {
   label: MessageKey
+  text?: string
   index: number
 }
 
@@ -33,6 +37,17 @@ export const SLOTS: Record<ModelType, readonly FieldSlot[]> = {
     { label: 'editor.header', index: 2 },
     { label: 'editor.extra', index: 3 },
   ],
+  // Named by the note type (slotsFor).
+  custom: [],
+}
+
+/** The form's text fields: fixed per built-in type, one per field of a custom note type. */
+export function slotsFor(
+  modelType: ModelType,
+  noteType?: Pick<NoteType, 'fields'>,
+): readonly FieldSlot[] {
+  if (modelType !== 'custom') return SLOTS[modelType]
+  return (noteType?.fields ?? []).map((text, index) => ({ label: 'editor.field', text, index }))
 }
 
 /**

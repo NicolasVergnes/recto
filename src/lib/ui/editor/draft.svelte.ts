@@ -4,16 +4,18 @@ import { clozeIndices } from '$lib/domain/cloze'
 import { cardOrds, convertFields } from '$lib/domain/notes'
 import { occlusionGroups, parseOcclusion } from '$lib/domain/occlusion'
 import { imageRefs, parseTags } from '$lib/domain/text'
-import type { ModelType } from '$lib/domain/types'
+import type { ModelType, NoteType } from '$lib/domain/types'
 import { t } from '$lib/i18n'
 import { navigate } from '$lib/router.svelte'
 import { toast } from '$lib/state/toast.svelte'
-import { SLOTS } from './slots'
+import { slotsFor } from './slots'
 
 /** The note being written in the editor (new or existing) and what it will produce. */
 export class NoteDraft {
   deckId = $state('')
   modelType = $state<ModelType>('basic')
+  /** custom notes: their note type. */
+  noteType = $state.raw<NoteType>()
   fields = $state<string[]>(['', '', ''])
   tagsText = $state('')
   source = $state('')
@@ -21,23 +23,25 @@ export class NoteDraft {
   /** Highest mask group of the note as loaded: a new mask never takes over an existing card. */
   loadedGroups = $state(0)
 
-  readonly slots = $derived(SLOTS[this.modelType])
+  readonly slots = $derived(slotsFor(this.modelType, this.noteType))
   readonly clozeMissing = $derived(
     this.modelType === 'cloze' && clozeIndices(this.fields[0] ?? '').length === 0,
   )
-  readonly cardCount = $derived(cardOrds(this.modelType, this.fields).length)
+  readonly cardCount = $derived(cardOrds(this.modelType, this.fields, this.noteType).length)
   /** First group number a new mask may use (02 §2.1: a card's identity is its group). */
   readonly nextGroup = $derived(this.loadedGroups + 1)
   /**
    * A deck, a front, cloze markers for a cloze note (an image and a mask for an occlusion
-   * note), and the initial load done.
+   * note, a card for a custom note), and the initial load done.
    */
   readonly complete = $derived(
     !!this.deckId &&
       this.loaded &&
       (this.modelType === 'image_occlusion'
         ? imageRefs(this.fields[0] ?? '').length > 0 && this.cardCount > 0
-        : (this.fields[0] ?? '').trim() !== '' && !this.clozeMissing),
+        : this.modelType === 'custom'
+          ? this.cardCount > 0
+          : (this.fields[0] ?? '').trim() !== '' && !this.clozeMissing),
   )
 
   /** Loads the note being edited, or selects the requested or remembered deck. */
@@ -54,6 +58,9 @@ export class NoteDraft {
       this.fields = [...note.fields]
       this.tagsText = note.tags.join(' ')
       this.source = note.source ?? ''
+      if (note.modelType === 'custom' && note.noteTypeId) {
+        this.noteType = await repo.getNoteType(note.noteTypeId)
+      }
       if (note.modelType === 'image_occlusion') {
         this.loadedGroups = Math.max(0, ...occlusionGroups(parseOcclusion(note.fields[1] ?? '')))
       }
@@ -64,9 +71,10 @@ export class NoteDraft {
   }
 
   /** Converts the fields to another note type (front and extra are kept, see convertFields). */
-  changeType(next: ModelType): void {
-    this.fields = convertFields(this.modelType, next, this.fields)
+  changeType(next: ModelType, noteType?: NoteType): void {
+    this.fields = convertFields(this.modelType, next, this.fields, noteType)
     this.modelType = next
+    this.noteType = next === 'custom' ? noteType : undefined
   }
 
   /** Plain copy for the repository (no reactive proxies in IndexedDB). */
@@ -74,6 +82,7 @@ export class NoteDraft {
     return {
       deckId: this.deckId,
       modelType: this.modelType,
+      ...(this.modelType === 'custom' && this.noteType ? { noteTypeId: this.noteType.id } : {}),
       fields: [...this.fields],
       tags: parseTags(this.tagsText),
       ...(this.source.trim() ? { source: this.source.trim() } : {}),

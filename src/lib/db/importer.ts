@@ -37,8 +37,9 @@ export async function applyImportPlan(
       createdAt: now,
     })
   }
-  await db.transaction('rw', db.decks, db.media, async () => {
+  await db.transaction('rw', db.decks, db.media, db.noteTypes, async () => {
     await db.decks.bulkAdd(plan.decks)
+    await db.noteTypes.bulkAdd(plan.noteTypes ?? [])
     await db.media.bulkPut(media)
   })
   report.mediaImported = media.length
@@ -104,12 +105,13 @@ export async function existingCollection() {
   return { decks, notes, mediaNames: new Set(mediaNames) }
 }
 
-/** Current decks, notes and media hashes, for the `.apkg` planner. */
+/** Current decks, notes, note types and media hashes, for the `.apkg` planner. */
 export async function existingForApkg() {
-  const [decks, notes, media] = await Promise.all([
+  const [decks, notes, noteTypes, media] = await Promise.all([
     db.decks.toArray(),
     db.notes.toArray(),
+    db.noteTypes.toArray(),
     db.media.toArray(),
   ])
-  return { decks, notes, media: new Map(media.map((m) => [m.name, m.sha256])) }
+  return { decks, notes, noteTypes, media: new Map(media.map((m) => [m.name, m.sha256])) }
 }

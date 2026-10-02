@@ -11,7 +11,10 @@ export interface BackupManifest {
   appVersion: string
   exportedAt: number
   device: string
-  counts: Record<'decks' | 'notes' | 'cards' | 'reviews' | 'settings' | 'media', number>
+  counts: Record<
+    'decks' | 'notes' | 'cards' | 'reviews' | 'settings' | 'media' | 'noteTypes',
+    number
+  >
 }
 
 export const BACKUP_EXTENSION = 'recto.zip'
@@ -75,6 +78,7 @@ export async function createBackup(now: number): Promise<Blob> {
       reviews: await db.reviews.count(),
       settings: await db.settings.count(),
       media: await db.media.count(),
+      noteTypes: await db.noteTypes.count(),
     },
   }
   const man = new ZipDeflate('manifest.json', { level: 6 })
@@ -85,6 +89,7 @@ export async function createBackup(now: number): Promise<Blob> {
   zip.add(data)
   data.push(strToU8('{'))
   await pushTable(data, 'decks', db.decks, undefined, true)
+  await pushTable(data, 'noteTypes', db.noteTypes)
   await pushTable(data, 'notes', db.notes)
   await pushTable(data, 'cards', db.cards)
   await pushTable(data, 'reviews', db.reviews)

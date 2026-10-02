@@ -28,7 +28,7 @@ export interface ApkgModel {
   /** 0 standard, 1 cloze */
   type: number
   fields: string[]
-  templates: { name: string; qfmt: string }[]
+  templates: { name: string; qfmt: string; afmt: string }[]
 }
 
 export interface ApkgNote {
@@ -167,6 +167,7 @@ function readModels(json: string): ApkgModel[] {
         .map((t) => ({
           name: typeof t.name === 'string' ? t.name : '',
           qfmt: typeof t.qfmt === 'string' ? t.qfmt : '',
+          afmt: typeof t.afmt === 'string' ? t.afmt : '',
         })),
     })
   }

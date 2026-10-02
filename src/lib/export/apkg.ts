@@ -8,6 +8,7 @@ import type { SqlJsStatic } from 'sql.js'
 import { deckPath } from '../domain/decks'
 import { normalizeFields } from '../domain/notes'
 import { labelsToAnkiComments, occlusionToAnki, parseOcclusion } from '../domain/occlusion'
+import { referencedFields } from '../domain/templates'
 import { decodeEntities, escapeHtml, mediaRefs } from '../domain/text'
 import {
   MODEL_TYPES,
@@ -15,6 +16,7 @@ import {
   type Deck,
   type ModelType,
   type Note,
+  type NoteType,
   type Review,
 } from '../domain/types'
 import { dayStart, daysBetween } from '../scheduler/day'
@@ -34,6 +36,8 @@ export interface ApkgExportInput {
   reviews: readonly Review[]
   /** Media referenced by the notes; unreferenced ones are left out. */
   media: readonly ApkgExportMedia[]
+  /** Note types of the custom notes (a custom note without its type is left out). */
+  noteTypes?: readonly NoteType[]
 }
 
 export interface ApkgExportOptions {
@@ -62,7 +66,10 @@ export interface ApkgExportResult {
  * Fixed note type ids, names and modification time: a second import into Anki reuses the note
  * types (no "Basic+" copies) and never overwrites one the user edited there.
  */
-export const ANKI_MODEL_IDS: Record<ModelType, number> = {
+type BuiltIn = Exclude<ModelType, 'custom'>
+const BUILT_IN = MODEL_TYPES.filter((t): t is BuiltIn => t !== 'custom')
+
+export const ANKI_MODEL_IDS: Record<BuiltIn, number> = {
   basic: 1758758400001,
   basic_reverse: 1758758400002,
   cloze: 1758758400003,
@@ -158,7 +165,48 @@ const IO_CSS = `#image-occlusion-canvas {
 `
 const IO_FIELDS = ['Occlusion', 'Image', 'Header', 'Back Extra', 'Comments']
 
-function model(type: ModelType) {
+/**
+ * Anki id of a custom note type: the Anki id it was imported with, else its creation time (Anki
+ * ids are creation times too), so that exporting it again updates the same note type in Anki.
+ */
+export function customModelId(type: Pick<NoteType, 'sourceId' | 'createdAt'>): number {
+  return type.sourceId ?? type.createdAt
+}
+
+const commonModel = (id: number, mod: number) => ({
+  id,
+  mod,
+  usn: -1,
+  sortf: 0,
+  did: DEFAULT_DECK_ID,
+  css: CSS,
+  latexPre: LATEX_PRE,
+  latexPost: '\\end{document}',
+  latexsvg: false,
+  tags: [],
+  vers: [],
+})
+
+/** A custom note type as a standard Anki note type: its fields and templates, as written. */
+function customModel(type: NoteType) {
+  return {
+    ...commonModel(customModelId(type), Math.floor(type.updatedAt / 1000)),
+    name: type.name,
+    type: 0,
+    flds: type.fields.map((name, ord) => field(name, ord)),
+    tmpls: type.templates.map((t, ord) => template(t.name, ord, t.front, t.back)),
+    // Legacy « required fields » of each template: the fields its question uses.
+    req: type.templates.map((t, ord) => [
+      ord,
+      'any',
+      referencedFields(t.front)
+        .map((name) => type.fields.indexOf(name))
+        .filter((i) => i >= 0),
+    ]),
+  }
+}
+
+function model(type: BuiltIn) {
   const id = ANKI_MODEL_IDS[type]
   const common = {
     id,
@@ -358,8 +406,11 @@ export function toRevlog(review: Review, lastIvl: number) {
  * Back Extra, Comments]; mask answers have no Anki equivalent and are listed in Comments, which
  * Anki does not display (« 2 : Lyon »).
  */
-export function ankiFields(note: Pick<Note, 'modelType' | 'fields'>): string[] {
-  const fields = normalizeFields(note.modelType, note.fields)
+export function ankiFields(
+  note: Pick<Note, 'modelType' | 'fields'>,
+  noteType?: Pick<NoteType, 'fields' | 'templates'>,
+): string[] {
+  const fields = normalizeFields(note.modelType, note.fields, noteType)
   if (note.modelType !== 'image_occlusion') return fields
   const [image = '', masks = '', header = '', extra = ''] = fields
   const occlusion = parseOcclusion(masks)
@@ -376,10 +427,12 @@ export async function buildApkg(
   options: ApkgExportOptions,
 ): Promise<ApkgExportResult> {
   const { now, dayStartHour } = options
-  // A note without cards would be removed by Anki's "Check database".
+  // A note without cards would be removed by Anki's "Check database"; a custom note needs its type.
   const withCards = new Set(input.cards.map((c) => c.noteId))
+  const noteTypes = new Map((input.noteTypes ?? []).map((t) => [t.id, t]))
+  const typeOf = (note: Note) => (note.noteTypeId ? noteTypes.get(note.noteTypeId) : undefined)
   const notes = input.notes
-    .filter((n) => withCards.has(n.id))
+    .filter((n) => withCards.has(n.id) && (n.modelType !== 'custom' || typeOf(n)))
     .sort((a, b) => a.createdAt - b.createdAt || compareIds(a, b))
   const noteIds = new Set(notes.map((n) => n.id))
   const cards = input.cards
@@ -391,7 +444,7 @@ export async function buildApkg(
     .sort((a, b) => a.reviewedAt - b.reviewedAt || compareIds(a, b))
   const sorted = await Promise.all(
     notes.map(async (note) => {
-      const fields = ankiFields(note)
+      const fields = ankiFields(note, typeOf(note))
       const sfld = sortField(fields[0] ?? '')
       return { note, fields, sfld, csum: await fieldChecksum(sfld) }
     }),
@@ -441,6 +494,12 @@ export async function buildApkg(
   try {
     db.exec(SCHEMA)
     db.exec('BEGIN')
+    const modelIdOf = (note: Note) => {
+      const type = typeOf(note)
+      return type
+        ? customModelId(type)
+        : ANKI_MODEL_IDS[note.modelType === 'custom' ? 'basic' : note.modelType]
+    }
     const newNoteId = idAllocator()
     const ankiNoteIds = new Map<string, number>()
     const insertNote = db.prepare('INSERT INTO notes VALUES (?, ?, ?, ?, -1, ?, ?, ?, ?, 0, ?)')
@@ -450,7 +509,7 @@ export async function buildApkg(
       insertNote.run([
         id,
         note.sourceGuid ?? note.id,
-        ANKI_MODEL_IDS[note.modelType],
+        modelIdOf(note),
         Math.floor(note.updatedAt / 1000),
         note.tags.length > 0 ? ` ${note.tags.join(' ')} ` : '',
         fields.map((f) => f.split('\u001f').join('')).join('\u001f'),
@@ -536,7 +595,13 @@ export async function buildApkg(
       sortBackwards: false,
       addToCur: true,
     }
-    const models = Object.fromEntries(MODEL_TYPES.map((t) => [ANKI_MODEL_IDS[t], model(t)]))
+    const models: Record<number, object> = Object.fromEntries(
+      BUILT_IN.map((t) => [ANKI_MODEL_IDS[t], model(t)]),
+    )
+    for (const note of notes) {
+      const type = typeOf(note)
+      if (type) models[customModelId(type)] ??= customModel(type)
+    }
     db.run('INSERT INTO col VALUES (1, ?, ?, ?, 11, 0, 0, 0, ?, ?, ?, ?, ?)', [
       Math.floor(crt / 1000),
       now,

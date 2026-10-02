@@ -15,6 +15,7 @@ export class RectoDB extends Dexie {
   reviews!: EntityTable<Review, 'id'>
   media!: EntityTable<Media, 'name'>
   settings!: EntityTable<Setting, 'key'>
+  noteTypes!: EntityTable<NoteType, 'id'>     // M8
 
   constructor(name = 'recto') {   // nom paramétrable pour les tests
     super(name)
@@ -25,6 +26,11 @@ export class RectoDB extends Dexie {
       reviews:  'id, cardId, reviewedAt, [cardId+reviewedAt]',
       media:    'name, sha256, createdAt',
       settings: 'key',
+    })
+    // M8 : types de notes personnalisés (nouvelle table, index sur un champ facultatif : pas d'upgrade)
+    this.version(2).stores({
+      notes:     'id, deckId, modelType, noteTypeId, *tags, sourceGuid, updatedAt',
+      noteTypes: 'id, name, sourceId',
     })
   }
 }
@@ -37,7 +43,7 @@ Règles de migration : chaque changement de schéma = nouvelle `version(n)` avec
 ```ts
 // src/lib/domain/types.ts
 export type SchedulerKind = 'fsrs' | 'leitner'
-export type ModelType = 'basic' | 'basic_reverse' | 'cloze' | 'image_occlusion'   // image_occlusion : V1
+export type ModelType = 'basic' | 'basic_reverse' | 'cloze' | 'image_occlusion' | 'custom'   // image_occlusion : V1 ; custom : M8 (§2.2)
 
 export interface Deck {
   id: string
@@ -79,8 +85,10 @@ export interface Note {
   id: string
   deckId: string
   modelType: ModelType
+  noteTypeId?: string          // custom uniquement : son NoteType (§2.2)
   fields: string[]             // basic: [recto, verso, extra] ; cloze: [texte, extra] ;
-                               // image_occlusion: [image, masques JSON, en-tête, extra] (§2.1)
+                               // image_occlusion: [image, masques JSON, en-tête, extra] (§2.1) ;
+                               // custom: un par champ de son type, dans l'ordre
   tags: string[]
   source?: string
   sourceGuid?: string          // guid Anki à l'import (déduplication : `sourceGuid ?? id`, guid écrit par l'export .apkg, 05 §4)
@@ -94,7 +102,7 @@ export interface Card {
   id: string
   noteId: string
   deckId: string               // dénormalisé (= note.deckId) pour les index
-  ord: number                  // 0: recto→verso, 1: verso→recto, cloze: index-1, image_occlusion: groupe-1
+  ord: number                  // 0: recto→verso, 1: verso→recto, cloze: index-1, image_occlusion: groupe-1, custom: indice du modèle de carte
   // Commun
   due: number                  // prochaine échéance (ms). Nouvelle carte : createdAt
   state: CardState
@@ -172,10 +180,29 @@ Une note `image_occlusion` a quatre champs : `fields[0]` = `<img src="nom" alt="
 - `hideAll` (défaut) : tous les masques cachent leur zone, celui de la carte est mis en évidence ; `hideOne` : seul le masque de la carte est dessiné.
 - Le JSON est relu avec tolérance (`parseOcclusion`) et réécrit sous forme canonique à l'enregistrement (`serializeOcclusion`).
 
+### 2.2 Types de notes personnalisés (M8)
+
+```ts
+export interface CardTemplate { name: string; front: string; back: string }
+export interface NoteType {
+  id: string
+  name: string
+  fields: string[]           // noms uniques (sans casse), sans { } : " ni # ^ / en tête
+  templates: CardTemplate[]  // au moins un ; ord d'une carte = indice de son modèle
+  sourceId?: number          // id du type Anki à l'import (réimport et réexport le réutilisent)
+  createdAt: number
+  updatedAt: number
+}
+```
+
+- Les modèles utilisent un sous-ensemble de la syntaxe Anki (`src/lib/domain/templates.ts`, ADR-010) : `{{Champ}}`, `{{FrontSide}}` (verso), sections `{{#Champ}}…{{/Champ}}` et `{{^Champ}}…{{/Champ}}`, filtres `text:` (sans HTML), `type:` (réponse tapée : rien n'est rendu, Recto compare), tout autre filtre rend la valeur ; un champ inconnu et les spéciaux (`{{Tags}}`, `{{Deck}}`…) rendent une chaîne vide. Le rendu passe par `sanitize()` comme tout champ (les styles en ligne d'Anki sont retirés ; `<hr>` est permis). Le CSS du type Anki est ignoré.
+- Une note a une carte par modèle dont la question rendue n'est pas vide et diffère de la question rendue avec tous les champs vides (règle d'Anki). En révision, le verso rendu remplace la question (il la reprend par `{{FrontSide}}`) ; pas d'Extra ; Leitner n'échange jamais les faces.
+- Modifier un type (`updateNoteType`, une transaction) : champs ajoutés (vides) ou retirés dans toutes ses notes, cartes déplacées avec leur modèle quand un modèle est retiré (leur `ord` suit), créées ou supprimées selon la règle ci-dessus (journal conservé). Renommer un champ réécrit ses références dans les modèles. Un type utilisé par une note ne se supprime pas.
+
 ## 3. Invariants (à tester)
 
 1. `card.deckId === note.deckId` pour toute carte (mise à jour en transaction lors d'un déplacement de note).
-2. Une note `basic` a exactement une carte `ord=0` ; `basic_reverse` exactement `ord=0` et `ord=1` ; `cloze` une carte par index distinct présent dans le texte ; `image_occlusion` une carte par groupe de masques distinct (les cartes des index ou groupes supprimés sont supprimées avec leur journal conservé).
+2. Une note `basic` a exactement une carte `ord=0` ; `basic_reverse` exactement `ord=0` et `ord=1` ; `cloze` une carte par index distinct présent dans le texte ; `image_occlusion` une carte par groupe de masques distinct ; `custom` une carte par modèle de carte dont la question n'est pas vide (§2.2) (les cartes des index, groupes ou modèles supprimés sont supprimées avec leur journal conservé).
 3. `reviews` est *append-only* : aucune fonction ne modifie ni ne supprime une ligne, sauf `rollback` de la dernière révision d'une carte (suppression de cette seule ligne) et la suppression explicite d'une carte/note par l'utilisateur.
 4. Une carte `retired` ou `suspended` n'apparaît jamais dans la file.
 5. Tout `Media.name` référencé dans un champ existe dans `media` (vérifié à l'import ; un utilitaire « médias orphelins » liste les entrées non référencées).
@@ -192,12 +219,12 @@ Une note `image_occlusion` a quatre champs : `fields[0]` = `<img src="nom" alt="
 ## 5. Sauvegarde `.recto.zip`
 
 ```
-manifest.json   { "format": "recto-backup", "schemaVersion": 2, "appVersion": "0.x", "exportedAt": ms, "device": "<navigator.userAgent tronqué à 120 car.>", "counts": {...} }
-data.json       { "decks": [...], "notes": [...], "cards": [...], "reviews": [...], "settings": [...],
+manifest.json   { "format": "recto-backup", "schemaVersion": 3, "appVersion": "0.x", "exportedAt": ms, "device": "<navigator.userAgent tronqué à 120 car.>", "counts": {...} }
+data.json       { "decks": [...], "noteTypes": [...], "notes": [...], "cards": [...], "reviews": [...], "settings": [...],
                   "media": [{ "name", "mime", "size", "sha256", "createdAt" }] }   // sans blobs
 media/<name>    fichiers binaires
 ```
 
-`schemaVersion` : 2 depuis la V1 (ajout du type `image_occlusion` ; une sauvegarde de version 1 se restaure telle quelle, une version plus récente que l'application est refusée). Le schéma IndexedDB (`version(1)`) n'a pas changé.
+`schemaVersion` : 2 depuis la V1 (ajout du type `image_occlusion`), 3 depuis M8 (table `noteTypes`, notes `custom` ; une note `custom` sans son type est rejetée à la lecture). Une sauvegarde de version 1 ou 2 se restaure telle quelle (pas de type personnalisé), une version plus récente que l'application est refusée. Fusion : un type de note est identifié par `id`, le plus récemment modifié gagne.
 
 Restauration « remplacer » : vide la base puis importe ; « fusionner » : les entités sont identifiées par `id` (et `sourceGuid` pour les notes) ; en cas de conflit, la version la plus récente (`updatedAt`) gagne, les journaux sont unionnés par `id`.

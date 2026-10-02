@@ -1,7 +1,10 @@
 import DOMPurify from 'dompurify'
 
-/** Whitelist for card fields (07-ROADMAP M1): b i u br p ul ol li img sub sup span. */
-const ALLOWED_TAGS = ['b', 'i', 'u', 'br', 'p', 'ul', 'ol', 'li', 'img', 'sub', 'sup', 'span']
+/**
+ * Whitelist for card fields (07-ROADMAP M1): b i u br p ul ol li img sub sup span, and hr, the
+ * separator of Anki card templates (`<hr id=answer>`, M8).
+ */
+const ALLOWED_TAGS = ['b', 'i', 'u', 'br', 'hr', 'p', 'ul', 'ol', 'li', 'img', 'sub', 'sup', 'span']
 const ALLOWED_ATTR = ['src', 'alt', 'title', 'class']
 
 const fields = DOMPurify(window)

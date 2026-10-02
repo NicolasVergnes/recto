@@ -1,6 +1,6 @@
 /** Domain types (02-DATA-MODEL §2). All dates are epoch milliseconds (UTC). */
 export type SchedulerKind = 'fsrs' | 'leitner'
-export const MODEL_TYPES = ['basic', 'basic_reverse', 'cloze', 'image_occlusion'] as const
+export const MODEL_TYPES = ['basic', 'basic_reverse', 'cloze', 'image_occlusion', 'custom'] as const
 export type ModelType = (typeof MODEL_TYPES)[number]
 
 export interface FsrsSettings {
@@ -53,11 +53,37 @@ export interface Deck {
   updatedAt: number
 }
 
+/** One card of a custom note type: question and answer templates (Anki syntax, templates.ts). */
+export interface CardTemplate {
+  name: string
+  front: string
+  back: string
+}
+
+/** A note type with named fields and one card per template, like Anki's (02 §2.2, M8). */
+export interface NoteType {
+  id: string
+  name: string
+  /** Field names, in note field order (unique, non-empty). */
+  fields: string[]
+  /** At least one; a card's `ord` is its template index. */
+  templates: CardTemplate[]
+  /** Anki note type id on import (re-import reuses the type). */
+  sourceId?: number
+  createdAt: number
+  updatedAt: number
+}
+
 export interface Note {
   id: string
   deckId: string
   modelType: ModelType
-  /** basic: [front, back, extra]; cloze: [text, extra]; image_occlusion: [image, masks JSON, header, extra]. */
+  /** custom only: its NoteType. */
+  noteTypeId?: string
+  /**
+   * basic: [front, back, extra]; cloze: [text, extra]; image_occlusion: [image, masks JSON,
+   * header, extra]; custom: one per field of its note type.
+   */
   fields: string[]
   tags: string[]
   source?: string
@@ -78,7 +104,10 @@ export interface Card {
   noteId: string
   /** Denormalised copy of note.deckId for indexes. */
   deckId: string
-  /** 0: front→back, 1: back→front, cloze: index - 1, image_occlusion: mask group - 1. */
+  /**
+   * 0: front→back, 1: back→front, cloze: index - 1, image_occlusion: mask group - 1,
+   * custom: template index.
+   */
   ord: number
   due: number
   state: CardState

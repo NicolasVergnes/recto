@@ -40,7 +40,7 @@
   }: Props = $props()
 
   // The browser shows the canonical sides (no Leitner swap), like the table does.
-  const rendered = $derived(renderCard(row.note, row.card))
+  const rendered = $derived(renderCard(row.note, row.card, false, row.noteType))
   let root: HTMLElement | undefined = $state()
   let flipButton: HTMLButtonElement | undefined = $state()
   /** The back face is mounted at the first flip only, then stays for the return animation. */

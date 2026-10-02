@@ -1,6 +1,6 @@
 import { stripHtml } from './text'
 import { renderCard } from './notes'
-import type { Card, Note } from './types'
+import type { Card, Note, NoteType } from './types'
 
 /** Display status of a card in the browser and statistics (states.* in fr.ts). */
 export type CardStatus = 'new' | 'learning' | 'review' | 'relearning' | 'suspended' | 'retired'
@@ -14,14 +14,28 @@ export function cardStatus(card: Pick<Card, 'state' | 'suspended' | 'retired'>):
 export interface BrowserRow {
   card: Card
   note: Note
+  /** custom notes: their note type (rendering). */
+  noteType?: NoteType
   deckName: string
   question: string
   answer: string
   status: CardStatus
 }
 
-export function buildRow(card: Card, note: Note, deckName: string): BrowserRow {
-  const r = renderCard(note, card)
+/** The answer side without the question it repeats (Anki's `<hr id=answer>` convention). */
+function answerOnly(answer: string, question: string): string {
+  const hr = /<hr\s+id\s*=\s*["']?answer["']?\s*\/?>/i.exec(answer)
+  if (hr) return answer.slice(hr.index + hr[0].length)
+  return answer.startsWith(question) ? answer.slice(question.length) : answer
+}
+
+export function buildRow(
+  card: Card,
+  note: Note,
+  deckName: string,
+  noteType?: NoteType,
+): BrowserRow {
+  const r = renderCard(note, card, false, noteType)
   const occlusion = r.occlusion
   // Occlusion: "header (or image) #group" and the mask labels (or the extra).
   const question = occlusion
@@ -29,8 +43,12 @@ export function buildRow(card: Card, note: Note, deckName: string): BrowserRow {
     : stripHtml(r.question)
   const answer = occlusion
     ? stripHtml(r.expected) || stripHtml(r.extra)
-    : stripHtml(r.answerReplacesQuestion ? r.extra : r.answer)
-  return { card, note, deckName, question, answer, status: cardStatus(card) }
+    : note.modelType === 'custom'
+      ? stripHtml(answerOnly(r.answer, r.question))
+      : stripHtml(r.answerReplacesQuestion ? r.extra : r.answer)
+  const row: BrowserRow = { card, note, deckName, question, answer, status: cardStatus(card) }
+  if (noteType) row.noteType = noteType
+  return row
 }
 
 export type StatusFilter = CardStatus | 'flagged' | ''

@@ -7,4 +7,5 @@ export const MODEL_LABEL: Record<ModelType, MessageKey> = {
   basic_reverse: 'editor.basicReverse',
   cloze: 'editor.cloze',
   image_occlusion: 'editor.imageOcclusion',
+  custom: 'editor.custom',
 }

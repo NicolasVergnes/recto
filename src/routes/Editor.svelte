@@ -22,6 +22,7 @@
 
   const decks = live(() => repo.listDecks(), [])
   const knownTags = live(() => repo.allTags(), [])
+  const noteTypes = live(() => repo.listNoteTypes(), [])
 
   const draft = new NoteDraft()
   let noteFields: NoteFields | undefined = $state()
@@ -129,8 +130,10 @@
           decks={decks.value}
           bind:deckId={draft.deckId}
           modelType={draft.modelType}
+          noteType={draft.noteType}
+          noteTypes={noteTypes.value}
           editing={!!editingId}
-          ontypechange={(next) => draft.changeType(next)}
+          ontypechange={(next, type) => draft.changeType(next, type)}
         />
 
         {#if draft.modelType === 'image_occlusion'}
@@ -179,7 +182,7 @@
         </p>
       </form>
 
-      <CardPreview modelType={draft.modelType} fields={draft.fields} />
+      <CardPreview modelType={draft.modelType} noteType={draft.noteType} fields={draft.fields} />
     </div>
   {/if}
 </section>

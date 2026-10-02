@@ -2,7 +2,7 @@ import { SvelteMap } from 'svelte/reactivity'
 import * as repo from '../db/repo'
 import { getSetting } from '../db/settings'
 import { loadTodayQueue } from '../db/study'
-import type { Card, Deck, Note, Rating } from '../domain/types'
+import type { Card, Deck, Note, NoteType, Rating } from '../domain/types'
 import { removeCard, type SessionQueue } from '../queue/session'
 import { dayKey } from '../scheduler/day'
 
@@ -32,6 +32,8 @@ export interface ActiveSession {
   queue: SessionQueue
   cards: Map<string, Card>
   notes: Map<string, Note>
+  /** Custom note types, to render their cards. */
+  noteTypes: Map<string, NoteType>
   decks: Map<string, Deck>
   dueLimit: number
   dayStartHour: number
@@ -59,12 +61,14 @@ export async function loadSession(deckId: string | undefined, t0: number): Promi
   }
   const q = await loadTodayQueue(t0, deckId)
   const notes = await notesOf(q.cards.values())
+  const noteTypes = await repo.noteTypesById()
   return {
     key,
     deckId,
     queue: { ids: q.result.ids, later: q.result.later },
     cards: new SvelteMap(q.cards),
     notes: new SvelteMap(notes.map((n) => [n.id, n])),
+    noteTypes: new SvelteMap(noteTypes),
     decks: new SvelteMap(q.decks.map((d) => [d.id, d])),
     dueLimit: q.result.dueLimit,
     dayStartHour: q.dayStartHour,
@@ -79,12 +83,14 @@ async function reload(active: ActiveSession): Promise<void> {
   const cards = (await repo.getCards(ids)).filter((c) => !c.suspended && !c.retired)
   const notes = await notesOf(cards)
   const decks = await repo.listDecks()
+  const noteTypes = await repo.noteTypesById()
   const alive = new Set(cards.map((c) => c.id))
   let queue = active.queue
   for (const id of ids) if (!alive.has(id)) queue = removeCard(queue, id)
   active.queue = queue
   active.cards = new SvelteMap(cards.map((c) => [c.id, c]))
   active.notes = new SvelteMap(notes.map((n) => [n.id, n]))
+  active.noteTypes = new SvelteMap(noteTypes)
   active.decks = new SvelteMap(decks.map((d) => [d.id, d]))
 }
 

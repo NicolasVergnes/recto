@@ -1,5 +1,14 @@
 import { makeCard, makeDeck } from '$lib/domain/defaults'
-import type { Card, Deck, Media, ModelType, Note, Review, Setting } from '$lib/domain/types'
+import type {
+  Card,
+  Deck,
+  Media,
+  ModelType,
+  Note,
+  NoteType,
+  Review,
+  Setting,
+} from '$lib/domain/types'
 import { sha256Hex } from '$lib/media/hash'
 import { seededRandom } from '$lib/queue/random'
 import type { RectoDB } from '$lib/db/schema'
@@ -39,11 +48,33 @@ export async function generateCollection(db: RectoDB, seed: string) {
       createdAt: t0,
     })
   }
+  const noteType: NoteType = {
+    id: id(),
+    name: 'Pays « é »',
+    fields: ['Pays', 'Capitale'],
+    templates: [
+      {
+        name: 'Capitale',
+        front: 'Capitale de {{Pays}} ?',
+        back: '{{FrontSide}}<hr id=answer>{{Capitale}}',
+      },
+      { name: 'Pays', front: '{{Capitale}} ?', back: '{{Pays}}' },
+    ],
+    sourceId: 1342697561419,
+    createdAt: t0,
+    updatedAt: t0,
+  }
   const notes: Note[] = []
   const cards: Card[] = []
   const reviews: Review[] = []
   for (let i = 0; i < 5 + int(20); i++) {
-    const modelType = pick<ModelType>(['basic', 'basic_reverse', 'cloze', 'image_occlusion'])
+    const modelType = pick<ModelType>([
+      'basic',
+      'basic_reverse',
+      'cloze',
+      'image_occlusion',
+      'custom',
+    ])
     const deck = pick(decks)
     const img =
       media.length > 0 && random() < 0.3 ? `<img src="${pick(media).name}" alt="a « b »">` : ''
@@ -70,6 +101,7 @@ export async function generateCollection(db: RectoDB, seed: string) {
       createdAt: t0 + i,
       updatedAt: t0 + i * 2,
     }
+    if (modelType === 'custom') note.noteTypeId = noteType.id
     if (random() < 0.3) note.source = 'https://example.org'
     if (random() < 0.2) note.sourceGuid = `guid-${i}`
     notes.push(note)
@@ -117,9 +149,10 @@ export async function generateCollection(db: RectoDB, seed: string) {
   ]
   await db.transaction(
     'rw',
-    [db.decks, db.notes, db.cards, db.reviews, db.media, db.settings],
+    [db.decks, db.noteTypes, db.notes, db.cards, db.reviews, db.media, db.settings],
     async () => {
       await db.decks.bulkAdd(decks)
+      await db.noteTypes.add(noteType)
       await db.notes.bulkAdd(notes)
       await db.cards.bulkAdd(cards)
       await db.reviews.bulkAdd(reviews)
@@ -145,6 +178,7 @@ export async function dumpDatabase(db: RectoDB) {
   )
   return {
     decks: byId(await db.decks.toArray()),
+    noteTypes: byId(await db.noteTypes.toArray()),
     notes: byId(await db.notes.toArray()),
     cards: byId(await db.cards.toArray()),
     reviews: byId(await db.reviews.toArray()),

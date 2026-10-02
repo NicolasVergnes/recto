@@ -6,36 +6,51 @@ import {
   type OcclusionMask,
   type OcclusionMode,
 } from './occlusion'
+import { fieldValues, renderTemplate, templateOrds, typedField } from './templates'
 import { escapeHtml, imageRefs, imageTag, removeImage, stripHtml } from './text'
-import type { Card, ModelType, Note } from './types'
+import type { Card, ModelType, Note, NoteType } from './types'
+
+/** What a custom note needs from its note type (the other types ignore it). */
+export type TypeShape = Pick<NoteType, 'fields' | 'templates'>
 
 /**
  * Number of fields per model: basic [front, back, extra], cloze [text, extra],
- * image_occlusion [image, masks JSON, header, extra].
+ * image_occlusion [image, masks JSON, header, extra], custom: its note type's fields.
  */
-export function fieldCount(modelType: ModelType): number {
+export function fieldCount(modelType: ModelType, noteType?: TypeShape): number {
   switch (modelType) {
     case 'cloze':
       return 2
     case 'image_occlusion':
       return 4
+    case 'custom':
+      return noteType?.fields.length ?? 0
     default:
       return 3
   }
 }
 
-/** Pads or trims `fields` to the model's field count. */
-export function normalizeFields(modelType: ModelType, fields: readonly string[]): string[] {
-  const n = fieldCount(modelType)
+/** Pads or trims `fields` to the model's field count (a custom note without its type: as is). */
+export function normalizeFields(
+  modelType: ModelType,
+  fields: readonly string[],
+  noteType?: TypeShape,
+): string[] {
+  const n = modelType === 'custom' && !noteType ? fields.length : fieldCount(modelType, noteType)
   return Array.from({ length: n }, (_, i) => fields[i] ?? '')
 }
 
 /**
  * Card ords a note must have (02-DATA-MODEL §3 invariant 2): basic → [0], basic_reverse → [0, 1],
  * cloze → one per distinct index (ord = index - 1), image_occlusion → one per mask group
- * (ord = group - 1).
+ * (ord = group - 1), custom → one per template whose question is not empty (none without its
+ * note type).
  */
-export function cardOrds(modelType: ModelType, fields: readonly string[]): number[] {
+export function cardOrds(
+  modelType: ModelType,
+  fields: readonly string[],
+  noteType?: TypeShape,
+): number[] {
   switch (modelType) {
     case 'basic':
       return [0]
@@ -45,6 +60,8 @@ export function cardOrds(modelType: ModelType, fields: readonly string[]): numbe
       return clozeIndices(fields[0] ?? '').map((i) => i - 1)
     case 'image_occlusion':
       return occlusionOrds(parseOcclusion(fields[1] ?? ''))
+    case 'custom':
+      return noteType ? templateOrds(noteType, fields) : []
   }
 }
 
@@ -81,13 +98,49 @@ export interface RenderedCard {
 }
 
 /**
- * Question/answer of a card. `flip` applies Leitner `sideFlipped` (ignored for cloze, 03 §3.3).
+ * Question/answer of a custom note's card: its template rendered like Anki, the answer side
+ * replacing the question (it usually repeats it through `{{FrontSide}}`).
+ */
+function renderCustom(
+  fields: readonly string[],
+  ord: number,
+  noteType: TypeShape | undefined,
+): RenderedCard {
+  const template = noteType?.templates[ord]
+  if (!noteType || !template) {
+    return {
+      question: '',
+      answer: '',
+      extra: '',
+      answerReplacesQuestion: true,
+      flipped: false,
+      expected: '',
+    }
+  }
+  const values = fieldValues(noteType.fields, fields)
+  const question = renderTemplate(template.front, values)
+  const typed = typedField(template)
+  return {
+    question,
+    answer: renderTemplate(template.back, values, question),
+    extra: '',
+    answerReplacesQuestion: true,
+    flipped: false,
+    expected: typed ? (values.get(typed) ?? '') : '',
+  }
+}
+
+/**
+ * Question/answer of a card. `flip` applies Leitner `sideFlipped` (ignored for cloze and custom
+ * notes, 03 §3.3). A custom note needs its note type.
  */
 export function renderCard(
   note: Pick<Note, 'modelType' | 'fields'>,
   card: Pick<Card, 'ord' | 'sideFlipped'>,
   flip = false,
+  noteType?: TypeShape,
 ): RenderedCard {
+  if (note.modelType === 'custom') return renderCustom(note.fields, card.ord, noteType)
   const [f0 = '', f1 = '', f2 = '', f3 = ''] = note.fields
   if (note.modelType === 'image_occlusion') {
     const occlusion = parseOcclusion(f1)
@@ -145,10 +198,17 @@ const joinLines = (...parts: string[]) =>
 /**
  * Maps fields when the note type changes in the editor. The front (cloze text; occlusion header
  * then image) and the extra are kept. To an occlusion note, the first image found becomes its
- * image, the rest of the front its header, and the rest of the back joins the extra.
+ * image, the rest of the front its header, and the rest of the back joins the extra. To and from
+ * a custom type, fields are copied by position (front, back, extra).
  */
-export function convertFields(from: ModelType, to: ModelType, fields: readonly string[]): string[] {
-  if (from === to) return normalizeFields(to, fields)
+export function convertFields(
+  from: ModelType,
+  to: ModelType,
+  fields: readonly string[],
+  toType?: TypeShape,
+): string[] {
+  if (from === to && to !== 'custom') return normalizeFields(to, fields)
+  if (from === 'custom' && to === 'custom') return normalizeFields(to, fields, toType)
   const [a = '', b = '', c = '', d = ''] = fields
   const src =
     from === 'cloze'
@@ -169,6 +229,8 @@ export function convertFields(from: ModelType, to: ModelType, fields: readonly s
         joinLines(without(src.back), without(src.extra)),
       ]
     }
+    case 'custom':
+      return normalizeFields(to, [src.front, src.back, src.extra], toType)
     default:
       return [src.front, src.back, src.extra]
   }

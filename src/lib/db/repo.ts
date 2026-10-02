@@ -5,10 +5,25 @@
 import { buildRow, type BrowserRow } from '../domain/browse'
 import { deckPath } from '../domain/decks'
 import { makeCard, makeDeck, resetScheduling, type NewDeckInput } from '../domain/defaults'
+import {
+  planNoteTypeEdit,
+  validateNoteType,
+  type NoteTypeEdit,
+  type NoteTypeEditPlan,
+} from '../domain/note-types'
 import { cardOrds, normalizeFields, noteFront } from '../domain/notes'
 import { parseOcclusion, serializeOcclusion } from '../domain/occlusion'
 import { frontKey, normalizeText } from '../domain/text'
-import type { Card, Deck, DeckSettings, Flag, ModelType, Note } from '../domain/types'
+import type {
+  Card,
+  CardTemplate,
+  Deck,
+  DeckSettings,
+  Flag,
+  ModelType,
+  Note,
+  NoteType,
+} from '../domain/types'
 import { RepoError } from './errors'
 import { db, newId } from './schema'
 
@@ -170,21 +185,40 @@ export async function deckCounts(): Promise<Map<string, DeckCount>> {
 export interface NoteInput {
   deckId: string
   modelType: ModelType
+  /** custom notes only. */
+  noteTypeId?: string
   fields: string[]
   tags: string[]
   source?: string
 }
 
-function buildNoteFields(input: NoteInput): { fields: string[]; ords: number[] } {
-  const fields = normalizeFields(input.modelType, input.fields)
+const NO_CARD: Record<ModelType, 'noteNoCloze' | 'noteNoMask' | 'noteNoCard'> = {
+  basic: 'noteNoCard',
+  basic_reverse: 'noteNoCard',
+  cloze: 'noteNoCloze',
+  image_occlusion: 'noteNoMask',
+  custom: 'noteNoCard',
+}
+
+/** The note type of a custom note (read inside the caller's transaction). */
+async function noteTypeOf(input: Pick<NoteInput, 'modelType' | 'noteTypeId'>) {
+  if (input.modelType !== 'custom') return undefined
+  const type = input.noteTypeId ? await db.noteTypes.get(input.noteTypeId) : undefined
+  if (!type) throw new RepoError('noteTypeNotFound')
+  return type
+}
+
+function buildNoteFields(
+  input: NoteInput,
+  noteType: NoteType | undefined,
+): { fields: string[]; ords: number[] } {
+  const fields = normalizeFields(input.modelType, input.fields, noteType)
   // Occlusion masks are stored in their canonical form (clamped, rounded, invalid ones dropped).
   if (input.modelType === 'image_occlusion') {
     fields[1] = serializeOcclusion(parseOcclusion(fields[1] ?? ''))
   }
-  const ords = cardOrds(input.modelType, fields)
-  if (ords.length === 0) {
-    throw new RepoError(input.modelType === 'image_occlusion' ? 'noteNoMask' : 'noteNoCloze')
-  }
+  const ords = cardOrds(input.modelType, fields, noteType)
+  if (ords.length === 0) throw new RepoError(NO_CARD[input.modelType])
   return { fields, ords }
 }
 
@@ -192,24 +226,26 @@ export async function createNote(
   input: NoteInput,
   now: number,
 ): Promise<{ note: Note; cards: Card[] }> {
-  const { fields, ords } = buildNoteFields(input)
-  const note: Note = {
-    id: newId(),
-    deckId: input.deckId,
-    modelType: input.modelType,
-    fields,
-    tags: [...input.tags],
-    createdAt: now,
-    updatedAt: now,
-  }
-  if (input.source) note.source = input.source
-  const cards = ords.map((ord) => makeCard(note, ord, newId(), now))
-  await db.transaction('rw', db.decks, db.notes, db.cards, async () => {
+  return db.transaction('rw', db.decks, db.notes, db.cards, db.noteTypes, async () => {
     await requireDeck(input.deckId)
+    const noteType = await noteTypeOf(input)
+    const { fields, ords } = buildNoteFields(input, noteType)
+    const note: Note = {
+      id: newId(),
+      deckId: input.deckId,
+      modelType: input.modelType,
+      fields,
+      tags: [...input.tags],
+      createdAt: now,
+      updatedAt: now,
+    }
+    if (noteType) note.noteTypeId = noteType.id
+    if (input.source) note.source = input.source
+    const cards = ords.map((ord) => makeCard(note, ord, newId(), now))
     await db.notes.add(note)
     await db.cards.bulkAdd(cards)
+    return { note, cards }
   })
-  return { note, cards }
 }
 
 export function getNote(id: string): Promise<Note | undefined> {
@@ -238,11 +274,12 @@ export async function updateNote(
   input: NoteInput,
   now: number,
 ): Promise<{ note: Note; added: Card[]; removed: string[] }> {
-  const { fields, ords } = buildNoteFields(input)
-  return db.transaction('rw', db.decks, db.notes, db.cards, async () => {
+  return db.transaction('rw', db.decks, db.notes, db.cards, db.noteTypes, async () => {
     const existing = await db.notes.get(id)
     if (!existing) throw new RepoError('noteNotFound')
     await requireDeck(input.deckId)
+    const noteType = await noteTypeOf(input)
+    const { fields, ords } = buildNoteFields(input, noteType)
     const note: Note = {
       ...existing,
       deckId: input.deckId,
@@ -251,6 +288,8 @@ export async function updateNote(
       tags: [...input.tags],
       updatedAt: now,
     }
+    if (noteType) note.noteTypeId = noteType.id
+    else delete note.noteTypeId
     if (input.source) note.source = input.source
     else delete note.source
     const cards = await db.cards.where('noteId').equals(id).toArray()
@@ -354,20 +393,128 @@ export async function resetCards(cardIds: readonly string[], now: number) {
 
 /** Every card with its note and deck path, for the card browser (filtered in memory). */
 export async function loadBrowserRows(): Promise<BrowserRow[]> {
-  const [cards, notes, decks] = await Promise.all([
+  const [cards, notes, decks, types] = await Promise.all([
     db.cards.toArray(),
     db.notes.toArray(),
     db.decks.toArray(),
+    db.noteTypes.toArray(),
   ])
   const noteById = new Map(notes.map((n) => [n.id, n]))
   const deckById = new Map(decks.map((d) => [d.id, d]))
+  const typeById = new Map(types.map((t) => [t.id, t]))
   const rows: BrowserRow[] = []
   for (const card of cards) {
     const note = noteById.get(card.noteId)
     const deck = deckById.get(card.deckId)
-    if (note) rows.push(buildRow(card, note, deck ? deckPath(deck, deckById) : ''))
+    const type = note?.noteTypeId ? typeById.get(note.noteTypeId) : undefined
+    if (note) rows.push(buildRow(card, note, deck ? deckPath(deck, deckById) : '', type))
   }
   return rows
+}
+
+// --- Note types (M8) ---------------------------------------------------------
+
+export function listNoteTypes(): Promise<NoteType[]> {
+  return db.noteTypes.orderBy('name').toArray()
+}
+
+export function getNoteType(id: string): Promise<NoteType | undefined> {
+  return db.noteTypes.get(id)
+}
+
+/** Note types by id (review sessions and exports render custom notes with them). */
+export async function noteTypesById(): Promise<Map<string, NoteType>> {
+  return new Map((await db.noteTypes.toArray()).map((t) => [t.id, t]))
+}
+
+/** A note of the type, for the preview of its templates. */
+export function firstNoteOfType(id: string): Promise<Note | undefined> {
+  return db.notes.where('noteTypeId').equals(id).first()
+}
+
+/** Number of notes of each note type. */
+export async function noteTypeUsage(): Promise<Map<string, number>> {
+  const usage = new Map<string, number>()
+  await db.notes
+    .where('modelType')
+    .equals('custom')
+    .each((n) => {
+      if (n.noteTypeId) usage.set(n.noteTypeId, (usage.get(n.noteTypeId) ?? 0) + 1)
+    })
+  return usage
+}
+
+export interface NoteTypeInput {
+  name: string
+  fields: string[]
+  templates: CardTemplate[]
+}
+
+export async function createNoteType(input: NoteTypeInput, now: number): Promise<NoteType> {
+  const error = validateNoteType(input)
+  if (error) throw new RepoError(error)
+  const type: NoteType = {
+    id: newId(),
+    name: input.name.trim(),
+    fields: input.fields.map((f) => f.trim()),
+    templates: input.templates.map((t) => ({ ...t, name: t.name.trim() })),
+    createdAt: now,
+    updatedAt: now,
+  }
+  await db.noteTypes.add(type)
+  return type
+}
+
+/** The edit's plan on the stored notes and cards (shown before saving, then applied). */
+async function planEdit(id: string, edit: NoteTypeEdit, now: number) {
+  const type = await db.noteTypes.get(id)
+  if (!type) throw new RepoError('noteTypeNotFound')
+  const error = validateNoteType(planNoteTypeEdit(type, edit, [], [], now, newId).type)
+  if (error) throw new RepoError(error)
+  const notes = await db.notes.where('noteTypeId').equals(id).toArray()
+  const cards = await db.cards
+    .where('noteId')
+    .anyOf(notes.map((n) => n.id))
+    .toArray()
+  return planNoteTypeEdit(type, edit, notes, cards, now, newId)
+}
+
+/** Cards created and deleted if `edit` were saved (nothing written). */
+export async function previewNoteTypeEdit(id: string, edit: NoteTypeEdit) {
+  const plan = await db.transaction('r', db.noteTypes, db.notes, db.cards, () =>
+    planEdit(id, edit, 0),
+  )
+  return { added: plan.added.length, removed: plan.removed.length }
+}
+
+/**
+ * Saves a note type and reconciles its notes and cards in one transaction (invariant 2): fields
+ * added or removed in every note, cards moved with their template, created or deleted (their
+ * review log is kept, like a deleted cloze).
+ */
+export async function updateNoteType(
+  id: string,
+  edit: NoteTypeEdit,
+  now: number,
+): Promise<NoteTypeEditPlan> {
+  return db.transaction('rw', db.noteTypes, db.notes, db.cards, async () => {
+    const plan = await planEdit(id, edit, now)
+    await db.noteTypes.put(plan.type)
+    await db.notes.bulkPut(plan.notes)
+    await db.cards.bulkPut(plan.moved)
+    await db.cards.bulkDelete(plan.removed)
+    await db.cards.bulkAdd(plan.added)
+    return plan
+  })
+}
+
+/** A note type is deleted only when no note uses it. */
+export async function deleteNoteType(id: string): Promise<void> {
+  await db.transaction('rw', db.noteTypes, db.notes, async () => {
+    if ((await db.notes.where('noteTypeId').equals(id).count()) > 0)
+      throw new RepoError('noteTypeInUse')
+    await db.noteTypes.delete(id)
+  })
 }
 
 /** Whole-collection counts (home screen, settings, backups). */

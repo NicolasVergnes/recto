@@ -4,7 +4,7 @@
  * (and `sourceGuid` for notes): the most recent `updatedAt` wins, review logs are unioned by id.
  */
 import { normalizeText } from '../domain/text'
-import type { Card, Deck, Media, Note, Review } from '../domain/types'
+import type { Card, Deck, Media, Note, NoteType, Review } from '../domain/types'
 import type { ParsedBackup } from '../import/backup'
 import { db } from './schema'
 
@@ -38,7 +38,7 @@ function mediaRows(
   return { rows, missing }
 }
 
-const ALL = () => [db.decks, db.notes, db.cards, db.reviews, db.media, db.settings]
+const ALL = () => [db.decks, db.noteTypes, db.notes, db.cards, db.reviews, db.media, db.settings]
 
 export async function restoreBackup(
   parsed: ParsedBackup,
@@ -53,6 +53,7 @@ async function replace(parsed: ParsedBackup): Promise<RestoreReport> {
   await db.transaction('rw', ALL(), async () => {
     for (const table of ALL()) await table.clear()
     await db.decks.bulkAdd(data.decks)
+    await db.noteTypes.bulkAdd(data.noteTypes)
     await db.notes.bulkAdd(data.notes)
     await db.cards.bulkAdd(data.cards)
     await db.reviews.bulkAdd(data.reviews)
@@ -124,6 +125,14 @@ async function merge(parsed: ParsedBackup): Promise<RestoreReport> {
     }
     await db.decks.bulkPut(deckPuts)
     const deckOf = (id: string) => deckIdMap.get(id) ?? id
+
+    // Note types: by id, the most recently edited wins.
+    const localTypes = new Map((await db.noteTypes.toArray()).map((t) => [t.id, t]))
+    const typePuts: NoteType[] = data.noteTypes.filter((t) => {
+      const local = localTypes.get(t.id)
+      return !local || t.updatedAt > local.updatedAt
+    })
+    await db.noteTypes.bulkPut(typePuts)
 
     // Notes: by id, then by Anki guid; the loser's cards are left out.
     const localNotes = await db.notes.toArray()

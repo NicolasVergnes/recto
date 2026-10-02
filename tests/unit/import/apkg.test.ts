@@ -132,26 +132,43 @@ describe('convertModel', () => {
     expect(convertModel(cloze).map(['t', 'x', 'y'])).toEqual(['t', 'x<br>y'])
     const rev = {
       ...basic,
-      fields: ['Front', 'Back', 'Note', 'Source'],
+      fields: ['Front', 'Back', 'Note'],
       templates: [
-        { name: '1', qfmt: '{{Front}}' },
-        { name: '2', qfmt: '{{Back}}' },
+        { name: '1', qfmt: '{{Front}}', afmt: '{{Back}}' },
+        { name: '2', qfmt: '{{Back}}', afmt: '{{Front}}' },
       ],
     }
-    expect(convertModel(rev)).toMatchObject({
-      modelType: 'basic_reverse',
-      converted: true,
-      mergedFields: 1,
-    })
+    expect(convertModel(rev)).toMatchObject({ modelType: 'basic_reverse', converted: false })
     expect(convertModel(rev).map(['a', 'b', 'c', 'd'])).toEqual(['a', 'b', 'c<br>d'])
+  })
+
+  it('keeps any other standard note type as a custom type (M8): no field merged', () => {
+    const basic = sample().models.find((m) => m.type === 0)
+    if (!basic) throw new Error('fixture')
+    // Four fields: nothing is merged into Extra any more.
+    const wide = {
+      ...basic,
+      name: 'Pays',
+      fields: ['Front', 'Back', 'Note', 'Source'],
+      templates: [{ name: 'Carte', qfmt: '{{Front}}', afmt: '{{Back}} {{Source}}' }],
+    }
+    const conversion = convertModel(wide)
+    expect(conversion).toMatchObject({ modelType: 'custom', converted: false, mergedFields: 0 })
+    expect(conversion.map(['a', 'b', 'c', 'd', 'e'])).toEqual(['a', 'b', 'c', 'd'])
+    expect(conversion.noteType).toEqual({
+      name: 'Pays',
+      fields: ['Front', 'Back', 'Note', 'Source'],
+      templates: [{ name: 'Carte', front: '{{Front}}', back: '{{Back}} {{Source}}' }],
+    })
+    // Two templates that do not ask the two sides: kept as they are.
     const odd = {
       ...basic,
       templates: [
-        { name: '1', qfmt: '{{Front}}' },
-        { name: '2', qfmt: '{{Front}} ?' },
+        { name: '1', qfmt: '{{Front}}', afmt: '' },
+        { name: '2', qfmt: '{{Front}} ?', afmt: '' },
       ],
     }
-    expect(convertModel(odd)).toMatchObject({ modelType: 'basic', converted: true })
+    expect(convertModel(odd).modelType).toBe('custom')
   })
 })
 
@@ -393,5 +410,40 @@ describe('planApkgImport', () => {
     expect(plan.report.missingMedia).toEqual(['lune.png', 'son.mp3'])
     expect(plan.media).toEqual([])
     expect(plan.report.skipped).toBe(1)
+  })
+})
+
+describe('multi-card note types (M8, data/samples/multi-template.apkg)', () => {
+  it('keeps the Anki note type: named fields, one card per template, no merged field', async () => {
+    const pkg = readApkg(sampleBytes('multi-template.apkg'), SQL)
+    expect(describePackage(pkg).models).toMatchObject([
+      { name: 'Departements', modelType: 'custom', converted: false },
+    ])
+    const plan = await planApkgImport(pkg, options, empty, now, newId)
+    expect(plan.report.errors).toEqual([])
+    expect(plan.report.convertedModels).toEqual([])
+    expect(plan.report.noteTypesCreated).toEqual(['Departements'])
+    const [type] = plan.noteTypes ?? []
+    expect(type).toMatchObject({
+      name: 'Departements',
+      fields: ['Numero', 'Dept', 'Carte', 'Prefecture', 'Région'],
+      sourceId: 1342697561419,
+    })
+    expect(type?.templates.map((t) => t.name)).toEqual(['QNumero', 'QDept', 'QCh-lieu', 'Qcarte'])
+    expect(plan.notes.map((n) => n.fields.slice(0, 2))).toEqual([
+      ['01', 'Ain'],
+      ['02', 'Aisne'],
+      ['03', 'Allier'],
+    ])
+    // Allier has no map: three cards, like in Anki.
+    const ords = (i: number) =>
+      plan.cards.filter((c) => c.noteId === plan.notes[i]?.id).map((c) => c.ord)
+    expect([ords(0), ords(1), ords(2)]).toEqual([
+      [0, 1, 2, 3],
+      [0, 1, 2, 3],
+      [0, 1, 2],
+    ])
+    expect(plan.report.cardsCreated).toBe(11)
+    expect(plan.media.map((m) => m.name).sort()).toEqual(['carte-01.png', 'carte-02.png'])
   })
 })

@@ -14,6 +14,8 @@
   import Home from './routes/Home.svelte'
   import Import from './routes/Import.svelte'
   import NotFound from './routes/NotFound.svelte'
+  import NoteTypeEditor from './routes/NoteTypeEditor.svelte'
+  import NoteTypes from './routes/NoteTypes.svelte'
   import Review from './routes/Review.svelte'
   import Settings from './routes/Settings.svelte'
   import Stats from './routes/Stats.svelte'
@@ -26,6 +28,8 @@
     { pattern: '/notes/new', component: Editor },
     { pattern: '/notes/:id', component: Editor },
     { pattern: '/import', component: Import },
+    { pattern: '/note-types', component: NoteTypes },
+    { pattern: '/note-types/:id', component: NoteTypeEditor },
     { pattern: '/stats', component: Stats },
     { pattern: '/settings', component: Settings },
   ]

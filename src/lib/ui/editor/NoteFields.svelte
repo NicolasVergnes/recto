@@ -70,10 +70,10 @@
   }
 </script>
 
-{#each slots as slot, j (slot.label)}
+{#each slots as slot, j (slot.index)}
   <FieldInput
     id={`field-${slot.index}`}
-    label={t(slot.label)}
+    label={slot.text ?? t(slot.label)}
     bind:value={() => fields[slot.index] ?? '', (v) => (fields[slot.index] = v)}
     bind:textarea={textareas[slot.index]}
     rows={j === 0 ? 3 : 2}

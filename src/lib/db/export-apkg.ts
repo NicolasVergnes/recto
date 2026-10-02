@@ -1,5 +1,5 @@
 import { mediaRefs } from '../domain/text'
-import type { Card, Deck, Media, Note, Review } from '../domain/types'
+import type { Card, Deck, Media, Note, NoteType, Review } from '../domain/types'
 import type { ApkgExportInput } from '../export/apkg'
 import { deckFamily, getNotes } from './repo'
 import { db } from './schema'
@@ -17,18 +17,20 @@ interface Rows {
   cards: Card[]
   reviews: Review[]
   media: Media[]
+  noteTypes: NoteType[]
 }
 
 /** Notes, their cards and reviews, their decks with parents and their media rows. */
 async function readRows(scope: ApkgExportScope): Promise<Rows> {
   const allDecks = await db.decks.toArray()
+  const noteTypes = await db.noteTypes.toArray()
   if (!scope.noteIds && !scope.deckId) {
     const [notes, cards, reviews] = await Promise.all([
       db.notes.toArray(),
       db.cards.toArray(),
       db.reviews.toArray(),
     ])
-    return { decks: allDecks, notes, cards, reviews, media: await mediaOf(notes) }
+    return { decks: allDecks, notes, cards, reviews, media: await mediaOf(notes), noteTypes }
   }
   const family = scope.deckId ? await deckFamily(scope.deckId) : []
   const notes = scope.noteIds
@@ -50,7 +52,7 @@ async function readRows(scope: ApkgExportScope): Promise<Rows> {
     if (parentId) used.add(parentId)
   }
   const decks = allDecks.filter((d) => used.has(d.id))
-  return { decks, notes, cards, reviews, media: await mediaOf(notes) }
+  return { decks, notes, cards, reviews, media: await mediaOf(notes), noteTypes }
 }
 
 async function mediaOf(notes: readonly Note[]): Promise<Media[]> {
@@ -71,8 +73,10 @@ async function mediaOf(notes: readonly Note[]): Promise<Media[]> {
 export async function gatherApkgExport(
   scope: ApkgExportScope = {},
 ): Promise<{ input: ApkgExportInput; dayStartHour: number }> {
-  const rows = await db.transaction('r', [db.decks, db.notes, db.cards, db.reviews, db.media], () =>
-    readRows(scope),
+  const rows = await db.transaction(
+    'r',
+    [db.decks, db.notes, db.cards, db.reviews, db.media, db.noteTypes],
+    () => readRows(scope),
   )
   const media = await Promise.all(
     rows.media.map(async (m) => ({

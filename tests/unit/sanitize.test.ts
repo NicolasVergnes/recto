@@ -27,5 +27,7 @@ describe('sanitize()', () => {
     expect(sanitize('<div>un</div><div><strong>deux</strong> <em>trois</em></div>')).toBe(
       'un<br><b>deux</b> <i>trois</i><br>',
     )
+    // The answer separator of Anki templates stays, without its id.
+    expect(sanitize('Q<hr id=answer>R')).toBe('Q<hr>R')
   })
 })

@@ -216,4 +216,47 @@ describe('parseBackup errors', () => {
     expect(parsed.files.get('m.png')).toEqual(strToU8('abc'))
     expect(parsed.manifest).toMatchObject({ appVersion: '', exportedAt: 0, device: '' })
   })
+
+  it('reads note types (version 3), and older backups without them', () => {
+    const note = (id: string, noteTypeId?: string) => ({
+      id,
+      deckId: 'd',
+      modelType: noteTypeId === undefined ? 'basic' : 'custom',
+      ...(noteTypeId === undefined ? {} : { noteTypeId }),
+      fields: ['a', 'b'],
+      tags: [],
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    const type = {
+      id: 't',
+      name: 'T',
+      fields: ['A', 'B'],
+      templates: [{ name: 'C', front: '{{A}}', back: '{{B}}' }],
+      sourceId: 42,
+      createdAt: 1,
+      updatedAt: 1,
+    }
+    const v3 = JSON.stringify({ format: 'recto-backup', schemaVersion: 3 })
+    const data = JSON.stringify({
+      noteTypes: [type, { ...type, id: 'empty', templates: [] }],
+      // A custom note needs its type: without it (or with an unknown one) it is dropped.
+      notes: [note('n1', 't'), note('n2', 'missing'), { ...note('n3'), modelType: 'custom' }],
+    })
+    const parsed = parseBackup(zip({ 'manifest.json': v3, 'data.json': data }), 3)
+    expect(parsed.data.noteTypes).toEqual([type])
+    expect(parsed.data.notes.map((n) => [n.id, n.noteTypeId])).toEqual([['n1', 't']])
+    expect(parsed.manifest.counts.noteTypes).toBe(1)
+    expect(parsed.invalid).toBe(3)
+
+    // A version 2 backup has no note types: nothing to migrate.
+    const v2 = JSON.stringify({ format: 'recto-backup', schemaVersion: 2 })
+    const old = parseBackup(
+      zip({ 'manifest.json': v2, 'data.json': JSON.stringify({ notes: [note('n')] }) }),
+      SCHEMA_VERSION,
+    )
+    expect(old.data.noteTypes).toEqual([])
+    expect(old.data.notes).toHaveLength(1)
+    expect(old.invalid).toBe(0)
+  })
 })

@@ -146,6 +146,9 @@
             <li>
               {m.name} →
               {t(MODEL_LABEL[m.modelType])}
+              {#if m.noteType}<span class="muted"
+                  >({t('apkg.cardsPerNote', { n: m.noteType.templates.length })})</span
+                >{/if}
               {#if m.converted}<span class="warning-text">({t('apkg.converted')})</span>{/if}
             </li>
           {/each}

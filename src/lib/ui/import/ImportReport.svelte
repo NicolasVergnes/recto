@@ -26,6 +26,9 @@
     {#if report.decksCreated.length > 0}
       <li>{t('importReport.decks', { names: report.decksCreated.join(', ') })}</li>
     {/if}
+    {#if report.noteTypesCreated.length > 0}
+      <li>{t('importReport.noteTypes', { names: report.noteTypesCreated.join(', ') })}</li>
+    {/if}
     {#if report.notesUpdated > 0}<li>
         {t('importReport.updated', { n: report.notesUpdated })}
       </li>{/if}

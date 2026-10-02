@@ -3,7 +3,7 @@ import { strFromU8, unzipSync, zipSync } from 'fflate'
 import type { Database, SqlJsStatic, SqlValue } from 'sql.js'
 import { makeCard, makeDeck } from '$lib/domain/defaults'
 import { cardOrds } from '$lib/domain/notes'
-import type { Card, Note, Review } from '$lib/domain/types'
+import type { Card, Note, NoteType, Review } from '$lib/domain/types'
 import {
   ANKI_MODEL_IDS,
   buildApkg,
@@ -656,6 +656,112 @@ describe('round trip through the Recto importer', () => {
     expect(update.updates).toHaveLength(1)
     expect(update.updates[0]?.fields.slice(2)).toEqual(['Grandes villes', 'Source'])
     expect(JSON.parse(update.updates[0]?.fields[1] ?? '').masks[0].label).toBe('Paris <1>')
+  })
+
+  it('keeps a multi-card note type (M8): Anki model, 4 cards per note, back to the same type', async () => {
+    const deck = makeDeck({ name: 'Départements' }, 'deck', now)
+    const type: NoteType = {
+      id: 'type',
+      name: 'Departements',
+      fields: ['Numero', 'Dept', 'Carte', 'Prefecture', 'Région'],
+      templates: [
+        {
+          name: 'QNumero',
+          front: 'Numéro {{Numero}} ?<br>{{Carte}}',
+          back: '{{FrontSide}}<hr id=answer>{{Dept}}',
+        },
+        {
+          name: 'QDept',
+          front: 'Numéro de {{Dept}} ?',
+          back: '{{FrontSide}}<hr id=answer>{{Numero}}',
+        },
+        { name: 'QCh-lieu', front: '{{Prefecture}} est la préfecture de ?', back: '{{Dept}}' },
+        {
+          name: 'Qcarte',
+          front: '{{#Carte}}Quel est ce département ?{{Carte}}{{/Carte}}',
+          back: '{{Dept}}',
+        },
+      ],
+      sourceId: 1342697561419,
+      createdAt: now,
+      updatedAt: now,
+    }
+    const notes: Note[] = [
+      ['01', 'Ain', '<img src="ain.png">', 'Bourg-en-Bresse', ''],
+      ['02', 'Aisne', '', 'Laon', ''],
+    ].map((fields, i) => ({
+      id: `n${i}`,
+      deckId: deck.id,
+      modelType: 'custom',
+      noteTypeId: type.id,
+      fields,
+      tags: [],
+      createdAt: now + i,
+      updatedAt: now + i,
+    }))
+    const cards = notes.flatMap((n) =>
+      cardOrds('custom', n.fields, type).map((ord) => makeCard(n, ord, `${n.id}-${ord}`, now)),
+    )
+    expect(cards).toHaveLength(7)
+    const input: ApkgExportInput = {
+      decks: [deck],
+      notes,
+      cards,
+      reviews: [],
+      media: [{ name: 'ain.png', data: PNG }],
+      noteTypes: [type],
+    }
+    const { bytes, db } = await open(input)
+    const models = JSON.parse(String(rows(db, 'SELECT models FROM col')[0]?.models)) as Record<
+      string,
+      {
+        name: string
+        flds: { name: string }[]
+        tmpls: { name: string; qfmt: string }[]
+        req: unknown
+      }
+    >
+    const model = models[String(type.sourceId)]
+    expect(model?.name).toBe('Departements')
+    expect(model?.flds.map((f) => f.name)).toEqual(type.fields)
+    expect(model?.tmpls.map((t) => t.qfmt)).toEqual(type.templates.map((t) => t.front))
+    expect(model?.req).toEqual([
+      [0, 'any', [0, 2]],
+      [1, 'any', [1]],
+      [2, 'any', [3]],
+      [3, 'any', [2]],
+    ])
+    expect(rows(db, 'SELECT ord FROM cards ORDER BY nid, ord').map((r) => r.ord)).toEqual([
+      0, 1, 2, 3, 0, 1, 2,
+    ])
+
+    // Into an empty collection: the same note type, one card per template.
+    const pkg = readApkg(bytes, SQL)
+    const ankiModel = pkg.models.find((m) => m.name === 'Departements')
+    if (!ankiModel) throw new Error('model not exported')
+    expect(convertModel(ankiModel)).toMatchObject({ modelType: 'custom' })
+    const plan = await planApkgImport(pkg, importOptions, empty, now, newId)
+    expect(plan.report.errors).toEqual([])
+    expect(plan.noteTypes?.map((t) => [t.name, t.sourceId, t.fields, t.templates])).toEqual([
+      ['Departements', type.sourceId, type.fields, type.templates],
+    ])
+    expect(plan.report.noteTypesCreated).toEqual(['Departements'])
+    expect(plan.notes.map((n) => [n.modelType, n.noteTypeId, n.fields])).toEqual(
+      notes.map((n) => ['custom', plan.noteTypes?.[0]?.id, n.fields]),
+    )
+    expect(plan.cards.map((c) => c.ord)).toEqual([0, 1, 2, 3, 0, 1, 2])
+
+    // Re-imported next to the type it created: the type is reused, the notes are skipped.
+    const again = await planApkgImport(
+      pkg,
+      importOptions,
+      { ...empty, decks: plan.decks, notes: plan.notes, noteTypes: plan.noteTypes ?? [] },
+      now,
+      newId,
+    )
+    expect(again.noteTypes).toEqual([])
+    expect(again.notes).toEqual([])
+    expect(again.report.skipped).toBe(2)
   })
 
   it('exports an empty selection as a valid package', async () => {
