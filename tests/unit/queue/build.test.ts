@@ -26,6 +26,7 @@ function input(decks: Deck[], cards: Card[], extra: Partial<QueueInput> = {}): Q
     todayReviews: [],
     globalReviewsPerDay: 500,
     retrievability: (c) => fsrs.retrievability(c, now, byId.get(c.deckId) ?? decks[0] ?? deck('x')),
+    twins: () => true,
     ...extra,
   }
 }
@@ -90,7 +91,9 @@ describe('buildQueue (03 §5)', () => {
     const d = deck('d1', 'fsrs', { newPerDay: 3 })
     const cards = Array.from({ length: 10 }, (_, i) => fresh(`n${i}`, now - (10 - i) * DAY))
     expect(buildQueue(input([d], cards)).ids).toEqual(['n0', 'n1', 'n2'])
-    const seen: TodayReview[] = [{ cardId: 'x', noteId: 'nx', deckId: 'd1', stateBefore: 0 }]
+    const seen: TodayReview[] = [
+      { cardId: 'x', noteId: 'nx', ord: 0, deckId: 'd1', stateBefore: 0 },
+    ]
     expect(buildQueue(input([d], cards, { todayReviews: seen })).ids).toEqual(['n0', 'n1'])
     expect(buildQueue(input([deck('d1', 'fsrs', { newPerDay: 0 })], cards)).ids).toEqual([])
   })
@@ -99,7 +102,9 @@ describe('buildQueue (03 §5)', () => {
     const d = deck('d1', 'fsrs', { reviewsPerDay: 4 })
     const cards = Array.from({ length: 10 }, (_, i) => review(`r${i}`))
     expect(buildQueue(input([d], cards)).counts.review).toBe(4)
-    const done: TodayReview[] = [{ cardId: 'z', noteId: 'nz', deckId: 'd1', stateBefore: 2 }]
+    const done: TodayReview[] = [
+      { cardId: 'z', noteId: 'nz', ord: 0, deckId: 'd1', stateBefore: 2 },
+    ]
     expect(buildQueue(input([d], cards, { todayReviews: done })).counts.review).toBe(3)
     expect(buildQueue(input([deck('d1')], cards, { globalReviewsPerDay: 2 })).counts.review).toBe(2)
     expect(
@@ -163,7 +168,9 @@ describe('buildQueue (03 §5)', () => {
   it('buries siblings: one card per note per day, none if a sibling was answered today', () => {
     const cards = [fresh('c0', now - DAY, 'd1', 'note', 0), fresh('c1', now - DAY, 'd1', 'note', 1)]
     expect(buildQueue(input([deck('d1')], cards)).ids).toEqual(['c0'])
-    const answered: TodayReview[] = [{ cardId: 'c0', noteId: 'note', deckId: 'd1', stateBefore: 0 }]
+    const answered: TodayReview[] = [
+      { cardId: 'c0', noteId: 'note', ord: 0, deckId: 'd1', stateBefore: 0 },
+    ]
     expect(
       buildQueue(input([deck('d1')], [cards[1] as Card], { todayReviews: answered })).ids,
     ).toEqual([])
@@ -171,6 +178,30 @@ describe('buildQueue (03 §5)', () => {
     const mixed = [card('l', { state: 1, due: now - MIN }, 'note2'), review('r', {}, 'd1')]
     mixed[1] = { ...mixed[1], noteId: 'note2' } as Card
     expect(buildQueue(input([deck('d1')], mixed)).ids).toEqual(['l'])
+  })
+
+  it('buries twins only: other siblings share the day, spaced apart', () => {
+    // ord 0 and 1 are twins (numéro → nom, nom → numéro); ord 2 is no twin (carte → nom).
+    const twins = (_: string, a: number, b: number) => a !== b && a + b === 1
+    const d = deck('d1', 'fsrs', { newPerDay: 20 })
+    const others = Array.from({ length: 12 }, (_, i) => fresh(`x${i}`, now - DAY))
+    const cards = [
+      fresh('c0', now - 2 * DAY, 'd1', 'note', 0),
+      fresh('c1', now - 2 * DAY, 'd1', 'note', 1),
+      fresh('c2', now - 2 * DAY, 'd1', 'note', 2),
+      ...others,
+    ]
+    const ids = buildQueue(input([d], cards, { twins })).ids
+    expect(ids).toContain('c0')
+    expect(ids).toContain('c2')
+    expect(ids).not.toContain('c1')
+    expect(Math.abs(ids.indexOf('c2') - ids.indexOf('c0'))).toBeGreaterThanOrEqual(10)
+    const answered: TodayReview[] = [
+      { cardId: 'c1', noteId: 'note', ord: 1, deckId: 'd1', stateBefore: 0 },
+    ]
+    const rest = [cards[0], cards[2]] as Card[]
+    const later = buildQueue(input([d], rest, { twins, todayReviews: answered })).ids
+    expect(later).toEqual(['c2'])
   })
 
   it('spaces siblings by at least 10 positions when burying is off', () => {
@@ -285,11 +316,11 @@ describe('buildQueue edge cases', () => {
       ...Array.from({ length: 6 }, (_, i) => review(`r${i}`)),
     ]
     const todayReviews: TodayReview[] = [
-      { cardId: 'a', noteId: 'na', deckId: 'd1', stateBefore: 0 },
-      { cardId: 'b', noteId: 'nb', deckId: 'd1', stateBefore: 0 },
-      { cardId: 'a', noteId: 'na', deckId: 'd1', stateBefore: 1 },
-      { cardId: 'c', noteId: 'nc', deckId: 'd1', stateBefore: 2 },
-      { cardId: 'e', noteId: 'nc', deckId: 'd1', stateBefore: 2 },
+      { cardId: 'a', noteId: 'na', ord: 0, deckId: 'd1', stateBefore: 0 },
+      { cardId: 'b', noteId: 'nb', ord: 0, deckId: 'd1', stateBefore: 0 },
+      { cardId: 'a', noteId: 'na', ord: 0, deckId: 'd1', stateBefore: 1 },
+      { cardId: 'c', noteId: 'nc', ord: 0, deckId: 'd1', stateBefore: 2 },
+      { cardId: 'e', noteId: 'nc', ord: 0, deckId: 'd1', stateBefore: 2 },
     ]
     const q = buildQueue(input([d], cards, { todayReviews }))
     expect(q.counts).toEqual({ learning: 0, review: 3, new: 1 })

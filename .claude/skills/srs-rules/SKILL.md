@@ -51,7 +51,7 @@ const { collections, reschedule_item } = f.reschedule(createEmptyCard(), history
 
 ## 3. Leitner Memory Box — invariants
 
-- Compartiments 1–7 ; `intervals = [1, 2, 7, 30, 90, 180, 365]` en mode `interval` ; règles calendaires en mode `calendar` (table dans `docs/03-SCHEDULING.md` §3.2).
+- Compartiments 1–7 ; `intervals = [1, 2, 7, 30, 90, 180, 365]`, réglables par paquet. Pas de mode calendrier du coffret (retiré en M9, `docs/03-SCHEDULING.md` §3.2).
 - Oublié → C1 ; Réussi → +1 ; Sûr → +2 ; plafond C7 ; C7 réussie reste en C7.
 - Nouvelle carte : premier succès → C2 ; premier échec → C1.
 - `alternateSides` : bascule `sideFlipped` à chaque succès uniquement.
@@ -60,7 +60,7 @@ const { collections, reschedule_item } = f.reschedule(createEmptyCard(), history
 
 ## 4. File du jour — ordre canonique
 
-1. Apprentissage dû (par `due`) → 2. Révisions en retard (R croissante / box croissante) → 3. Révisions du jour (aléatoire stable) → 4. Nouvelles (plafond, ordre du paquet), insérées tous les *k* items. Round-robin entre paquets ; sœurs (`noteId`) espacées de ≥ 10 positions ; cartes `suspended`/`retired` exclues ; jour à `dayStartHour` (04:00).
+1. Apprentissage dû (par `due`) → 2. Révisions en retard (R croissante / box croissante) → 3. Révisions du jour (aléatoire stable) → 4. Nouvelles (plafond, ordre du paquet), insérées tous les *k* items. Round-robin entre paquets ; jumelles (`areTwins`) enterrées si `burySiblings`, autres sœurs (`noteId`) espacées de ≥ 10 positions ; cartes `suspended`/`retired` exclues ; jour à `dayStartHour` (04:00).
 
 ## 5. Anti-patterns à refuser
 

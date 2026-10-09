@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addDays } from '$lib/scheduler/day'
-import {
-  boxFromStability,
-  calendarOrigin,
-  createLeitnerScheduler,
-  isBoxDue,
-  nextCalendarDue,
-} from '$lib/scheduler/leitner'
+import { boxFromStability, createLeitnerScheduler } from '$lib/scheduler/leitner'
 import type { Rating } from '$lib/domain/types'
 import { card, deck, paris } from '../../helpers/fixtures'
 
@@ -24,7 +17,7 @@ function answer(box: number, rating: Rating, patch = {}) {
   )
 }
 
-describe('Leitner transitions (03 §3.3, interval mode)', () => {
+describe('Leitner transitions (03 §3.3)', () => {
   it('new card: success → C2, failure → C1 in relearning due now', () => {
     for (const r of [3, 4] as const) {
       const { card: c } = answer(0, r)
@@ -134,78 +127,7 @@ describe('Leitner transitions (03 §3.3, interval mode)', () => {
   })
 })
 
-describe('Leitner calendar mode (03 §3.2)', () => {
-  const origin = { year: 2026, month: 0 } // deck created in January 2026
-
-  it('matches the booklet truth table over two years', () => {
-    const counts = [0, 0, 0, 0, 0, 0, 0, 0]
-    let date = { year: 2026, month: 0, day: 10, weekday: 6 }
-    for (let i = 0; i < 730; i++) {
-      for (let box = 1; box <= 7; box++) {
-        const due = isBoxDue(box, date, origin)
-        const expected = [
-          true,
-          date.day % 2 === 0,
-          date.weekday === 1,
-          date.day === 1,
-          date.day === 1 && date.month % 3 === 0,
-          date.day === 1 && date.month % 6 === 0,
-          date.day === 1 && date.month === 0 && date.year >= 2027,
-        ][box - 1]
-        expect(due, `${date.year}-${date.month + 1}-${date.day} C${box}`).toBe(expected)
-        if (due) counts[box] = (counts[box] ?? 0) + 1
-      }
-      date = addDays(date, 1)
-    }
-    // 2026-01-10 → 2028-01-09: 24 firsts of month, 8 quarterly, 4 half-yearly, 2 yearly.
-    expect(counts.slice(1)).toEqual([730, counts[2], 104, 24, 8, 4, 2])
-    expect(counts[2]).toBeGreaterThan(355)
-    expect(counts[2]).toBeLessThan(375)
-  })
-
-  it('computes the origin and the next due day', () => {
-    const cal = deck(
-      'd1',
-      'leitner',
-      { leitner: { mode: 'calendar' } },
-      paris('2026-01-10T10:00:00Z'),
-    )
-    expect(calendarOrigin(cal)).toEqual(origin)
-    // Friday 25 Sept 2026, 10:00 local.
-    const at = (box: number) => new Date(nextCalendarDue(box, now, origin, 4)).toISOString()
-    expect(at(1)).toBe('2026-09-26T02:00:00.000Z') // tomorrow 04:00
-    expect(at(2)).toBe('2026-09-26T02:00:00.000Z') // 26 is even
-    expect(at(3)).toBe('2026-09-28T02:00:00.000Z') // Monday
-    expect(at(4)).toBe('2026-10-01T02:00:00.000Z') // 1st October
-  })
-
-  it('schedules answers on the booklet dates, never twice the same day', () => {
-    const cal = deck(
-      'd1',
-      'leitner',
-      { leitner: { mode: 'calendar' } },
-      paris('2026-01-10T10:00:00Z'),
-    )
-    const iso = (ms: number) => new Date(ms).toISOString()
-    const c3 = leitner.answer(card('c', { box: 2, state: 2 }), 3, now, cal).card
-    expect(iso(c3.due)).toBe('2026-09-28T02:00:00.000Z') // C3 → Monday 28
-    const c4 = leitner.answer(card('c', { box: 3, state: 2 }), 3, now, cal).card
-    expect(iso(c4.due)).toBe('2026-10-01T02:00:00.000Z') // C4 → 1st October 04:00 (UTC+2)
-    const c5 = leitner.answer(card('c', { box: 4, state: 2 }), 3, now, cal).card
-    expect(iso(c5.due)).toBe('2026-10-01T02:00:00.000Z') // C5: October ≡ January (mod 3)
-    const c6 = leitner.answer(card('c', { box: 5, state: 2 }), 3, now, cal).card
-    expect(iso(c6.due)).toBe('2027-01-01T03:00:00.000Z') // C6: January/July, winter time
-    const c7 = leitner.answer(card('c', { box: 6, state: 2 }), 3, now, cal).card
-    expect(iso(c7.due)).toBe('2027-01-01T03:00:00.000Z') // C7: January from 2027
-    // A C1 card answered today is due tomorrow, not again today.
-    const c2 = leitner.answer(card('c', { box: 0 }), 1, now, cal)
-    expect(c2.card.due).toBe(now)
-    const back = leitner.answer(c2.card, 3, now, cal).card
-    expect(iso(back.due)).toBe('2026-09-26T02:00:00.000Z')
-    const p = leitner.preview(card('c', { box: 3, state: 2 }), now, cal)
-    expect(p[3]?.label).toBe('→ C4 · dans 6 j')
-  })
-
+describe('FSRS → Leitner conversion (03 §4)', () => {
   it('maps FSRS stability to a box', () => {
     const cases: [number, number][] = [
       [0, 1],

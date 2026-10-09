@@ -126,6 +126,37 @@ describe('daily queue from the database', () => {
     expect(q.result.ids).toEqual([cards[0].id])
     expect(q.cards.get(cards[0].id)?.state).toBe(1)
   })
+
+  it('lets non-twin cards of a custom note share the day (03 §5.2)', async () => {
+    const deck = await repo.createDeck({ name: 'Départements' }, now)
+    const type = await repo.createNoteType(
+      {
+        name: 'Departements',
+        fields: ['Numero', 'Dept', 'Carte'],
+        templates: [
+          { name: 'QNumero', front: '{{Numero}}', back: '{{Dept}}' },
+          { name: 'QDept', front: '{{Dept}}', back: '{{Numero}}' },
+          { name: 'Qcarte', front: '{{Carte}}', back: '{{Numero}} {{Dept}}' },
+        ],
+      },
+      now,
+    )
+    const { cards } = await repo.createNote(
+      {
+        deckId: deck.id,
+        modelType: 'custom',
+        noteTypeId: type.id,
+        fields: ['31', 'Haute-Garonne', 'carte'],
+        tags: [],
+      },
+      now - DAY,
+    )
+    const ids = (await loadTodayQueue(now)).result.ids
+    const ord = (o: number) => cards.find((c) => c.ord === o)?.id
+    expect(ids).toHaveLength(2)
+    expect(ids).toContain(ord(0))
+    expect(ids).toContain(ord(2))
+  })
 })
 
 describe('retire (P7) and scheduler switch', () => {

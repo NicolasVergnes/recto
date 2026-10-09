@@ -2,7 +2,7 @@
  * Daily queue (03-SCHEDULING §5, srs-rules §4). Pure: every input is a parameter.
  * Order: learning due → reviews (overdue by increasing R / box, then today's in stable random
  * order) with new cards inserted every k items; decks interleaved round-robin (P5); caps per
- * deck and global (P6); siblings buried or spaced.
+ * deck and global (P6); twin siblings buried, the others spaced.
  */
 import type { Card, CardState, Deck } from '../domain/types'
 import { dayKey, dayStart, nextDayStart } from '../scheduler/day'
@@ -12,6 +12,8 @@ import { seededShuffle } from './random'
 export interface TodayReview {
   cardId: string
   noteId: string
+  /** The card's ord, -1 when the card no longer exists. */
+  ord: number
   deckId: string
   stateBefore: CardState
 }
@@ -27,6 +29,8 @@ export interface QueueInput {
   globalReviewsPerDay: number
   /** FSRS retrievability, null when not modelled. */
   retrievability: (card: Card, deck: Deck) => number | null
+  /** Whether two cards (ords) of a note are twins (domain/notes.ts `areTwins`). */
+  twins: (noteId: string, a: number, b: number) => boolean
 }
 
 export interface QueueCounts {
@@ -95,14 +99,14 @@ export function buildQueue(input: QueueInput): QueueResult {
   const seed = dayKey(now, dayStartHour)
   const deckById = new Map(decks.map((d) => [d.id, d]))
 
-  const answeredByNote = new Map<string, Set<string>>()
+  const answeredByNote = new Map<string, Map<string, number>>()
   const newSeen = new Map<string, Set<string>>()
   const reviewsDone = new Map<string, number>()
   let reviewsDoneTotal = 0
   for (const r of input.todayReviews) {
-    let set = answeredByNote.get(r.noteId)
-    if (!set) answeredByNote.set(r.noteId, (set = new Set()))
-    set.add(r.cardId)
+    let answered = answeredByNote.get(r.noteId)
+    if (!answered) answeredByNote.set(r.noteId, (answered = new Map()))
+    answered.set(r.cardId, r.ord)
     if (r.stateBefore === 0) {
       let seen = newSeen.get(r.deckId)
       if (!seen) newSeen.set(r.deckId, (seen = new Set()))
@@ -116,9 +120,11 @@ export function buildQueue(input: QueueInput): QueueResult {
   const eligible = input.cards.filter((c) => deckById.has(c.deckId) && !c.suspended && !c.retired)
   const buryDecks = new Set(decks.filter((d) => d.settings.burySiblings).map((d) => d.id))
   const bury = (c: Card) => buryDecks.has(c.deckId)
-  // Burying (03 §5.2): a sibling was already answered today.
-  const siblingAnswered = (c: Card) =>
-    [...(answeredByNote.get(c.noteId) ?? [])].some((id) => id !== c.id)
+  // Burying (03 §5.2): a twin was already answered today.
+  const twinAnswered = (c: Card) =>
+    [...(answeredByNote.get(c.noteId) ?? [])].some(
+      ([id, ord]) => id !== c.id && input.twins(c.noteId, ord, c.ord),
+    )
 
   // 1. Learning cards due now, by due date; later ones are handed to the session.
   const learning = eligible
@@ -129,12 +135,15 @@ export function buildQueue(input: QueueInput): QueueResult {
     .sort((a, b) => a.due - b.due)
     .map((c) => ({ id: c.id, due: c.due }))
 
-  // One card per note and per day when burying (learning cards keep their slot).
-  const usedNotes = new Set(learning.map((c) => c.noteId))
+  // No two twins per day when burying (learning cards keep their slot).
+  const usedOrds = new Map<string, number[]>()
+  const use = (c: Card) => usedOrds.set(c.noteId, [...(usedOrds.get(c.noteId) ?? []), c.ord])
+  learning.forEach(use)
   const take = (c: Card) => {
     if (!bury(c)) return true
-    if (siblingAnswered(c) || usedNotes.has(c.noteId)) return false
-    usedNotes.add(c.noteId)
+    const used = usedOrds.get(c.noteId) ?? []
+    if (twinAnswered(c) || used.some((ord) => input.twins(c.noteId, ord, c.ord))) return false
+    use(c)
     return true
   }
 

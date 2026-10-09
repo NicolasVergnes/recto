@@ -20,7 +20,6 @@ export function defaultDeckSettings(): DeckSettings {
       ratingMode: 4,
     },
     leitner: {
-      mode: 'interval',
       intervals: [...DEFAULT_LEITNER_INTERVALS],
       alternateSides: true,
       allowSure: true,

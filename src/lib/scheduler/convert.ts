@@ -4,7 +4,7 @@ import { boxFromStability } from './leitner'
 
 /**
  * Converts a card when its deck changes scheduler (03 §4). Pure; the caller writes all cards in
- * one transaction after an automatic backup.
+ * one transaction.
  */
 export function convertCard(
   card: Card,

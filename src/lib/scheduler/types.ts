@@ -25,7 +25,7 @@ export interface Scheduler {
 }
 
 export interface SchedulerOptions {
-  /** Local hour at which the study day starts (Leitner calendar mode). */
+  /** Local hour at which the study day starts (Leitner study days). */
   dayStartHour: number
   /** FSRS fuzz; disabled in tests for determinism. */
   fuzz: boolean

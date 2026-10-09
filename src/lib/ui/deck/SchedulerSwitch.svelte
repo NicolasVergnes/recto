@@ -1,8 +1,6 @@
 <script lang="ts">
   import { switchScheduler } from '$lib/db/study'
   import type { Deck, SchedulerKind } from '$lib/domain/types'
-  import { BACKUP_EXTENSION, createBackup } from '$lib/export/backup'
-  import { downloadBlob, timestampedName } from '$lib/export/download'
   import { t } from '$lib/i18n'
   import { confirmAction } from '$lib/state/confirm.svelte'
   import { endSession } from '$lib/state/session.svelte'
@@ -19,7 +17,7 @@
   let scheduler = $state<SchedulerKind>(deck.scheduler)
   let busy = $state(false)
 
-  /** 03 §4: conversion in one transaction, preceded by an automatic backup. */
+  /** 03 §4: conversion in one transaction, after confirmation. */
   async function changeScheduler() {
     if (scheduler === deck.scheduler) return
     const ok = await confirmAction({
@@ -33,12 +31,7 @@
     }
     busy = true
     try {
-      const now = Date.now()
-      downloadBlob(
-        await createBackup(now),
-        timestampedName('recto-avant-conversion', BACKUP_EXTENSION, now),
-      )
-      const n = await switchScheduler(deck.id, scheduler, now)
+      const n = await switchScheduler(deck.id, scheduler, Date.now())
       endSession()
       toast(t('deckSettings.switched', { n }))
     } catch (err) {
@@ -70,7 +63,6 @@
       >
         {t('deckSettings.switch')}
       </button>
-      <span class="muted small">{t('deckSettings.switchHelp')}</span>
     </div>
   {/if}
 </fieldset>

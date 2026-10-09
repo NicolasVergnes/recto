@@ -27,7 +27,7 @@ Critères d'acceptation : chaque ligne « ✔ » doit être vérifiable par un t
 - ✔ `queue/` conforme à 03 §5 avec ses tests.
 - ✔ Écran Révision complet (04-UI §2.2) : masquage, réponse tapée, boutons avec prévisualisation, raccourcis, annuler, modifier, suspendre, retirer (P7), infos, résumé de fin, jour à 04:00.
 - ✔ Accueil : compteurs du jour et « Réviser aujourd'hui » toutes cartes confondues.
-- ✔ Paramètres de paquet : planificateur, plafonds, rétention (avec texte d'aide), mode Leitner, alternance ; changement de planificateur (03 §4) avec sauvegarde automatique.
+- ✔ Paramètres de paquet : planificateur, plafonds, rétention (avec texte d'aide), mode Leitner, alternance ; changement de planificateur (03 §4) avec sauvegarde automatique (mode Leitner et sauvegarde retirés en M9).
 - ✔ E2E 2.
 
 ## M3 — Import CSV et sauvegarde
@@ -90,3 +90,14 @@ Critères d'acceptation :
 - [x] Écran « Types de notes » : créer, modifier (champs, cartes, aperçu, confirmation des cartes créées et supprimées), supprimer un type inutilisé.
 - [x] Éditeur de notes : types personnalisés, champs nommés, aperçu de toutes les cartes.
 - [x] Tests unitaires (gabarits, réconciliation, migration, sauvegarde, import, export) et E2E bureau et mobile.
+
+## M9 — Jumelles, Memory Box sans calendrier, conversion sans sauvegarde (demande de Nicolas, 2026-10-10)
+
+Hors roadmap initiale. L'enterrement ne vise plus toutes les cartes sœurs d'une note mais seulement les jumelles (« numéro → nom » et « nom → numéro ») ; « carte → nom » et « numéro → nom » peuvent passer le même jour, par défaut. Le calendrier du coffret, utile seulement pour la boîte en papier, est retiré ; les intervalles des compartiments restent réglables. Le changement de planificateur ne télécharge plus de sauvegarde.
+
+Critères d'acceptation :
+- [x] `areTwins` (03 §5.2) : recto/verso, texte à trous, occlusion, types personnalisés (champs demandés et ajoutés) ; la file enterre les jumelles et espace les autres sœurs.
+- [x] Le paquet « Les départements français » propose chaque jour une carte « numéro / nom / préfecture » et la carte « Quel est ce département ? ».
+- [x] Memory Box : plus de choix de mode ; intervalles réglables ; sauvegardes et paquets plus anciens en mode calendrier lus en intervalles.
+- [x] Changement de planificateur : confirmation, aucun téléchargement.
+- [x] Tests unitaires (jumelles, file, chargement de la file, validation) et E2E mis à jour.

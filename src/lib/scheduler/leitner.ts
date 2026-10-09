@@ -1,69 +1,15 @@
 /**
- * Leitner "Memory Box" with seven boxes, faithful to the booklet (03-SCHEDULING §3).
+ * Leitner "Memory Box" with seven boxes and an interval per box (03-SCHEDULING §3).
  * Pure: `now` is a parameter; no Dexie, no DOM.
  */
 import type { Card, CardState, Deck, Rating } from '../domain/types'
 import { formatInterval } from '../i18n/format'
 import { t } from '../i18n/t'
-import { addDays, daysBetween, startOfDate, studyDate, type LocalDate } from './day'
+import { daysBetween } from './day'
 import type { PreviewItem, Scheduler, SchedulerOptions, SchedulerOutcome } from './types'
 
 export const MAX_BOX = 7
 const DAY_MS = 86_400_000
-
-export interface CalendarOrigin {
-  year: number
-  month: number
-}
-
-const mod = (a: number, n: number) => ((a % n) + n) % n
-
-/**
- * Booklet calendar (03 §3.2): C1 every day, C2 even days, C3 Mondays, C4 the 1st of the month,
- * C5/C6 the 1st every 3/6 months from the deck's creation month, C7 yearly from the next year.
- */
-export function isBoxDue(box: number, date: LocalDate, origin: CalendarOrigin): boolean {
-  const months = (date.year - origin.year) * 12 + (date.month - origin.month)
-  switch (box) {
-    case 1:
-      return true
-    case 2:
-      return date.day % 2 === 0
-    case 3:
-      return date.weekday === 1
-    case 4:
-      return date.day === 1
-    case 5:
-      return date.day === 1 && mod(months, 3) === 0
-    case 6:
-      return date.day === 1 && mod(months, 6) === 0
-    case 7:
-      return date.day === 1 && date.month === origin.month && date.year > origin.year
-    default:
-      return false
-  }
-}
-
-export function calendarOrigin(deck: Pick<Deck, 'createdAt'>): CalendarOrigin {
-  const d = new Date(deck.createdAt)
-  return { year: d.getFullYear(), month: d.getMonth() }
-}
-
-/** First study day strictly after today when `box` is due, as the start of that day. */
-export function nextCalendarDue(
-  box: number,
-  now: number,
-  origin: CalendarOrigin,
-  dayStartHour: number,
-): number {
-  const today = studyDate(now, dayStartHour)
-  // C7 recurs yearly: at most two years ahead.
-  for (let offset = 1; offset <= 800; offset++) {
-    const date = addDays(today, offset)
-    if (isBoxDue(box, date, origin)) return startOfDate(date, dayStartHour)
-  }
-  return startOfDate(today, dayStartHour, 365)
-}
 
 /** FSRS → Leitner conversion (03 §4): box from stability, an approximation. */
 export function boxFromStability(stability: number): number {
@@ -81,7 +27,6 @@ export function createLeitnerScheduler(options: Pick<SchedulerOptions, 'dayStart
 
   function dueFor(box: number, now: number, deck: Deck): number {
     const s = deck.settings.leitner
-    if (s.mode === 'calendar') return nextCalendarDue(box, now, calendarOrigin(deck), dayStartHour)
     const days = s.intervals[box - 1] ?? s.intervals[s.intervals.length - 1] ?? 1
     return now + days * DAY_MS
   }

@@ -6,9 +6,16 @@ import { convertCard } from '../scheduler/convert'
 import { canRetire } from '../scheduler/retire'
 import { getScheduler, type SchedulerOutcome } from '../scheduler'
 import { dayStart, nextDayStart } from '../scheduler/day'
-import { buildQueue, type QueueCounts, type QueueResult, type TodayReview } from '../queue/build'
+import {
+  buildQueue,
+  type QueueCounts,
+  type QueueInput,
+  type QueueResult,
+  type TodayReview,
+} from '../queue/build'
 import type { Card, Deck, Review, SchedulerKind } from '../domain/types'
 import { deckTree } from '../domain/decks'
+import { areTwins } from '../domain/notes'
 import { RepoError } from './errors'
 import { db, newId } from './schema'
 import { getSetting } from './settings'
@@ -79,6 +86,23 @@ export interface TodayQueue {
   dayStartHour: number
 }
 
+/** The twin relation of the notes having several of `cards` (the others need none). */
+async function twinsOf(cards: readonly Card[]): Promise<QueueInput['twins']> {
+  const cardsByNote = new Map<string, Set<string>>()
+  for (const c of cards)
+    cardsByNote.set(c.noteId, (cardsByNote.get(c.noteId) ?? new Set()).add(c.id))
+  const noteIds = [...cardsByNote].filter(([, ids]) => ids.size > 1).map(([id]) => id)
+  const notes = (await db.notes.bulkGet(noteIds)).filter((n) => n !== undefined)
+  const typeIds = [...new Set(notes.flatMap((n) => (n.noteTypeId ? [n.noteTypeId] : [])))]
+  const types = (await db.noteTypes.bulkGet(typeIds)).filter((t) => t !== undefined)
+  const typeById = new Map(types.map((t) => [t.id, t]))
+  const noteById = new Map(notes.map((n) => [n.id, n]))
+  return (noteId, a, b) => {
+    const note = noteById.get(noteId)
+    return areTwins(note?.modelType ?? 'basic_reverse', a, b, typeById.get(note?.noteTypeId ?? ''))
+  }
+}
+
 /** Loads candidates with indexed queries and builds the daily queue (03 §5). */
 export async function loadTodayQueue(now: number, deckId?: string): Promise<TodayQueue> {
   const [allDecks, dayStartHour, globalReviewsPerDay] = await Promise.all([
@@ -97,14 +121,18 @@ export async function loadTodayQueue(now: number, deckId?: string): Promise<Toda
     .where('reviewedAt')
     .aboveOrEqual(dayStart(now, dayStartHour))
     .toArray()
-  const reviewedCards = await db.cards.bulkGet([...new Set(reviews.map((r) => r.cardId))])
-  const noteOf = new Map(reviewedCards.flatMap((c) => (c ? [[c.id, c.noteId] as const] : [])))
+  const reviewedCards = (await db.cards.bulkGet([...new Set(reviews.map((r) => r.cardId))])).filter(
+    (c) => c !== undefined,
+  )
+  const cardOf = new Map(reviewedCards.map((c) => [c.id, c]))
   const todayReviews: TodayReview[] = reviews.map((r) => ({
     cardId: r.cardId,
-    noteId: noteOf.get(r.cardId) ?? r.cardId,
+    noteId: cardOf.get(r.cardId)?.noteId ?? r.cardId,
+    ord: cardOf.get(r.cardId)?.ord ?? -1,
     deckId: r.deckId,
     stateBefore: r.stateBefore,
   }))
+  const twins = await twinsOf([...candidates, ...reviewedCards])
   const schedulers = {
     fsrs: getScheduler('fsrs', { dayStartHour }),
     leitner: getScheduler('leitner', { dayStartHour }),
@@ -117,6 +145,7 @@ export async function loadTodayQueue(now: number, deckId?: string): Promise<Toda
     todayReviews,
     globalReviewsPerDay,
     retrievability: (card, deck) => schedulers[deck.scheduler].retrievability(card, now, deck),
+    twins,
   })
   // Cards the session may show: the queue and the later learning cards.
   const wanted = new Set([...result.ids, ...result.later.map((l) => l.id)])
@@ -146,8 +175,8 @@ export function countsByDeck(queue: TodayQueue): Map<string, QueueCounts> {
 }
 
 /**
- * Changes a deck's scheduler (03 §4) in a single transaction; the caller downloads a backup
- * first. Leitner → FSRS replays each card's history; FSRS → Leitner derives the box.
+ * Changes a deck's scheduler (03 §4) in a single transaction. Leitner → FSRS replays each
+ * card's history (the log is kept); FSRS → Leitner derives the box.
  */
 export async function switchScheduler(
   deckId: string,

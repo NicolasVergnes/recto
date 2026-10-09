@@ -18,7 +18,6 @@ export interface FsrsSettings {
 }
 
 export interface LeitnerSettings {
-  mode: 'interval' | 'calendar'
   /** Days per box, default [1, 2, 7, 30, 90, 180, 365]. */
   intervals: number[]
   /** Default true (faithful to the booklet). */
@@ -35,7 +34,7 @@ export interface DeckSettings {
   newOrder: 'added' | 'random'
   typedAnswer: boolean
   autoplayAudio: boolean
-  /** Default true: a single card per note and per day. */
+  /** Default true: no two twin cards of a note the same day (03 §5.2, notes.ts `areTwins`). */
   burySiblings: boolean
   fsrs: FsrsSettings
   leitner: LeitnerSettings

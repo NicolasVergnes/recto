@@ -63,9 +63,9 @@ export default defineConfig({
 ## 4. Stratégie de tests
 
 ### Unitaires (Vitest)
-- `scheduler/leitner` : toutes les transitions de 03-SCHEDULING §3.3, les deux modes, `isBoxDue` sur un calendrier de 2 ans (table de vérité), alternance des faces, C7.
+- `scheduler/leitner` : toutes les transitions de 03-SCHEDULING §3.3, intervalles par compartiment, alternance des faces, C7.
 - `scheduler/fsrs` : conversions aller-retour Card ↔ ts-fsrs, `preview` cohérent avec `answer`, rollback restaure l'état, paramètres invalides rejetés.
-- `queue` : cas de 03-SCHEDULING §5 (plafonds, entrelacement, sœurs, tri par R, changement de jour à 04:00, fuseau Europe/Paris et heure d'été).
+- `queue` : cas de 03-SCHEDULING §5 (plafonds, entrelacement, sœurs et jumelles, tri par R, changement de jour à 04:00, fuseau Europe/Paris et heure d'été).
 - `import/csv` : séparateurs, BOM, en-tête, doublons, cloze auto, rapport.
 - `import/apkg` : fixture synthétique, refus `anki21b`, replay revlog.
 - `export/backup` + `import/backup` : aller-retour bit à bit (propriété : restaurer(exporter(db)) ≡ db).

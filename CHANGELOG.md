@@ -4,6 +4,17 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 ## [Unreleased]
 
+### M9 — Jumelles, Memory Box sans calendrier, conversion sans sauvegarde
+
+#### Changed
+
+- **Enterrement des jumelles** (03 §5.2) : seules les cartes jumelles d'une note (« numéro → nom » et « nom → numéro », les deux sens d'une note recto/verso, les trous d'un même texte, les zones d'une même occlusion) ne passent plus le même jour ; les autres cartes d'une note (« carte → nom » et « numéro → nom ») peuvent être révisées le même jour, espacées d'au moins 10 cartes. Activé par défaut, réglage de paquet renommé « Pas de cartes jumelles le même jour ».
+- **Changement de planificateur** : plus de téléchargement de sauvegarde avant la conversion (la confirmation reste).
+
+#### Removed
+
+- Mode **« Calendrier du coffret »** de la Memory Box : il ne sert qu'à la boîte en papier. Les intervalles des compartiments restent réglables ; un paquet en mode calendrier (ou une sauvegarde plus ancienne) passe aux intervalles, ses échéances déjà calculées sont conservées.
+
 ### M8 — Types de notes multi-cartes
 
 #### Added

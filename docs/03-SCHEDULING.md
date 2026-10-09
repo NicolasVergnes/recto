@@ -95,23 +95,11 @@ Quand `ratingMode = 2`, l'UI n'affiche que **Encore** (`Rating.Again`) et **Bien
 
 Sept compartiments ; C1 « tous les jours », C2 « les jours pairs », C3 « tous les lundis », C4 « chaque 1er du mois », C5 « tous les 3 mois », C6 « tous les 6 mois », C7 « tous les ans ». Réponse juste → compartiment suivant, carte **retournée** (au prochain test, on interroge l'autre face). Réponse fausse ou oubliée → compartiment 1. Une carte réussie en C7 y reste. Routine « temps limité » : sûr → +2, juste avec un doute → +1, faux → retour.
 
-### 3.2 Deux modes
+### 3.2 Intervalles par compartiment
 
-**`interval` (défaut)** : chaque carte a sa propre échéance : `due = now + intervals[box-1] jours` avec `intervals = [1, 2, 7, 30, 90, 180, 365]` (approximation des périodes du livret, réglable par paquet). C'est le mode recommandé : il respecte P4 (espacement par carte) et lisse la charge.
+Chaque carte a sa propre échéance : `due = now + intervals[box-1] jours` avec `intervals = [1, 2, 7, 30, 90, 180, 365]` (approximation des périodes du livret, réglable par paquet). Ce mode respecte P4 (espacement par carte) et lisse la charge.
 
-**`calendar` (fidèle)** : reproduit le livret à la lettre. Une carte est due quand *son compartiment* est « concerné par la date du jour » :
-
-| Box | Règle | Implémentation (`isBoxDue(box, today)`) |
-|---|---|---|
-| 1 | tous les jours | `true` |
-| 2 | jours pairs | `today.getDate() % 2 === 0` |
-| 3 | tous les lundis | `today.getDay() === 1` |
-| 4 | 1er du mois | `today.getDate() === 1` |
-| 5 | tous les 3 mois | 1er des mois `m ≡ m0 (mod 3)` où `m0` = mois de création du paquet |
-| 6 | tous les 6 mois | 1er des mois `m ≡ m0 (mod 6)` |
-| 7 | tous les ans | 1er du mois `m0`, à partir de l'année suivant la création |
-
-Une carte n'est pas due deux fois le même jour : `lastReview` du jour ⇒ non due. `due` est alors calculé comme la prochaine date où `isBoxDue` est vrai (pour l'affichage et les prévisions). Le mode `calendar` est proposé avec l'avertissement : « fidèle au coffret ; la charge est irrégulière (le 1er du mois qui tombe un lundi cumule quatre compartiments) ».
+Le calendrier du coffret (C2 les jours pairs, C3 le lundi, C4 le 1er du mois…) n'est pas proposé : il n'existe que pour gérer à la main une boîte en papier, et rend la charge irrégulière (M9, demande de Nicolas du 2026-10-10). Un paquet réglé ainsi avant M9 passe aux intervalles ; les échéances déjà calculées sont conservées.
 
 ### 3.3 Notation et transitions
 
@@ -122,8 +110,8 @@ Une carte n'est pas due deux fois le même jour : `lastReview` du jour ⇒ non d
 | 4 (Easy) | Sûr | `box = min(box + 2, 7)` (routine « temps limité » du livret ; si `allowSure = false`, `ratings()` renvoie `[1, 3]`) |
 
 - Nouvelle carte (`box = 0`, `state = New`) : première réponse → Réussi/Sûr ⇒ `box = 2` (elle a été vue une fois et réussie) et `state = Review` ; Oublié ⇒ `box = 1`, `state = Relearning`, `due = now` comme ci-dessus.
-- `alternateSides = true` : à chaque **succès**, `sideFlipped = !sideFlipped` ; l'écran de révision montre alors le verso comme question. En cas d'échec, la face reste la même (le livret retourne aussi la fiche, mais retester le même sens après un échec est pédagogiquement préférable et c'est ce que fait le mode `interval` ; documenter ce choix dans l'UI d'aide). Pour les notes `cloze`, `alternateSides` est ignoré.
-- Carte en C7 réussie : reste en C7, `due` = + 365 j (ou prochaine date annuelle en mode `calendar`).
+- `alternateSides = true` : à chaque **succès**, `sideFlipped = !sideFlipped` ; l'écran de révision montre alors le verso comme question. En cas d'échec, la face reste la même (le livret retourne aussi la fiche, mais retester le même sens après un échec est pédagogiquement préférable ; ce choix est expliqué dans l'aide des paramètres). Pour les notes `cloze`, `alternateSides` est ignoré.
+- Carte en C7 réussie : reste en C7, `due` = + `intervals[6]` j (365 par défaut).
 - `retrievability()` renvoie `null` (Leitner ne modélise pas R) ; les statistiques de rétention réelle restent calculables depuis le journal.
 
 ### 3.4 Répétition intra-séance des échecs
@@ -138,14 +126,14 @@ Comme dans le livret (« replacez la fiche dans le compartiment 1, derrière les
 
 - Leitner → FSRS : pour chaque carte avec journal, rejouer l'historique avec `const { reschedule_item } = f.reschedule(createEmptyCard(), history)` et prendre `reschedule_item?.card` (les ratings Leitner 1/3/4 sont des ratings FSRS valides) ; sans journal, `createEmptyCard()` avec `due` conservé.
 - FSRS → Leitner : `box` déduit de la stabilité : `S < 1.5 → 1`, `< 4 → 2`, `< 15 → 3`, `< 50 → 4`, `< 120 → 5`, `< 250 → 6`, sinon `7` ; `due` conservé. Documenter que cette conversion est une approximation.
-- L'opération est une transaction unique, précédée d'une sauvegarde automatique.
+- L'opération est une transaction unique, après confirmation. Elle ne télécharge pas de sauvegarde (M9) : le journal des révisions, intact, permet de revenir à FSRS en rejouant l'historique.
 
 ## 5. File du jour (`src/lib/queue`)
 
 Entrée : `now`, `dayStartHour`, paquets sélectionnés (défaut : tous), plafonds. Sortie : liste ordonnée d'`id` de cartes + compteurs.
 
 1. `todayStart = début de journée local (dayStartHour)` ; `dueLimit = fin de journée`.
-2. Exclure `suspended`, `retired`, et, si `deck.settings.burySiblings` (défaut `true`), les cartes dont une sœur (`noteId`) a déjà été répondue aujourd'hui (enterrement des sœurs). Si l'option est désactivée, les sœurs restent dans la file mais espacées d'au moins 10 positions (étape 6).
+2. Exclure `suspended`, `retired`, et, si `deck.settings.burySiblings` (défaut `true`), les cartes dont une **jumelle** a déjà été répondue ou retenue aujourd'hui (enterrement des jumelles, M9). Deux cartes d'une note sont jumelles quand la question de chacune montre ce que l'autre demande (`areTwins`, `domain/notes.ts`) : les deux sens d'une note recto/verso, tous les trous d'un texte à trous, toutes les zones d'une occlusion ; pour un type personnalisé, la question de l'une contient un champ que la réponse de l'autre ajoute, et réciproquement (« numéro → nom » et « nom → numéro » sont jumelles, « carte → nom » et « numéro → nom » ne le sont pas). Les sœurs non jumelles restent dans la file, espacées d'au moins 10 positions (étape 6) ; si l'option est désactivée, toutes les sœurs restent, espacées de même.
 3. **Apprentissage** : `state ∈ {Learning, Relearning}` et `due ≤ now` (intra-journée, ordre par `due`).
 4. **Révisions** : `state = Review` et `due < dueLimit`, limitées par `reviewsPerDay` du paquet puis `globalReviewsPerDay`. Ordre : retards (`due < todayStart`) d'abord, par récupérabilité croissante (FSRS) ou par `box` croissante puis `due` (Leitner) ; puis cartes du jour, ordre aléatoire stable (graine = date).
 5. **Nouvelles** : `state = New`, limitées par `newPerDay` moins les nouvelles déjà vues aujourd'hui, ordre `newOrder`.

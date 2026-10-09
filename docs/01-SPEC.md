@@ -64,7 +64,7 @@ Ces règles s'appliquent à tout le produit ; le skill `srs-rules` les détaille
 ### 5.1 Paquets (decks)
 
 - Arborescence à un niveau (paquet → sous-paquet) suffisante en V0 ; nom, description, couleur/emoji optionnels.
-- Paramètres par paquet : planificateur (`fsrs` | `leitner`), nouvelles cartes/jour (défaut 20), révisions/jour (défaut 200), ordre des nouvelles cartes (ordre d'ajout | aléatoire), rétention cible (FSRS), pas d'apprentissage (FSRS), mode Leitner (`interval` | `calendar`), alternance des faces (Leitner, défaut activé), bouton « Sûr » (Leitner, défaut activé), enterrement des sœurs (défaut activé).
+- Paramètres par paquet : planificateur (`fsrs` | `leitner`), nouvelles cartes/jour (défaut 20), révisions/jour (défaut 200), ordre des nouvelles cartes (ordre d'ajout | aléatoire), rétention cible (FSRS), pas d'apprentissage (FSRS), intervalles des compartiments (Leitner), alternance des faces (Leitner, défaut activé), bouton « Sûr » (Leitner, défaut activé), enterrement des cartes jumelles (défaut activé).
 - Changer de planificateur sur un paquet existant convertit l'état des cartes (règles en 03-SCHEDULING §4).
 - Actions : créer, renommer, déplacer, fusionner, exporter, supprimer (avec confirmation et compte de cartes ; le journal de révisions est conservé dans la sauvegarde exportée automatiquement avant suppression).
 
@@ -90,7 +90,7 @@ Une **note** porte le contenu ; une note génère une ou plusieurs **cartes** (c
 
 ### 5.3 Révision
 
-- **File du jour** : cartes en apprentissage dues, puis révisions dues (retards d'abord, triés par récupérabilité croissante), puis nouvelles cartes jusqu'aux plafonds ; les paquets sont entrelacés (round-robin) et par défaut une seule carte par note et par jour (« enterrement des sœurs », option `burySiblings` par paquet ; désactivée, les sœurs sont seulement espacées dans la file).
+- **File du jour** : cartes en apprentissage dues, puis révisions dues (retards d'abord, triés par récupérabilité croissante), puis nouvelles cartes jusqu'aux plafonds ; les paquets sont entrelacés (round-robin) et par défaut deux cartes jumelles d'une note (« numéro → nom » et « nom → numéro ») ne sont pas révisées le même jour (option `burySiblings` par paquet, 03 §5.2) ; les autres cartes d'une même note le peuvent, espacées dans la file.
 - Écran de carte : recto plein écran, bouton « Afficher la réponse » (Espace/Entrée), puis verso + Extra, boutons de notation avec l'intervalle prévu affiché (FSRS) ou le compartiment cible (Leitner). Raccourcis 1–4 (FSRS) ou 1–3 (Leitner). Mode « réponse tapée » par paquet : champ de saisie, comparaison caractère par caractère, notation proposée mais toujours modifiable.
 - Audio : lecture automatique à l'affichage du côté qui le contient (option), bouton de relecture (R).
 - Barre de progression de la séance (restant : apprentissage / révisions / nouvelles). Chronomètre par carte (durée enregistrée dans le journal, plafonnée à 60 s pour les stats).

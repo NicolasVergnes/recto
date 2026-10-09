@@ -5,5 +5,5 @@ import { Blob as NodeBlob } from 'node:buffer'
 // Blobs do. Use Node's native Blob so stored media round-trip like in a browser.
 Object.defineProperty(globalThis, 'Blob', { value: NodeBlob, configurable: true, writable: true })
 
-// Domain tests reason in the user's time zone (dayStartHour, Leitner calendar, DST): Paris.
+// Domain tests reason in the user's time zone (dayStartHour, study days, DST): Paris.
 process.env.TZ = 'Europe/Paris'

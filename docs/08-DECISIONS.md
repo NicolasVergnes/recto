@@ -23,7 +23,7 @@ Conséquences : quota large (jusqu'à ~60 % du disque sur Chrome/Safari 17+) ; d
 ## ADR-004 — FSRS-6 via `ts-fsrs` comme planificateur principal, Leitner comme mode fidèle (2026-09-25)
 
 Contexte : le benchmark ouvert (10 000 utilisateurs Anki, 350 M de révisions) place FSRS loin devant SM-2/Leitner ; la méthode Memory Box est celle de départ de l'utilisateur.
-Décision : `ts-fsrs` 5.x (FSRS-6, MIT) pour FSRS ; implémentation maison de Leitner à 7 compartiments avec deux modes (`interval`, `calendar`). Pas de SM-2.
+Décision : `ts-fsrs` 5.x (FSRS-6, MIT) pour FSRS ; implémentation maison de Leitner à 7 compartiments avec un intervalle par compartiment (le mode `calendar` du livret, présent jusqu'en M8, est retiré en M9). Pas de SM-2.
 Conséquences : les paramètres FSRS sont d'abord ceux par défaut ; optimisation locale en V1 avec `fsrs-browser`. Les deux planificateurs partagent une interface et le même journal.
 
 ## ADR-005 — Formats ouverts : CSV, `.apkg` legacy en import, sauvegarde zip JSON (2026-09-25)

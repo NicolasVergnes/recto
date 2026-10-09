@@ -58,13 +58,12 @@ describe('backup validators', () => {
         settings: {
           ...deck.settings,
           fsrs: { ...deck.settings.fsrs, params: Array(21).fill(0.5), ratingMode: 2 },
-          leitner: { ...deck.settings.leitner, mode: 'calendar' },
         },
       }),
-    ).toMatchObject({
-      parentId: 'p',
-      settings: { fsrs: { ratingMode: 2 }, leitner: { mode: 'calendar' } },
-    })
+    ).toMatchObject({ parentId: 'p', settings: { fsrs: { ratingMode: 2 } } })
+    // The booklet calendar mode (removed in M9) is dropped from older backups.
+    const old = { ...deck.settings.leitner, mode: 'calendar' }
+    expect(readDeck({ ...deck, settings: { ...deck.settings, leitner: old } })).toEqual(deck)
     expect(readNote(note)).toEqual(note)
     expect(readCard(card)).toEqual(card)
     expect(readCard({ ...card, flag: undefined })?.flag).toBe(0)
@@ -128,7 +127,7 @@ describe('backup validators', () => {
     expect(d?.settings).toMatchObject({
       newOrder: 'added',
       fsrs: { learningSteps: ['10m', '10m'], params: null, ratingMode: 4 },
-      leitner: { intervals: [1, 2, 7, 30, 90, 180, 365], mode: 'interval' },
+      leitner: { intervals: [1, 2, 7, 30, 90, 180, 365] },
     })
     expect(readAll('x', readSetting)).toEqual({ rows: [], invalid: 0 })
   })

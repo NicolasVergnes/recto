@@ -1,12 +1,24 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-10-02 · Branche : m8-note-types (créée depuis la branche M7 `claude/compassionate-albattani-f8qn5u`, non fusionnée) · **V1 (M6) fusionnée sur `main` (PR #1)** · **M7 (vue mosaïque) et M8 (types de notes multi-cartes) livrés**, en attente de relecture et de fusion par Nicolas (M7 d'abord)
+Dernière mise à jour : 2026-10-10 · Branche : m9-review-tweaks (créée depuis `m8-note-types`, non fusionnée ni poussée) · **V1 (M6) fusionnée sur `main` (PR #1)** · **M7 (vue mosaïque), M8 (types de notes multi-cartes) et M9 (jumelles, Memory Box sans calendrier) livrés**, en attente de relecture et de fusion par Nicolas
 
 ## Jalon en cours
 
-Aucun : M8 est terminé, en attente de relecture et de fusion (après M7). Suivant : V2 (synchronisation par fichier, empaquetage Android — voir « Écarts »), et la dette ci-dessous.
+Aucun : M9 est terminé, en attente de relecture et de fusion (après M7 et M8, dont il dépend). Suivant : V2 (synchronisation par fichier, empaquetage Android — voir « Écarts »), et la dette ci-dessous.
 
 ## Terminé
+
+### M9 — Jumelles, Memory Box sans calendrier, conversion sans sauvegarde (2026-10-10)
+
+Demande de Nicolas du 2026-10-10 (07-ROADMAP « M9 ») : ne pas réviser le même jour deux cartes jumelles (« numéro → nom », « nom → numéro ») mais permettre, par défaut, « numéro → nom » et « carte → nom » ; retirer le calendrier du coffret (utile seulement pour la boîte en papier) en gardant les intervalles réglables ; ne plus forcer le téléchargement d'une sauvegarde au changement de planificateur. Plan suivi : 1) domaine `areTwins` (`domain/notes.ts`) et ses tests ; 2) file (`queue/build.ts`, entrée `twins`, `TodayReview.ord`) ; 3) chargement (`db/study.ts`, notes et types des seules notes à plusieurs cartes candidates) ; 4) retrait du mode `calendar` (type, planificateur, validation, écran, libellés) ; 5) `SchedulerSwitch` sans sauvegarde ; 6) docs (SPEC, 02, 03, 04, 06, 07, 08, skill `srs-rules`) ; 7) `npm run verify`.
+
+Critères (07-ROADMAP M9) :
+
+- ✔ `areTwins` : recto/verso, trous, occlusion, types personnalisés — `tests/unit/domain/twins.test.ts` (les 4 modèles réels du paquet des départements : QNumero, QDept et QCh-lieu jumelles entre elles, Qcarte jumelle d'aucune).
+- ✔ File : jumelles enterrées, autres sœurs le même jour à ≥ 10 positions, jumelle répondue aujourd'hui — `tests/unit/queue/build.test.ts` › « buries twins only… » ; chargement depuis la base avec un type personnalisé — `tests/unit/db/study.test.ts` › « lets non-twin cards of a custom note share the day ».
+- ✔ Memory Box sans mode : `tests/unit/scheduler/leitner.test.ts` (intervalles), `tests/unit/import/validate.test.ts` (ancien `mode: 'calendar'` ignoré) ; E2E `review.spec.ts` › « Memory Box decks… » (intervalle C1 éditable, pas de « Calendrier du coffret »).
+- ✔ Changement de planificateur sans téléchargement — même E2E (aucun événement `download`).
+- ✔ `npm run verify` vert (une première passe a échoué sur `export-apkg.spec.ts` en projet mobile, délai de 5 s dépassé sous charge ; 12/12 en relance isolée puis E2E complets verts).
 
 ### M8 — Types de notes multi-cartes (2026-10-02)
 
@@ -196,9 +208,15 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 - L'éditeur n'explique pas la syntaxe des formules ; les syntaxes Anki `[$]…[/$]`, `[$$]…[/$$]` et `[latex]` restent en source.
 - M8 : pas de réordonnancement des champs ni des modèles de cartes dans l'éditeur de types (ajout, renommage, suppression seulement) ; les filtres avancés d'Anki (`furigana:`, `tts:`…) rendent la valeur brute ; le CSS des types Anki est ignoré ; l'import CSV ne crée pas de note d'un type personnalisé.
 - M8 : `NoteTypeEditor.svelte` et `NoteTypes.svelte` restent sous 200 lignes ; `CardPreview` sert à la fois l'éditeur de notes et celui de types.
+- E2E `export-apkg.spec.ts` (mobile) : a dépassé une fois son délai de 5 s pendant `npm run verify` (M9) ; à surveiller, sans changer le délai tant que ce n'est pas reproductible.
 - Couverture globale ≈ 91 % des lignes (seuils de 90 % appliqués au domaine : scheduler, queue, import) ; `db/`, `export/` et `domain/` couverts sans seuil.
 
 ## Décisions prises en session
+
+- 2026-10-10 (M9) : deux cartes sont **jumelles** quand la question de chacune montre ce que l'autre demande. Type personnalisé : la question de A contient un champ que la réponse de B ajoute (champs du verso absents du recto) et réciproquement. Trous et occlusion restent toujours jumeaux (chaque question montre les réponses des autres ; en occlusion « tout cacher » c'est moins vrai, mais la règle reste simple et prudente). Alternative écartée : une liste de paires à cocher dans l'éditeur de types (plus de réglages, rien d'automatique à l'import).
+- 2026-10-10 (M9) : le réglage `burySiblings` garde son nom et sa valeur par défaut (`true`) mais n'enterre plus que les jumelles ; désactivé, toutes les sœurs restent, espacées. Pas de migration : les paquets existants passent d'eux-mêmes au nouveau comportement. Alternative écartée : un choix à trois valeurs (aucune / jumelles / toutes).
+- 2026-10-10 (M9) : `leitner.mode` des paquets déjà enregistrés n'est pas effacé de la base (champ ignoré, pas de version Dexie 3) ; la relecture d'une sauvegarde le laisse tomber.
+- 2026-10-10 (M9) : note sans fiche trouvée au chargement de la file : ses cartes sont traitées comme jumelles (comportement d'avant M9).
 
 - 2026-09-29 (M7) : un seul contrôle « Affichage » à trois positions (Liste, Mosaïque, Mosaïque recto-verso) plutôt que deux niveaux ; `browserView` mémorisé en silence (comme `lastDeckId`), `flipStyle` réglé dans Paramètres › Affichage, défaut « Rotation horizontale » (choix de Nicolas). Deux clés `settings` de plus, sans changement de `schemaVersion` (la sauvegarde exporte les lignes telles quelles).
 - 2026-09-29 (M7) : la mosaïque réutilise `VirtualList` avec des lignes de N tuiles de hauteur fixe (15 rem ; 21 rem pour une tuile recto-verso seule sur sa ligne, faces empilées), N calculé depuis la largeur du conteneur (`columnsFor`, largeur minimale 18 rem / 26 rem) ; `overscan` 1 ligne pour rester sous les 50 URL d'objets du cache média. `VirtualList` reçoit un rôle ARIA (`list` hors tableau : un `rowgroup` sans `table` est invalide). Alternative écartée : grille CSS avec `content-visibility` (5 000 `CardContent` montés).
@@ -293,6 +311,8 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## Écarts par rapport aux docs
 
+- M9 : 03 §3.2 (calendrier du coffret), §4 (sauvegarde automatique avant conversion) et §5.2 (une carte par note et par jour) ainsi que SPEC §5 changent à la demande de Nicolas ; docs mises à jour. `07-ROADMAP` M2 garde son historique avec une mention du retrait.
+
 - M8 : 05 §2.3 disait qu'un type Anki à plus de 3 champs ou aux modèles non basiques devient `basic` avec ses champs fusionnés dans Extra ; il devient désormais un type personnalisé (doc mise à jour, ADR-010). Le texte à trous Anki à plus de 2 champs garde la fusion.
 
 - M7 : 04-UI §4 limitait les transitions à 150 ms sans animation décorative ; le retournement d'une tuile (≤ 400 ms, style réglable, « Sans animation » disponible) est une demande explicite de Nicolas — 04-UI §4 mis à jour.
@@ -310,6 +330,8 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 - Chromium ne passe pas la requête du favicon SVG par le service worker : hors ligne, la console signale l'échec de `logo.svg` (sans effet sur l'application, les icônes du manifeste sont précachées).
 
 ## À vérifier manuellement par Nicolas
+
+- M9 — paquet des départements : sur deux ou trois jours, une même note ne doit jamais proposer « numéro → nom » et « nom → numéro » (ni « préfecture → … ») le même jour, mais peut proposer l'une d'elles et « Quel est ce département ? ». Changer le planificateur d'un paquet : confirmation seule, aucun fichier téléchargé. Paramètres d'un paquet Memory Box : plus de choix « Calendrier du coffret », intervalles modifiables.
 
 - M8 — supprimer l'ancien paquet des départements (importé en Basique, champs dans Extra), réimporter `Les_dpartements_franais.apkg` : 404 cartes, une note s'ouvre avec ses 5 champs ; réviser quelques cartes des 4 sortes ; dans « Types de notes », ajouter une carte au type puis la retirer (confirmation des cartes créées et supprimées) ; exporter le paquet pour Anki et le rouvrir dans Anki (type « Departements » mis à jour, pas copié).
 

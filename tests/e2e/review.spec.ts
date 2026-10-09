@@ -69,10 +69,16 @@ test('Memory Box decks show boxes under the rating buttons', async ({ page }) =>
   await page.goto('/#/')
   await page.getByRole('link', { name: 'Boîte', exact: true }).click()
   await page.getByLabel('Memory Box (7 compartiments)').check()
-  page.once('download', () => undefined)
+  // No backup is downloaded before the conversion any more (M9).
+  let downloads = 0
+  page.on('download', () => downloads++)
   await page.getByRole('button', { name: 'Changer de planificateur' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Changer de planificateur' }).click()
   await expect(page.getByText(/Planificateur changé/)).toBeVisible()
+  expect(downloads).toBe(0)
+  // Box intervals stay editable; the booklet calendar is gone.
+  await expect(page.getByLabel('Compartiment 1', { exact: true })).toHaveValue('1')
+  await expect(page.getByText(/Calendrier du coffret/)).toHaveCount(0)
 
   await page.getByRole('link', { name: 'Réviser ce paquet' }).click()
   await page.getByRole('button', { name: 'Afficher la réponse' }).click()

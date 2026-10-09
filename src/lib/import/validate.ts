@@ -50,7 +50,6 @@ function readSettings(x: unknown): DeckSettings | null {
       ratingMode: f.ratingMode === 2 ? 2 : 4,
     },
     leitner: {
-      mode: l.mode === 'calendar' ? 'calendar' : 'interval',
       intervals:
         isNumArray(l.intervals) && l.intervals.length === 7 ? l.intervals : d.leitner.intervals,
       alternateSides: isBool(l.alternateSides) ? l.alternateSides : d.leitner.alternateSides,

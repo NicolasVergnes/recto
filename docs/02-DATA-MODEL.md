@@ -63,7 +63,7 @@ export interface DeckSettings {
   newOrder: 'added' | 'random'
   typedAnswer: boolean         // réponse tapée
   autoplayAudio: boolean
-  burySiblings: boolean        // défaut true : une seule carte par note et par jour
+  burySiblings: boolean        // défaut true : pas deux cartes jumelles le même jour (03 §5.2)
   fsrs: {
     requestRetention: number   // 0.80–0.97, défaut 0.90
     maximumInterval: number    // jours, défaut 365 (écho au compartiment 7 « tous les ans » ; réglable)
@@ -73,7 +73,6 @@ export interface DeckSettings {
     ratingMode: 4 | 2          // 4 boutons ou 2 (Encore/Bien)
   }
   leitner: {
-    mode: 'interval' | 'calendar'  // voir 03-SCHEDULING §3
     intervals: number[]            // jours, défaut [1, 2, 7, 30, 90, 180, 365]
     alternateSides: boolean        // défaut true (fidèle au livret)
     allowSure: boolean             // défaut true : bouton « Sûr » (+2)

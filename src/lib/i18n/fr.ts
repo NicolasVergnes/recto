@@ -321,8 +321,6 @@ export const fr = {
     retention: 'Rétention cible',
     retentionHelp:
       '90 % : vous oublierez une carte sur dix à chaque révision. Au-dessus de 95 %, la charge explose.',
-    leitnerInterval: 'Intervalles par carte (recommandé)',
-    leitnerCalendar: 'Calendrier du coffret (fidèle, charge irrégulière)',
     alternateSides: 'Alterner recto/verso à chaque réussite',
     box: 'Compartiment {n}',
     boxTarget: '→ C{n} · {when}',
@@ -511,11 +509,10 @@ export const fr = {
     scheduler: 'Planificateur',
     switch: 'Changer de planificateur',
     switchTitle: 'Changer de planificateur',
-    switchHelp: 'Une sauvegarde est téléchargée avant la conversion.',
     toFsrs:
-      'L’historique de chaque carte sera rejoué avec FSRS pour estimer sa mémoire. Une sauvegarde complète est téléchargée avant.',
+      'L’historique de chaque carte sera rejoué avec FSRS pour estimer sa mémoire ; ses échéances seront recalculées.',
     toLeitner:
-      'Chaque carte sera placée dans un compartiment déduit de sa stabilité FSRS (approximation) ; ses échéances sont conservées. Une sauvegarde complète est téléchargée avant.',
+      'Chaque carte sera placée dans un compartiment déduit de sa stabilité FSRS (approximation) ; ses échéances sont conservées.',
     switched:
       'Planificateur changé ({n} carte convertie)|Planificateur changé ({n} cartes converties)',
     newPerDay: 'Nouvelles cartes par jour',
@@ -525,7 +522,7 @@ export const fr = {
     orderRandom: 'Aléatoire',
     typedAnswer: 'Réponse tapée (comparaison caractère par caractère)',
     autoplay: 'Lecture automatique des sons',
-    bury: 'Une seule carte par note et par jour (cartes sœurs enterrées)',
+    bury: 'Pas de cartes jumelles le même jour (par exemple « numéro → nom » et « nom → numéro »)',
     fsrsTitle: 'FSRS',
     workload: 'Charge de révision estimée : ×{x} par rapport à 90 %.',
     maxInterval: 'Intervalle maximal (jours)',
@@ -538,8 +535,6 @@ export const fr = {
     fourButtons: '4 boutons (Encore, Difficile, Bien, Facile)',
     twoButtons: '2 boutons (Encore, Bien)',
     leitnerTitle: 'Memory Box',
-    calendarWarning:
-      'Fidèle au coffret ; la charge est irrégulière (le 1er du mois qui tombe un lundi cumule quatre compartiments).',
     intervals: 'Intervalles des compartiments',
     intervalsHelp:
       'Jours avant la prochaine révision pour une carte arrivant dans chaque compartiment.',
