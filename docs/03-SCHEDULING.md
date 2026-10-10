@@ -25,6 +25,10 @@ export interface Scheduler {
 
 `answer` est pure ; `repo.recordReview(outcome, durationMs)` écrit carte + journal dans une transaction. `preview` sert à afficher « 10 min · 1 j · 4 j · 12 j » sur les boutons.
 
+### 1.1 Sens de la question (les deux planificateurs, M11)
+
+Une note `basic` a une seule carte, posée dans les deux sens : pas de carte inverse jumelle. Avec `deck.settings.alternateSides` (défaut `true`), chaque **succès** (note ≥ 2) bascule `sideFlipped` (`scheduler/sides.ts`, appelé par les deux `answer`) ; l'écran de révision montre alors le verso comme question, avec l'indicateur « ↔ Sens inversé ». En cas d'échec, la face reste la même (le livret retourne aussi la fiche, mais retester le même sens après un échec est pédagogiquement préférable ; ce choix est expliqué dans l'aide des paramètres). Une note `oneWay` (« Ne jamais retourner cette note ») est toujours posée Recto → Verso. Les notes `cloze`, `image_occlusion` et `custom` gardent le sens de leurs modèles. La réponse tapée compare la face non demandée : rien à taper quand c'est une image (`canTypeAnswer`). Avec FSRS, les deux sens partagent un même état mémoire (stabilité, difficulté) : c'est le prix d'une seule carte, accepté par Nicolas (M11) ; l'optimiseur voit une seule carte.
+
 ## 2. FSRS-6 via `ts-fsrs` 5.x
 
 ### 2.1 Construction du planificateur
@@ -110,7 +114,7 @@ Le calendrier du coffret (C2 les jours pairs, C3 le lundi, C4 le 1er du mois…)
 | 4 (Easy) | Sûr | `box = min(box + 2, 7)` (routine « temps limité » du livret ; si `allowSure = false`, `ratings()` renvoie `[1, 3]`) |
 
 - Nouvelle carte (`box = 0`, `state = New`) : première réponse → Réussi/Sûr ⇒ `box = 2` (elle a été vue une fois et réussie) et `state = Review` ; Oublié ⇒ `box = 1`, `state = Relearning`, `due = now` comme ci-dessus.
-- `alternateSides = true` : à chaque **succès**, `sideFlipped = !sideFlipped` ; l'écran de révision montre alors le verso comme question. En cas d'échec, la face reste la même (le livret retourne aussi la fiche, mais retester le même sens après un échec est pédagogiquement préférable ; ce choix est expliqué dans l'aide des paramètres). Pour les notes `cloze`, `alternateSides` est ignoré.
+- Sens de la question : réglage commun aux deux planificateurs, voir §1.1.
 - Carte en C7 réussie : reste en C7, `due` = + `intervals[6]` j (365 par défaut).
 - `retrievability()` renvoie `null` (Leitner ne modélise pas R) ; les statistiques de rétention réelle restent calculables depuis le journal.
 
@@ -133,7 +137,7 @@ Comme dans le livret (« replacez la fiche dans le compartiment 1, derrière les
 Entrée : `now`, `dayStartHour`, paquets sélectionnés (défaut : tous), plafonds. Sortie : liste ordonnée d'`id` de cartes + compteurs.
 
 1. `todayStart = début de journée local (dayStartHour)` ; `dueLimit = fin de journée`.
-2. Exclure `suspended`, `retired`, et, si `deck.settings.burySiblings` (défaut `true`), les cartes dont une **jumelle** a déjà été répondue ou retenue aujourd'hui (enterrement des jumelles, M9). Deux cartes d'une note sont jumelles quand la question de chacune montre ce que l'autre demande (`areTwins`, `domain/notes.ts`) : les deux sens d'une note recto/verso, tous les trous d'un texte à trous, toutes les zones d'une occlusion ; pour un type personnalisé, la question de l'une contient un champ que la réponse de l'autre ajoute, et réciproquement (« numéro → nom » et « nom → numéro » sont jumelles, « carte → nom » et « numéro → nom » ne le sont pas). Les sœurs non jumelles restent dans la file, espacées d'au moins 10 positions (étape 6) ; si l'option est désactivée, toutes les sœurs restent, espacées de même.
+2. Exclure `suspended`, `retired`, et, si `deck.settings.burySiblings` (défaut `true`), les cartes dont une **jumelle** a déjà été répondue ou retenue aujourd'hui (enterrement des jumelles, M9). Deux cartes d'une note sont jumelles quand la question de chacune montre ce que l'autre demande (`areTwins`, `domain/notes.ts`) : tous les trous d'un texte à trous, toutes les zones d'une occlusion ; pour un type personnalisé, la question de l'une contient un champ que la réponse de l'autre ajoute, et réciproquement (« numéro → nom » et « nom → numéro » sont jumelles, « carte → nom » et « numéro → nom » ne le sont pas). Les sœurs non jumelles restent dans la file, espacées d'au moins 10 positions (étape 6) ; si l'option est désactivée, toutes les sœurs restent, espacées de même.
 3. **Apprentissage** : `state ∈ {Learning, Relearning}` et `due ≤ now` (intra-journée, ordre par `due`).
 4. **Révisions** : `state = Review` et `due < dueLimit`, limitées par `reviewsPerDay` du paquet puis `globalReviewsPerDay`. Ordre : retards (`due < todayStart`) d'abord, par récupérabilité croissante (FSRS) ou par `box` croissante puis `due` (Leitner) ; puis cartes du jour, ordre aléatoire stable (graine = date).
 5. **Nouvelles** : `state = New`, limitées par `newPerDay` moins les nouvelles déjà vues aujourd'hui, ordre `newOrder`.

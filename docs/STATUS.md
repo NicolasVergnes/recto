@@ -1,12 +1,26 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-10-10 · Branche : m10-tech-debt (créée depuis `m9-review-tweaks`, non fusionnée ni poussée) · **V1 (M6) fusionnée sur `main` (PR #1)** · **M7 (vue mosaïque), M8 (types de notes multi-cartes) et M9 (jumelles, Memory Box sans calendrier) livrés**, en attente de relecture et de fusion par Nicolas · **M10 (dette technique) livré**, en attente de relecture et de fusion (après M7, M8 et M9)
+Dernière mise à jour : 2026-10-11 · Branche : m11-two-way-cards (créée depuis `m10-tech-debt`, non fusionnée ni poussée) · **V1 (M6) fusionnée sur `main` (PR #1)** · **M7 (vue mosaïque), M8 (types de notes multi-cartes) et M9 (jumelles, Memory Box sans calendrier) livrés**, en attente de relecture et de fusion par Nicolas · **M10 (dette technique) et M11 (une carte, deux sens) livrés**, en attente de relecture et de fusion (dans l'ordre M7 → M11)
 
 ## Jalon en cours
 
-Aucun : M10 est terminé, en attente de relecture et de fusion (après M7, M8 et M9, dont il dépend). Suivant : V2 (synchronisation par fichier, empaquetage Android), à confirmer par Nicolas, et la dette ci-dessous.
+Aucun : M11 est terminé, en attente de relecture et de fusion (après M7 à M10, dont il dépend). Suivant : V2 (synchronisation par fichier, empaquetage Android), à confirmer par Nicolas, et la dette ci-dessous.
 
 ## Terminé
+
+### M11 — Une carte, deux sens ; champs protégés ; plus d'emoji (2026-10-11)
+
+Demande de Nicolas : supprimer l'emoji des paquets ; supprimer « Basique + inversé » (une carte doit pouvoir être vue dans les deux sens sans créer de carte jumelle ; le sens est un réglage) ; rendre « retourner après chaque réussite » disponible en FSRS ; empêcher de supprimer un champ utilisé par les cartes (le champ « Numero » des départements disparaissait des cartes sans avertissement) ; la réponse tapée doit suivre le sens de la carte (nom ↔ photo : rien à taper quand la réponse est la photo). Plan validé : sens réglé par paquet avec exception par note, activé partout par défaut, aucune migration.
+
+Critères (07-ROADMAP M11) :
+
+- ✔ `basic_reverse` retiré (types, éditeur, CSV, import et export Anki, validation) ; le type inversé d'Anki et la colonne CSV « basique + inverse » donnent une note `basic` à une carte — `tests/unit/import/apkg.test.ts`, `apkg-large.test.ts`, `apkg-robust.test.ts`, `csv.test.ts`, `validate.test.ts`.
+- ✔ `DeckSettings.alternateSides` (défaut `true`) pour les deux planificateurs (`scheduler/sides.ts` `flipAfter`) ; `Note.oneWay` (« Ne jamais retourner cette note ») ; rendu dans `renderCard` — `tests/unit/scheduler/fsrs.test.ts`, `leitner.test.ts`, `tests/unit/domain/notes.test.ts`, `tests/unit/db/repo.test.ts`, E2E `review.spec.ts` (« an FSRS deck asks a basic card both ways »), `create-notes.spec.ts`.
+- ✔ Réponse tapée : face non demandée comparée, rien à taper quand c'est une image — `notes.test.ts` › « types the side that is not asked ».
+- ✔ Champs : retrait refusé si une carte l'utilise (`fieldUsers`), référence inconnue refusée (`unknownReference`, `noteTypeUnknownField`), contenu perdu annoncé (`NoteTypeEditPlan.lost`), renommage qui ne prend plus les références d'un autre champ — `tests/unit/domain/note-types.test.ts`, `tests/unit/note-type-draft.test.ts`, E2E `note-types.spec.ts` (« a field used by a card stays »). Vérifié sur le vrai paquet des départements : retirer « Numero » est refusé, les cartes « QNumero », « QDept », « QCh-lieu », « Qcarte » sont nommées.
+- ✔ Emoji retiré ; sauvegardes anciennes lisibles (valeur ignorée) — `validate.test.ts`.
+- ✔ Interopérabilité : échantillon, `--fsrs`, type personnalisé et aller-retour des départements revérifiés avec le moteur d'Anki 26.9.3, verdict OK (7 notes, 8 cartes ; `tests/interop/README.md`).
+- ✔ `npm run verify` vert : check 0 erreur 0 avertissement, lint, format, 516 tests unitaires (couverture 91,9 % des lignes), build, E2E 103 réussis et 1 ignoré (bureau et mobile).
 
 ### M10 — Dette technique (2026-10-10)
 
@@ -233,7 +247,7 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 ## Reste à faire / dettes
 
 - V2 (SPEC §2, §3) : synchronisation par fichier (dossier choisi par File System Access API, un fichier par appareil, et surtout des « pierres tombales » pour propager les suppressions : sans elles, une fusion ressuscite les notes supprimées ; étude faite en M6, non implémentée) et empaquetage Android (TWA ou Capacitor ; l'hébergement sous `/recto/` impose un `assetlinks.json` à la racine du domaine pour une TWA).
-- Composants de plus de 200 lignes restants : `Heatmap.svelte` (271), `ApkgImport.svelte` (249), `Cards.svelte` (223), `ColumnChart.svelte` (210), `Editor.svelte` (205), `CardMosaic.svelte` (203). Une copie de travail M10 a commencé l'extraction de la navigation clavier commune des deux graphiques (`src/lib/ui/charts/keys.ts`, non intégrée).
+- Composants de plus de 200 lignes restants : `Heatmap.svelte` (271), `ApkgImport.svelte` (249), `Cards.svelte` (223), `ColumnChart.svelte` (210), `Editor.svelte` (206, une ligne de plus en M11 pour « Ne jamais retourner »), `CardMosaic.svelte` (203). Une copie de travail M10 a commencé l'extraction de la navigation clavier commune des deux graphiques (`src/lib/ui/charts/keys.ts`, non intégrée).
 - Optimiseur : évaluation sur les révisions mêmes de l'entraînement (pas de validation croisée, comme Anki) ; il fonctionne dans Firefox (M10) ; Safari non testé (le WebKit de Playwright refuse les `Blob` dans IndexedDB).
 - Les filtres avancés d'Anki (`furigana:`, `tts:`…) rendent la valeur brute ; `[latex]…[/latex]` reste en source (LaTeX en mode texte, que KaTeX ne rend pas).
 - Réimport Anki : un type dont on a réordonné ou modifié les champs dans Recto n'est plus reconnu (ses notes sont ignorées et comptées) ; un type dont Anki a changé les champs aussi. L'export rend le style d'un type importé, pas les options de ses champs (police, taille).
@@ -243,6 +257,10 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## Décisions prises en session
 
+- 2026-10-11 (M11) : sens des cartes réglé par paquet (`alternateSides`, sorti de `leitner`, défaut `true` pour FSRS comme Memory Box) avec une exception par note (`oneWay`, notes basiques seulement) ; les textes à trous, masques et types personnalisés gardent le sens de leurs modèles (un type personnalisé définit ses sens par ses modèles). Avec FSRS, les deux sens partagent un état mémoire : prix accepté d'une seule carte. Aucune migration (phase de test, choix de Nicolas) : une note `basic_reverse` d'une ancienne base ou sauvegarde n'est plus lue ; l'ancienne clé `leitner.alternateSides` est ignorée (défaut).
+- 2026-10-11 (M11) : export Anki d'une note posée dans les deux sens en « Recto · Basique » (une carte), **et non** en « Basique et inversée » comme prévu au plan : le réglage étant activé par défaut, toutes les notes basiques auraient changé de type dans Anki d'un export à l'autre, ce que l'import d'Anki gère mal (copie « + » ou type remplacé, vu en M10). Anki ne sait pas retourner une carte : dans Anki, la note n'est posée que Recto → Verso.
+- 2026-10-11 (M11) : retirer un champ cité par un modèle est refusé (message nommant les cartes) plutôt que de réécrire les modèles ; tout modèle citant un champ absent invalide le type (garde-fou aussi pour les renommages), sauf les champs spéciaux d'Anki. Retirer un champ rempli mais non cité est permis, après confirmation chiffrée.
+- 2026-10-11 (M11) : libellé « Ne jamais retourner cette note » (et non « Toujours dans ce sens (recto → verso) », qui aurait aussi répondu au libellé « Recto » des champs pour les lecteurs d'écran et les tests).
 - 2026-10-10 (M10) : périmètre de la session autonome = la dette de « Reste à faire » sans décision produit ; la V2 attend la confirmation de Nicolas (empaquetage : comptes et clés de signature). Branche créée depuis `m9-review-tweaks`.
 - 2026-10-10 (M10) : une seule fonction pure `reconcileCards` (`domain/notes.ts`) décide des cartes gardées, créées et supprimées d'une note pour l'éditeur, le réimport, la fusion et le CSV ; à `ord` égal, la carte la plus récemment révisée reste. Le plan d'import porte `removedCards`, écrits avec la note dans la transaction de son lot.
 - 2026-10-10 (M10) : fusion de sauvegarde, `ord` manquant : la carte de la sauvegarde est adoptée (remappée sur la note locale si celle-ci a été trouvée par guid Anki), avec ses révisions (P10), plutôt qu'une carte neuve ; un contenu qui ne produit aucune carte laisse les cartes telles quelles.
@@ -350,6 +368,7 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## Écarts par rapport aux docs
 
+- M11 : 01-SPEC §5.1 (emoji, alternance Leitner seulement) et §5.2 (`basic_reverse` à deux cartes) changent à la demande de Nicolas ; 02, 03 (§1.1 nouveau, §3.3, §5.2), 04, 05, 06 §4 (E2E 1 : 4 cartes au lieu de 5), ADR-010 et `srs-rules` mis à jour. Écart au plan validé : l'export Anki garde « Recto · Basique » (décision ci-dessus).
 - M10 : 05 §1 disait que l'import CSV ne crée jamais de note d'un type personnalisé, 05 §2.3 qu'une note réimportée dont les cartes changent est ignorée, ADR-010 que le CSS des types Anki est ignoré (il l'est encore à l'affichage) : docs mises à jour (02, 04, 05, 06, ADR-005, ADR-009, ADR-010), comportement décrit tel qu'il est.
 - M10 : favicon hors ligne (écart noté en M5, plus bas) non reproduit avec Playwright (Chromium sans tête et nouveau mode sans tête : aucune requête en échec ni erreur console) ; `index.html` non modifié. À observer dans un vrai Chrome.
 
@@ -373,6 +392,9 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## À vérifier manuellement par Nicolas
 
+- M11 — Effacer les données de test (« Tout effacer ») avant d'essayer : les anciennes notes « Basique + inverse » ne sont plus lues. Réviser une note basique dans un paquet FSRS : après une réussite, elle revient retournée (« ↔ Sens inversé ») ; cocher « Ne jamais retourner cette note » sur une autre.
+- M11 — Réponse tapée sur une note nom ↔ photo : pas de saisie quand la réponse attendue est la photo, saisie du nom quand la photo est la question.
+- M11 — Types de notes : dans « Departements », tenter de retirer « Numero » (refus nommant les 4 cartes) ; retirer un champ rempli que les modèles n'utilisent plus (confirmation avec le nombre de notes).
 - M10 — Anki : réimporter dans Anki (desktop) un export Recto d'un paquet venu d'Anki, avec les réglages par défaut : le type garde son style (vérifié avec le moteur sans interface, pas à l'écran). Dans Recto : réimporter un paquet Anki après y avoir ajouté un trou, voir la nouvelle carte ; fusionner une sauvegarde du téléphone sur le PC après des modifications des deux côtés.
 - M10 — Firefox sur le PC : ajouter plusieurs notes à la suite, y compris la toute première (une demande d'autorisation de stockage peut apparaître : l'éditeur doit rester utilisable sans y répondre) ; importer un CSV dans le type « Departements ».
 - M10 — Éditeur de types : monter et descendre champs et cartes au clavier, avec un lecteur d'écran (annonce de la position).

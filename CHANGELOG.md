@@ -4,6 +4,23 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 ## [Unreleased]
 
+### M11 — Une carte, deux sens
+
+#### Added
+
+- **Interroger dans les deux sens** : réglage de chaque paquet, **FSRS compris** (il n'existait que pour Memory Box), activé par défaut. Une réussite retourne la carte, un échec la repose dans le même sens ; l'indicateur « ↔ Sens inversé » le signale.
+- Éditeur de notes : « Ne jamais retourner cette note » pour une note basique dont la seconde face ne permet pas de répondre.
+- Éditeur de types : retirer un champ qu'une carte utilise est refusé, avec le nom des cartes concernées ; un modèle qui cite un champ inexistant empêche l'enregistrement, avec la carte et le champ ; retirer un champ rempli annonce, avant l'enregistrement, combien de notes perdent son contenu.
+
+#### Removed
+
+- Le type **« Basique + inverse »** : une note basique a une seule carte, posée dans les deux sens. Le type inversé d'Anki et la colonne CSV « basique + inverse » donnent une note basique ; l'export Anki n'écrit plus le type « Recto · Basique et inversée ». Pas de migration : les notes et sauvegardes de ce type ne sont plus lues.
+- L'**emoji** des paquets (doublon du nom) ; une sauvegarde qui en a reste lisible.
+
+#### Fixed
+
+- Éditeur de types : supprimer un champ cité par un modèle s'enregistrait sans avertissement et la carte n'affichait plus ce champ ; renommer un champ en un nom déjà pris, puis à nouveau, pouvait réécrire les références d'un autre champ.
+
 ### M10 — Dette technique
 
 #### Added

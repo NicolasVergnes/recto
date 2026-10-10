@@ -54,7 +54,7 @@ const { collections, reschedule_item } = f.reschedule(createEmptyCard(), history
 - Compartiments 1–7 ; `intervals = [1, 2, 7, 30, 90, 180, 365]`, réglables par paquet. Pas de mode calendrier du coffret (retiré en M9, `docs/03-SCHEDULING.md` §3.2).
 - Oublié → C1 ; Réussi → +1 ; Sûr → +2 ; plafond C7 ; C7 réussie reste en C7.
 - Nouvelle carte : premier succès → C2 ; premier échec → C1.
-- `alternateSides` : bascule `sideFlipped` à chaque succès uniquement.
+- `alternateSides` (réglage du paquet, FSRS et Leitner depuis M11) : bascule `sideFlipped` à chaque succès uniquement ; une note basique n'a qu'une carte, posée dans les deux sens (plus de `basic_reverse`), sauf `oneWay`.
 - Échec re-présenté dans la séance après ≥ 10 cartes ; chaque réponse journalisée.
 - `retrievability()` renvoie `null` ; les stats de rétention réelle viennent du journal (`stateBefore = Review`).
 

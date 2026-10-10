@@ -115,3 +115,15 @@ Critères d'acceptation :
 - [ ] Aucun composant de plus de 200 lignes ; comportement inchangé (E2E existants verts). — partiel : 6 composants restent au-delà (STATUS « Reste à faire »).
 - [x] Favicon sans requête réseau ; export d'un type personnalisé vérifié avec le moteur d'Anki ; suite E2E lancée dans Firefox et WebKit, écarts corrigés ou consignés. — favicon : défaut non reproductible avec Playwright, `index.html` non modifié (STATUS « Écarts »).
 - [x] `npm run verify` vert.
+
+## M11 — Une carte, deux sens ; champs protégés ; plus d'emoji (demande de Nicolas, 2026-10-11)
+
+Hors roadmap initiale. Une carte doit pouvoir être vue dans les deux sens sans en créer une seconde, jumelle : le type « Basique + inversé » disparaît, le sens se règle par paquet (avec une exception par note) et vaut pour FSRS comme pour Memory Box. Dans l'éditeur de types, un champ utilisé par une carte ne se supprime plus en silence. L'emoji des paquets, doublon du nom, est retiré. Aucune migration des données (phase de test).
+
+Critères d'acceptation :
+- [x] Plus de type `basic_reverse` (éditeur, CSV, import et export Anki) ; une note basique a une seule carte ; le type inversé d'Anki et la colonne CSV « basique + inverse » donnent une note basique.
+- [x] « Interroger dans les deux sens » (défaut activé) dans les réglages de tout paquet, FSRS compris : une réussite retourne la carte, un échec la repose dans le même sens ; « Ne jamais retourner cette note » dans l'éditeur.
+- [x] Réponse tapée : la face non demandée est comparée ; rien à taper quand c'est une image.
+- [x] Éditeur de types : retirer un champ qu'une carte utilise est refusé avec les cartes concernées ; un modèle citant un champ inexistant empêche l'enregistrement ; le contenu perdu des champs retirés est annoncé avant l'enregistrement.
+- [x] Emoji retiré (création, détails, affichage) ; les sauvegardes qui en ont restent lisibles.
+- [x] Tests unitaires et E2E mis à jour ; `npm run verify` vert.

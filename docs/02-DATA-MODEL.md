@@ -43,14 +43,13 @@ Règles de migration : chaque changement de schéma = nouvelle `version(n)` avec
 ```ts
 // src/lib/domain/types.ts
 export type SchedulerKind = 'fsrs' | 'leitner'
-export type ModelType = 'basic' | 'basic_reverse' | 'cloze' | 'image_occlusion' | 'custom'   // image_occlusion : V1 ; custom : M8 (§2.2)
+export type ModelType = 'basic' | 'cloze' | 'image_occlusion' | 'custom'   // image_occlusion : V1 ; custom : M8 (§2.2) ; basic_reverse retiré en M11
 
 export interface Deck {
   id: string
   name: string
   description?: string
   parentId?: string | null
-  emoji?: string
   scheduler: SchedulerKind
   settings: DeckSettings
   createdAt: number
@@ -64,6 +63,7 @@ export interface DeckSettings {
   typedAnswer: boolean         // réponse tapée
   autoplayAudio: boolean
   burySiblings: boolean        // défaut true : pas deux cartes jumelles le même jour (03 §5.2)
+  alternateSides: boolean      // défaut true : carte retournée après chaque réussite, FSRS et Leitner (03 §1.1, M11)
   fsrs: {
     requestRetention: number   // 0.80–0.97, défaut 0.90
     maximumInterval: number    // jours, défaut 365 (écho au compartiment 7 « tous les ans » ; réglable)
@@ -74,7 +74,6 @@ export interface DeckSettings {
   }
   leitner: {
     intervals: number[]            // jours, défaut [1, 2, 7, 30, 90, 180, 365]
-    alternateSides: boolean        // défaut true (fidèle au livret)
     allowSure: boolean             // défaut true : bouton « Sûr » (+2)
     failToBox: 1                   // fixe en V0
   }
@@ -89,6 +88,7 @@ export interface Note {
                                // image_occlusion: [image, masques JSON, en-tête, extra] (§2.1) ;
                                // custom: un par champ de son type, dans l'ordre
   tags: string[]
+  oneWay?: boolean             // basic seulement : toujours Recto → Verso, même si le paquet alterne (M11)
   source?: string
   sourceGuid?: string          // guid Anki à l'import (déduplication : `sourceGuid ?? id`, guid écrit par l'export .apkg, 05 §4)
   createdAt: number
@@ -118,7 +118,7 @@ export interface Card {
   learningSteps: number
   // Leitner
   box: number                  // 0 = non applicable / nouvelle, 1..7
-  sideFlipped: boolean         // Leitner alternateSides : true = on teste verso→recto
+  sideFlipped: boolean         // alternateSides du paquet : true = on teste verso→recto (notes basic)
   createdAt: number
 }
 
@@ -198,13 +198,14 @@ export interface NoteType {
 
 - Les modèles utilisent un sous-ensemble de la syntaxe Anki (`src/lib/domain/templates.ts`, ADR-010) : `{{Champ}}`, `{{FrontSide}}` (verso), sections `{{#Champ}}…{{/Champ}}` et `{{^Champ}}…{{/Champ}}`, filtres `text:` (sans HTML), `type:` (réponse tapée : rien n'est rendu, Recto compare), tout autre filtre rend la valeur ; un champ inconnu et les spéciaux (`{{Tags}}`, `{{Deck}}`…) rendent une chaîne vide. Le rendu passe par `sanitize()` comme tout champ (les styles en ligne d'Anki sont retirés ; `<hr>` est permis). Le CSS du type Anki est ignoré.
 - Une note a une carte par modèle dont la question rendue n'est pas vide et diffère de la question rendue avec tous les champs vides (règle d'Anki). En révision, le verso rendu remplace la question (il la reprend par `{{FrontSide}}`) ; pas d'Extra ; Leitner n'échange jamais les faces.
-- Modifier un type (`updateNoteType`, une transaction) : champs ajoutés (vides), retirés ou réordonnés (M10) dans toutes ses notes, cartes déplacées avec leur modèle quand un modèle est retiré ou réordonné (leur `ord` suit), créées ou supprimées selon la règle ci-dessus (journal conservé). Renommer un champ réécrit ses références dans les modèles. Un type utilisé par une note ne se supprime pas.
+- Modifier un type (`updateNoteType`, une transaction) : champs ajoutés (vides), retirés ou réordonnés (M10) dans toutes ses notes, cartes déplacées avec leur modèle quand un modèle est retiré ou réordonné (leur `ord` suit), créées ou supprimées selon la règle ci-dessus (journal conservé). Renommer un champ réécrit ses références dans les modèles (sauf si l'ancien ou le nouveau nom est vide ou porté par un autre champ, sans casse : aucune référence n'est alors fusionnée ni prise à un autre champ). Un type utilisé par une note ne se supprime pas.
+- Champs utilisés (M11) : un champ cité par un modèle (`{{Champ}}`, section ou filtre) ne se retire pas, l'éditeur nomme les cartes qui l'utilisent (`fieldUsers`) ; un modèle qui cite un champ absent du type (hors champs spéciaux d'Anki : `FrontSide`, `Tags`, `Type`, `Deck`, `Subdeck`, `Card`, `CardFlag`) rend le type invalide (`noteTypeUnknownField`, avec la carte et le champ). Retirer un champ non cité qui a du contenu est annoncé avant l'enregistrement, avec le nombre de notes qui le perdent (`NoteTypeEditPlan.lost`).
 - Réordonner (M10) : chaque champ et chaque modèle de l'édition (`NoteTypeEdit`) garde son indice d'origine `from` (null s'il est nouveau) ; c'est cet indice, non le nom ni la position, qui relie la valeur d'une note à son champ et une carte à son modèle. Enregistrer écrit donc `fields` de chaque note dans le nouvel ordre des champs et donne à chaque carte pour `ord` la nouvelle position de son modèle : même `id`, même planification, même journal ; aucune carte n'est créée ni supprimée par un simple changement d'ordre (les modèles désignent les champs par leur nom, la question de chaque carte reste la même). Déplacer, renommer, ajouter et retirer se combinent dans un même enregistrement. L'ordre des champs est celui du formulaire de note et de l'export Anki ; le premier champ est la clé de détection des doublons de l'éditeur de notes. Annuler (`undoReview`) une réponse donnée avant un déplacement rend à la carte sa planification d'avant mais garde son `ord` actuel, comme son paquet actuel : la pile d'annulation d'une séance de révision survit à la navigation vers l'éditeur de types.
 
 ## 3. Invariants (à tester)
 
 1. `card.deckId === note.deckId` pour toute carte (mise à jour en transaction lors d'un déplacement de note).
-2. Une note `basic` a exactement une carte `ord=0` ; `basic_reverse` exactement `ord=0` et `ord=1` ; `cloze` une carte par index distinct présent dans le texte ; `image_occlusion` une carte par groupe de masques distinct ; `custom` une carte par modèle de carte dont la question n'est pas vide (§2.2) (les cartes des index, groupes ou modèles supprimés sont supprimées avec leur journal conservé). Vaut aussi pour une note mise à jour hors de l'éditeur (M10) : réimport `.apkg` (05 §2.3) et fusion de sauvegarde (§5) réconcilient ses cartes avec son nouveau contenu, avec la même fonction `reconcileCards` que l'éditeur (deux cartes de même `ord` n'en font plus qu'une).
+2. Une note `basic` a exactement une carte `ord=0`, posée dans les deux sens par `sideFlipped` (M11 : plus de `basic_reverse` ni de carte jumelle) ; `cloze` une carte par index distinct présent dans le texte ; `image_occlusion` une carte par groupe de masques distinct ; `custom` une carte par modèle de carte dont la question n'est pas vide (§2.2) (les cartes des index, groupes ou modèles supprimés sont supprimées avec leur journal conservé). Vaut aussi pour une note mise à jour hors de l'éditeur (M10) : réimport `.apkg` (05 §2.3) et fusion de sauvegarde (§5) réconcilient ses cartes avec son nouveau contenu, avec la même fonction `reconcileCards` que l'éditeur (deux cartes de même `ord` n'en font plus qu'une).
 3. `reviews` est *append-only* : aucune fonction ne modifie ni ne supprime une ligne, sauf `rollback` de la dernière révision d'une carte (suppression de cette seule ligne) et la suppression explicite d'une carte/note par l'utilisateur.
 4. Une carte `retired` ou `suspended` n'apparaît jamais dans la file.
 5. Tout `Media.name` référencé dans un champ existe dans `media` (vérifié à l'import ; un utilitaire « médias orphelins » liste les entrées non référencées).

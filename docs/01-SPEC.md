@@ -63,8 +63,8 @@ Ces règles s'appliquent à tout le produit ; le skill `srs-rules` les détaille
 
 ### 5.1 Paquets (decks)
 
-- Arborescence à un niveau (paquet → sous-paquet) suffisante en V0 ; nom, description, couleur/emoji optionnels.
-- Paramètres par paquet : planificateur (`fsrs` | `leitner`), nouvelles cartes/jour (défaut 20), révisions/jour (défaut 200), ordre des nouvelles cartes (ordre d'ajout | aléatoire), rétention cible (FSRS), pas d'apprentissage (FSRS), intervalles des compartiments (Leitner), alternance des faces (Leitner, défaut activé), bouton « Sûr » (Leitner, défaut activé), enterrement des cartes jumelles (défaut activé).
+- Arborescence à un niveau (paquet → sous-paquet) suffisante en V0 ; nom et description facultative (l'emoji, prévu à l'origine, a été retiré en M11 : il faisait doublon avec le nom).
+- Paramètres par paquet : planificateur (`fsrs` | `leitner`), nouvelles cartes/jour (défaut 20), révisions/jour (défaut 200), ordre des nouvelles cartes (ordre d'ajout | aléatoire), rétention cible (FSRS), pas d'apprentissage (FSRS), intervalles des compartiments (Leitner), interrogation dans les deux sens (les deux planificateurs, défaut activé, M11), bouton « Sûr » (Leitner, défaut activé), enterrement des cartes jumelles (défaut activé).
 - Changer de planificateur sur un paquet existant convertit l'état des cartes (règles en 03-SCHEDULING §4).
 - Actions : créer, renommer, déplacer, fusionner, exporter, supprimer (avec confirmation et compte de cartes ; le journal de révisions est conservé dans la sauvegarde exportée automatiquement avant suppression).
 
@@ -74,11 +74,12 @@ Une **note** porte le contenu ; une note génère une ou plusieurs **cartes** (c
 
 | Type | Champs | Cartes générées |
 |---|---|---|
-| `basic` | Recto, Verso, Extra (optionnel) | 1 : Recto → Verso |
-| `basic_reverse` | Recto, Verso, Extra | 2 : Recto → Verso et Verso → Recto |
+| `basic` | Recto, Verso, Extra (optionnel) | 1, posée dans les deux sens : retournée après chaque réussite si le paquet interroge dans les deux sens (défaut), sauf note « Ne jamais retourner » (M11, 03 §1.1) |
 | `cloze` | Texte, Extra | 1 par index `{{cN::…}}` (syntaxe Anki, indice optionnel `{{c1::réponse::indice}}`) |
 | `image_occlusion` (V1) | Image, masques, En-tête, Extra | 1 par groupe de masques rectangulaires (02 §2.1) ; importé/exporté vers le type « Image Occlusion » d'Anki ≥ 23.10 |
 | `custom` (M8) | Champs nommés de son type de note | 1 par modèle de carte dont le recto n'est pas vide, comme Anki (02 §2.2) ; types créés dans « Types de notes » ou importés d'Anki tels quels |
+
+Le type « Basique + inversé » (deux cartes jumelles par note) a été retiré en M11 : une carte doit pouvoir être vue dans les deux sens sans en créer une seconde.
 
 - Les champs sont du HTML restreint (gras, italique, listes, `<img src="nom">`, `[sound:nom]`, formules `\( … \)` (en ligne) et `\[ … \]` (bloc), ainsi que les écritures d'Anki `[$]…[/$]` et `[$$]…[/$$]` (M10), rendues par KaTeX en V1 seulement — en V0 affichées telles quelles ; `[latex]…[/latex]` reste en source, 04-UI §4).
 - Tags libres (chaîne, séparés par des espaces), autocomplétion.

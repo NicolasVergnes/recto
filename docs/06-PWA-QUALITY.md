@@ -76,7 +76,7 @@ export default defineConfig({
 Horloge : tous les modules reçoivent `now: number` en paramètre ; les tests utilisent `vi.useFakeTimers()` et des dates fixes, jamais `Date.now()` direct dans le domaine.
 
 ### E2E (Playwright, Chromium mobile + desktop)
-1. Premier lancement → créer un paquet → ajouter 3 notes (basique, inverse, cloze) → 5 cartes visibles dans le navigateur.
+1. Premier lancement → créer un paquet → ajouter 3 notes (basique, basique « Ne jamais retourner », cloze à deux trous) → 4 cartes visibles dans le navigateur.
 2. Réviser : réponse masquée, afficher, noter, compteur décrémenté, annuler, re-noter.
 3. Import CSV d'exemple → 101 cartes → réviser 5.
 4. Import `.apkg` fixture → rapport correct.
