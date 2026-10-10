@@ -1,12 +1,15 @@
 /**
  * Restoring a `.recto.zip` (02-DATA-MODEL §5, 05 §3). « Remplacer » empties then refills every
  * table in ONE transaction (nothing is lost if it fails). « Fusionner » matches entities by `id`
- * (and `sourceGuid` for notes): the most recent `updatedAt` wins, review logs are unioned by id.
+ * (and `sourceGuid` for notes): the most recent `updatedAt` wins, review logs are unioned by id,
+ * and the cards of every merged note are reconciled with the content that won (invariant 2).
  */
+import { makeCard } from '../domain/defaults'
+import { byRecency, cardOrds, reconcileCards } from '../domain/notes'
 import { normalizeText } from '../domain/text'
-import type { Card, Deck, Media, Note, NoteType, Review } from '../domain/types'
+import type { Card, Deck, Media, Note, NoteType } from '../domain/types'
 import type { ParsedBackup } from '../import/backup'
-import { db } from './schema'
+import { db, newId } from './schema'
 
 export type RestoreMode = 'replace' | 'merge'
 
@@ -14,7 +17,10 @@ export interface RestoreReport {
   decks: number
   notes: number
   notesUpdated: number
+  /** Cards added: the backup's for an ord the note lacked, and new ones for an ord no copy had. */
   cards: number
+  /** Local cards deleted because the winning content of their note no longer generates them. */
+  cardsRemoved: number
   reviews: number
   media: number
   missingFiles: number
@@ -43,8 +49,9 @@ const ALL = () => [db.decks, db.noteTypes, db.notes, db.cards, db.reviews, db.me
 export async function restoreBackup(
   parsed: ParsedBackup,
   mode: RestoreMode,
+  now = Date.now(),
 ): Promise<RestoreReport> {
-  return mode === 'replace' ? replace(parsed) : merge(parsed)
+  return mode === 'replace' ? replace(parsed) : merge(parsed, now)
 }
 
 async function replace(parsed: ParsedBackup): Promise<RestoreReport> {
@@ -65,27 +72,87 @@ async function replace(parsed: ParsedBackup): Promise<RestoreReport> {
     notes: data.notes.length,
     notesUpdated: 0,
     cards: data.cards.length,
+    cardsRemoved: 0,
     reviews: data.reviews.length,
     media: media.rows.length,
     missingFiles: media.missing,
   }
 }
 
-const cardRecency = (c: Card) => [c.lastReview ?? -1, c.reps] as const
+/**
+ * The cards of the notes a merge kept or updated (`merged`: backup note id → the note as stored).
+ * Every such note ends up with exactly the cards its winning content generates (invariant 2):
+ * - candidates are its local cards and the backup's, moved onto it when it was matched by Anki
+ *   guid under another id (its deck follows the note, invariant 1); copies of one card, same id,
+ *   resolve to the most recently reviewed one;
+ * - then `reconcileCards`: a card whose ord the content no longer generates, or a second card for
+ *   an ord (two devices made the card of the same new hole), is deleted unless it is the most
+ *   recently reviewed, its review log kept; an ord left without any card gets a new one.
+ * Returns the ids of the backup cards looked at: their log is merged even when the card is not.
+ */
+async function mergeCards(
+  parsed: ParsedBackup,
+  merged: ReadonlyMap<string, Note>,
+  types: ReadonlyMap<string, NoteType>,
+  now: number,
+  report: RestoreReport,
+): Promise<Set<string>> {
+  const localCards = await db.cards.toArray()
+  const stored = new Map(localCards.map((c) => [c.id, c]))
+  const notes = new Map([...merged.values()].map((n) => [n.id, n]))
+  const candidates = new Map<string, Map<string, Card>>()
+  const offer = (card: Card) => {
+    const copies = candidates.get(card.noteId) ?? new Map<string, Card>()
+    const have = copies.get(card.id)
+    if (!have || byRecency(card, have) < 0) copies.set(card.id, card)
+    candidates.set(card.noteId, copies)
+  }
+  for (const card of localCards) if (notes.has(card.noteId)) offer(card)
+  const looked = new Set<string>()
+  for (const raw of parsed.data.cards) {
+    const note = merged.get(raw.noteId)
+    if (!note) continue
+    looked.add(raw.id)
+    offer({ ...raw, noteId: note.id, deckId: note.deckId })
+  }
 
-function newer(a: Card, b: Card): boolean {
-  const [ra, na] = cardRecency(a)
-  const [rb, nb] = cardRecency(b)
-  return ra > rb || (ra === rb && na > nb)
+  const puts: Card[] = []
+  const deletes: string[] = []
+  for (const note of notes.values()) {
+    const cards = [...(candidates.get(note.id)?.values() ?? [])]
+    const type = note.noteTypeId ? types.get(note.noteTypeId) : undefined
+    const wanted = cardOrds(note.modelType, note.fields, type)
+    // Content that generates no card is not something the app writes: its cards are left alone.
+    const result =
+      wanted.length > 0 ? reconcileCards(cards, wanted) : { keep: cards, create: [], remove: [] }
+    for (const card of result.keep) {
+      const was = stored.get(card.id)
+      if (!was) report.cards++
+      if (was !== card || card.deckId !== note.deckId) puts.push({ ...card, deckId: note.deckId })
+    }
+    for (const ord of result.create) {
+      puts.push(makeCard(note, ord, newId(), now))
+      report.cards++
+    }
+    for (const card of result.remove) {
+      if (!stored.has(card.id)) continue
+      deletes.push(card.id)
+      report.cardsRemoved++
+    }
+  }
+  await db.cards.bulkDelete(deletes)
+  await db.cards.bulkPut(puts)
+  return looked
 }
 
-async function merge(parsed: ParsedBackup): Promise<RestoreReport> {
+async function merge(parsed: ParsedBackup, now: number): Promise<RestoreReport> {
   const { data } = parsed
   const report: RestoreReport = {
     decks: 0,
     notes: 0,
     notesUpdated: 0,
     cards: 0,
+    cardsRemoved: 0,
     reviews: 0,
     media: 0,
     missingFiles: 0,
@@ -133,14 +200,17 @@ async function merge(parsed: ParsedBackup): Promise<RestoreReport> {
       return !local || t.updatedAt > local.updatedAt
     })
     await db.noteTypes.bulkPut(typePuts)
+    for (const type of typePuts) localTypes.set(type.id, type)
 
-    // Notes: by id, then by Anki guid; the loser's cards are left out.
+    // Notes: by id, then by Anki guid. `merged` maps each backup note kept or used to update a
+    // local one to the note as stored; a note matched by guid that is not newer is left out,
+    // with its cards.
     const localNotes = await db.notes.toArray()
     const notesById = new Map(localNotes.map((n) => [n.id, n]))
     const notesByGuid = new Map(
       localNotes.filter((n) => n.sourceGuid).map((n) => [n.sourceGuid, n]),
     )
-    const keptNotes = new Map<string, Note>()
+    const merged = new Map<string, Note>()
     const notePuts: Note[] = []
     for (const raw of data.notes) {
       const note: Note = { ...raw, deckId: deckOf(raw.deckId) }
@@ -148,7 +218,7 @@ async function merge(parsed: ParsedBackup): Promise<RestoreReport> {
         notesById.get(note.id) ?? (note.sourceGuid ? notesByGuid.get(note.sourceGuid) : undefined)
       if (!local) {
         notePuts.push(note)
-        keptNotes.set(note.id, note)
+        merged.set(note.id, note)
         report.notes++
       } else if (local.id === note.id) {
         const winner = note.updatedAt > local.updatedAt ? note : local
@@ -156,37 +226,29 @@ async function merge(parsed: ParsedBackup): Promise<RestoreReport> {
           notePuts.push(note)
           report.notesUpdated++
         }
-        keptNotes.set(note.id, winner)
+        merged.set(note.id, winner)
       } else if (note.updatedAt > local.updatedAt) {
         // Same Anki note under another id: the newer content updates the local note.
-        notePuts.push({ ...local, fields: note.fields, tags: note.tags, updatedAt: note.updatedAt })
+        const next: Note = {
+          ...local,
+          fields: note.fields,
+          tags: note.tags,
+          updatedAt: note.updatedAt,
+        }
+        notePuts.push(next)
+        merged.set(note.id, next)
         report.notesUpdated++
       }
     }
     await db.notes.bulkPut(notePuts)
 
-    // Cards of kept notes: by id, the most recently reviewed wins; deckId follows the note
-    // (invariant 1).
-    const localCards = new Map((await db.cards.toArray()).map((c) => [c.id, c]))
-    const cardPuts: Card[] = []
-    const keptCards = new Set<string>()
-    for (const raw of data.cards) {
-      const note = keptNotes.get(raw.noteId)
-      if (!note) continue
-      const local = localCards.get(raw.id)
-      const card: Card = { ...raw, deckId: note.deckId }
-      if (!local) report.cards++
-      if (!local || newer(card, local)) cardPuts.push(card)
-      else if (local.deckId !== note.deckId) cardPuts.push({ ...local, deckId: note.deckId })
-      keptCards.add(raw.id)
-    }
-    await db.cards.bulkPut(cardPuts)
+    // Cards: of the merged notes only, reconciled with the content that won (invariant 2).
+    const looked = await mergeCards(parsed, merged, localTypes, now, report)
 
-    // Reviews: union by id, only for cards that exist.
+    // Reviews: union by id, for the backup cards looked at (the log of a card the merge removed
+    // or did not keep is kept like the log of any removed card).
     const localReviews = new Set(await db.reviews.toCollection().primaryKeys())
-    const reviews: Review[] = data.reviews.filter(
-      (r) => keptCards.has(r.cardId) && !localReviews.has(r.id),
-    )
+    const reviews = data.reviews.filter((r) => looked.has(r.cardId) && !localReviews.has(r.id))
     await db.reviews.bulkAdd(reviews)
     report.reviews = reviews.length
 

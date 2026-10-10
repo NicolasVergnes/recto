@@ -23,7 +23,7 @@ beforeAll(async () => {
 const now = Date.UTC(2026, 8, 25, 8)
 let seq = 0
 const newId = () => `io-${++seq}`
-const empty: ApkgExisting = { decks: [], notes: [], media: new Map() }
+const empty: ApkgExisting = { decks: [], notes: [], cards: [], media: new Map() }
 const options: ApkgImportOptions = {
   target: { mode: 'anki' },
   importHistory: false,

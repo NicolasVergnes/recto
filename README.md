@@ -34,7 +34,7 @@ Toutes les données restent dans le navigateur de l'appareil : **la sauvegarde e
 
 - **Paramètres → Sauvegarde → Sauvegarder maintenant** produit un fichier `recto-sauvegarde-AAAA-MM-JJ-HHMM.recto.zip` (cartes, historique, médias, réglages). Sur Android, la feuille de partage permet de l'envoyer vers Drive, un e-mail ou Fichiers.
 - L'accueil rappelle de sauvegarder au-delà de 7 jours sans sauvegarde.
-- **Importer → Sauvegarde Recto** restaure un fichier : _Remplacer toutes les données_ (l'appareil devient identique à la sauvegarde ; les données actuelles sont d'abord téléchargées) ou _Fusionner avec les données actuelles_ (ajoute ce qui manque, garde la version la plus récente de chaque note).
+- **Importer → Sauvegarde Recto** restaure un fichier : _Remplacer toutes les données_ (l'appareil devient identique à la sauvegarde ; les données actuelles sont d'abord téléchargées) ou _Fusionner avec les données actuelles_ (ajoute ce qui manque, garde la version la plus récente de chaque note, et ses cartes suivent le contenu retenu).
 - Pour passer sur un nouveau téléphone : sauvegarder sur l'ancien, restaurer sur le nouveau.
 
 ## Importer depuis Anki
@@ -44,7 +44,7 @@ Toutes les données restent dans le navigateur de l'appareil : **la sauvegarde e
 3. Choisir : garder les paquets Anki ou tout mettre dans un seul paquet, le planificateur (FSRS ou Memory Box), la reprise de l'historique des révisions.
 4. Le rapport final liste les notes créées, les types de notes convertis et les médias manquants.
 
-Réimporter le même paquet met à jour les notes modifiées dans Anki au lieu de créer des doublons (une note dont les cartes changeraient — type de note, trous ou masques ajoutés ou retirés — est laissée telle quelle et comptée parmi les doublons ignorés). Les notes « Image Occlusion » d'Anki (≥ 23.10) deviennent des occlusions d'image Recto.
+Réimporter le même paquet met à jour les notes modifiées dans Anki au lieu de créer des doublons, et leurs cartes suivent : une carte est créée pour un trou ou un masque ajouté, supprimée (son historique de révisions est conservé) pour un trou ou un masque retiré, et les cartes qui restent gardent leur planification. Seule une note dont le type de note a changé dans Anki est laissée telle quelle et comptée parmi les doublons ignorés. Les notes « Image Occlusion » d'Anki (≥ 23.10) deviennent des occlusions d'image Recto.
 
 ## Exporter vers Anki
 

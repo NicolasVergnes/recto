@@ -1,10 +1,13 @@
 /**
  * Writes an import plan (05 §1): batches of 500 notes, one transaction per batch (a failure
  * never leaves half a batch), progress between batches, cancellable — batches already written
- * stay, and the report says so.
+ * stay, and the report says so. A batch of updated notes is written with the cards they gain,
+ * the reviews of those cards and the removal of the cards they lose, so that a note never stays
+ * with cards that do not match its content (invariant 2); the review log of a removed card is
+ * not touched (invariant 3).
  */
 import type { ImportPlan, ImportReport } from '../import/plan'
-import type { Media } from '../domain/types'
+import type { Media, Note } from '../domain/types'
 import { sha256Hex } from '../media/hash'
 import { db } from './schema'
 
@@ -44,18 +47,32 @@ export async function applyImportPlan(
   })
   report.mediaImported = media.length
 
-  const cardsByNote = new Map<string, typeof plan.cards>()
-  for (const card of plan.cards)
-    cardsByNote.set(card.noteId, [...(cardsByNote.get(card.noteId) ?? []), card])
-  const reviewsByCard = new Map<string, typeof plan.reviews>()
-  for (const r of plan.reviews)
-    reviewsByCard.set(r.cardId, [...(reviewsByCard.get(r.cardId) ?? []), r])
+  const groupBy = <T>(rows: readonly T[], key: (row: T) => string) => {
+    const groups = new Map<string, T[]>()
+    for (const row of rows) {
+      const group = groups.get(key(row))
+      if (group) group.push(row)
+      else groups.set(key(row), [row])
+    }
+    return groups
+  }
+  const cardsByNote = groupBy(plan.cards, (c) => c.noteId)
+  const reviewsByCard = groupBy(plan.reviews, (r) => r.cardId)
+  const removedByNote = groupBy(plan.removedCards ?? [], (c) => c.noteId)
+  /** What goes into the transaction of a batch of notes besides the notes themselves. */
+  const rowsOf = (batch: readonly Note[]) => {
+    const cards = batch.flatMap((n) => cardsByNote.get(n.id) ?? [])
+    const reviews = cards.flatMap((c) => reviewsByCard.get(c.id) ?? [])
+    const removed = batch.flatMap((n) => removedByNote.get(n.id) ?? []).map((c) => c.id)
+    return { cards, reviews, removed }
+  }
 
   const total = plan.notes.length + plan.updates.length
   let done = 0
   let notes = 0
   let cards = 0
   let reviews = 0
+  let removed = 0
   options.onProgress?.(0, total)
   for (let i = 0; i < plan.notes.length; i += size) {
     if (options.signal?.aborted) {
@@ -63,16 +80,15 @@ export async function applyImportPlan(
       break
     }
     const batch = plan.notes.slice(i, i + size)
-    const batchCards = batch.flatMap((n) => cardsByNote.get(n.id) ?? [])
-    const batchReviews = batchCards.flatMap((c) => reviewsByCard.get(c.id) ?? [])
+    const rows = rowsOf(batch)
     await db.transaction('rw', db.notes, db.cards, db.reviews, async () => {
       await db.notes.bulkAdd(batch)
-      await db.cards.bulkAdd(batchCards)
-      await db.reviews.bulkAdd(batchReviews)
+      await db.cards.bulkAdd(rows.cards)
+      await db.reviews.bulkAdd(rows.reviews)
     })
     notes += batch.length
-    cards += batchCards.length
-    reviews += batchReviews.length
+    cards += rows.cards.length
+    reviews += rows.reviews.length
     done += batch.length
     options.onProgress?.(done, total)
   }
@@ -83,13 +99,23 @@ export async function applyImportPlan(
       break
     }
     const batch = plan.updates.slice(i, i + size)
-    await db.notes.bulkPut(batch)
+    const rows = rowsOf(batch)
+    await db.transaction('rw', db.notes, db.cards, db.reviews, async () => {
+      await db.notes.bulkPut(batch)
+      await db.cards.bulkDelete(rows.removed)
+      await db.cards.bulkAdd(rows.cards)
+      await db.reviews.bulkAdd(rows.reviews)
+    })
     updated += batch.length
+    cards += rows.cards.length
+    reviews += rows.reviews.length
+    removed += rows.removed.length
     done += batch.length
     options.onProgress?.(done, total)
   }
   report.notesCreated = notes
   report.cardsCreated = cards
+  report.cardsRemoved = removed
   report.reviewsImported = reviews
   report.notesUpdated = updated
   return report
@@ -105,13 +131,17 @@ export async function existingCollection() {
   return { decks, notes, mediaNames: new Set(mediaNames) }
 }
 
-/** Current decks, notes, note types and media hashes, for the `.apkg` planner. */
+/**
+ * Current decks, notes, note types, cards (one query for all: a re-import reconciles those of
+ * the notes it updates) and media hashes, for the `.apkg` planner.
+ */
 export async function existingForApkg() {
-  const [decks, notes, noteTypes, media] = await Promise.all([
+  const [decks, notes, noteTypes, cards, media] = await Promise.all([
     db.decks.toArray(),
     db.notes.toArray(),
     db.noteTypes.toArray(),
+    db.cards.toArray(),
     db.media.toArray(),
   ])
-  return { decks, notes, noteTypes, media: new Map(media.map((m) => [m.name, m.sha256])) }
+  return { decks, notes, noteTypes, cards, media: new Map(media.map((m) => [m.name, m.sha256])) }
 }

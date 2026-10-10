@@ -633,6 +633,8 @@ export const fr = {
     decks: 'Paquets créés : {names}',
     noteTypes: 'Types de notes créés : {names}',
     updated: '{n} note mise à jour|{n} notes mises à jour',
+    cardsRemoved:
+      '{n} carte supprimée : sa note mise à jour ne la produit plus (historique conservé)|{n} cartes supprimées : leurs notes mises à jour ne les produisent plus (historique conservé)',
     skipped: '{n} doublon ignoré|{n} doublons ignorés',
     reviews: '{n} révision importée|{n} révisions importées',
     media: '{n} média importé|{n} médias importés',
@@ -686,7 +688,7 @@ export const fr = {
     restore: 'Restaurer',
     restored: 'Sauvegarde restaurée',
     report:
-      'Ajoutés : paquets {decks}, notes {notes}, cartes {cards}, révisions {reviews}, médias {media} ; notes mises à jour : {updated}.',
+      'Ajoutés : paquets {decks}, notes {notes}, cartes {cards}, révisions {reviews}, médias {media} ; notes mises à jour : {updated} ; cartes supprimées : {removed}.',
     missingFiles: '{n} média absent de l’archive.|{n} médias absents de l’archive.',
   },
   // `button`, `title` and `export` belong to the export dialog of both formats (CSV and Anki).

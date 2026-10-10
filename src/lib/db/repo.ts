@@ -11,7 +11,7 @@ import {
   type NoteTypeEdit,
   type NoteTypeEditPlan,
 } from '../domain/note-types'
-import { cardOrds, normalizeFields, noteFront } from '../domain/notes'
+import { cardOrds, normalizeFields, noteFront, reconcileCards } from '../domain/notes'
 import { parseOcclusion, serializeOcclusion } from '../domain/occlusion'
 import { frontKey, normalizeText } from '../domain/text'
 import type {
@@ -293,9 +293,9 @@ export async function updateNote(
     if (input.source) note.source = input.source
     else delete note.source
     const cards = await db.cards.where('noteId').equals(id).toArray()
-    const removed = cards.filter((c) => !ords.includes(c.ord)).map((c) => c.id)
-    const present = new Set(cards.map((c) => c.ord))
-    const added = ords.filter((o) => !present.has(o)).map((o) => makeCard(note, o, newId(), now))
+    const { create, remove } = reconcileCards(cards, ords)
+    const removed = remove.map((c) => c.id)
+    const added = create.map((o) => makeCard(note, o, newId(), now))
     await db.notes.put(note)
     await db.cards.bulkDelete(removed)
     await db.cards.bulkAdd(added)

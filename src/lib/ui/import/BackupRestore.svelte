@@ -137,6 +137,7 @@
           decks: report.decks,
           notes: report.notes,
           updated: report.notesUpdated,
+          removed: report.cardsRemoved,
           cards: report.cards,
           reviews: report.reviews,
           media: report.media,

@@ -71,6 +71,54 @@ export function cardOrds(
   }
 }
 
+/** What reconciling the cards of a note needs to know about each one (a stored `Card` has it all). */
+export type ReconcilableCard = Pick<Card, 'id' | 'noteId' | 'ord' | 'lastReview' | 'reps'>
+
+/**
+ * Orders copies of a card, the one to keep first: the most recently reviewed, then the one with
+ * the most repetitions. Backup merges and `reconcileCards` share this single rule.
+ */
+export function byRecency(
+  a: Pick<Card, 'lastReview' | 'reps'>,
+  b: Pick<Card, 'lastReview' | 'reps'>,
+): number {
+  return (b.lastReview ?? -1) - (a.lastReview ?? -1) || b.reps - a.reps
+}
+
+export interface CardReconciliation<C extends ReconcilableCard> {
+  /** Cards that stay: one per wanted ord that already has a card, in the order of `ords`. */
+  keep: C[]
+  /** Wanted ords without a card: each needs a new one. */
+  create: number[]
+  /** Cards to delete, their review log kept: an ord no longer generated, or a second copy. */
+  remove: C[]
+}
+
+/**
+ * Invariant 2 for one note (02-DATA-MODEL §3), shared by every writer that changes a note's
+ * content outside the editor (re-import, backup merge) and by the editor itself: given the cards
+ * it has and the ords its content generates (`cardOrds`), which cards stay, which ords need a
+ * new card and which cards go. A card whose ord is not generated goes; when several cards share
+ * a generated ord, the most recently reviewed stays (`byRecency`) and the others go. Cards are
+ * matched by their ord only: a card keeps its schedule and its log with what it asks.
+ */
+export function reconcileCards<C extends ReconcilableCard>(
+  cards: readonly C[],
+  ords: readonly number[],
+): CardReconciliation<C> {
+  const wanted = new Set(ords)
+  const stay = new Map<number, C>()
+  for (const card of [...cards].sort(byRecency)) {
+    if (wanted.has(card.ord) && !stay.has(card.ord)) stay.set(card.ord, card)
+  }
+  const kept = new Set(stay.values())
+  return {
+    keep: ords.flatMap((ord) => stay.get(ord) ?? []),
+    create: ords.filter((ord) => !stay.has(ord)),
+    remove: cards.filter((card) => !kept.has(card)),
+  }
+}
+
 /**
  * Twin cards of a note (03 §5.2): each one's question shows what the other one answers, as
  * front→back and back→front, so reviewing both the same day gives the second answer away.

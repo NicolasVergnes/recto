@@ -31,6 +31,7 @@ Conséquences : les paramètres FSRS sont d'abord ceux par défaut ; optimisatio
 Contexte : la captivité des données est le premier défaut des applications auditées (Quizlet, Memrise, Tinycards).
 Décision : import CSV et `.apkg` (legacy via `sql.js`), sauvegarde complète en zip JSON + médias ; export `.apkg` en V1. Format `anki21b` (zstd) refusé avec message d'aide plutôt qu'une dépendance zstd supplémentaire.
 Conséquences : `sql.js` (~1,2 Mo wasm) chargé à la demande ; test avec une fixture synthétique.
+Mise à jour (2026-10-10, M10) : une note mise à jour hors de l'éditeur — réimport `.apkg`, fusion de sauvegarde — voit ses cartes suivre son nouveau contenu (invariant 2) au lieu d'être ignorée ou de garder des cartes en trop ; une même fonction pure (`reconcileCards`) sert l'éditeur, le réimport et la fusion (05 §2.3, 02 §5).
 
 ## ADR-006 — Pas de bibliothèque de graphiques ni d'UI (2026-09-25)
 

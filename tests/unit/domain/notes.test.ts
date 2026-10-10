@@ -1,6 +1,68 @@
 import { describe, expect, it } from 'vitest'
 import { makeCard, makeDeck, resetScheduling } from '$lib/domain/defaults'
-import { cardOrds, fieldCount, normalizeFields, renderCard } from '$lib/domain/notes'
+import {
+  byRecency,
+  cardOrds,
+  fieldCount,
+  normalizeFields,
+  reconcileCards,
+  renderCard,
+} from '$lib/domain/notes'
+
+describe('reconcileCards (invariant 2)', () => {
+  /** A stored card: `ord`, with when it was last reviewed (null: never) and how many times. */
+  const card = (id: string, ord: number, lastReview: number | null = null, reps = 0) => ({
+    ...makeCard({ id: 'n', deckId: 'd' }, ord, id, 0),
+    lastReview,
+    reps,
+  })
+  const ids = (cards: { id: string }[]) => cards.map((c) => c.id)
+
+  it('keeps the cards of the generated ords, creates the missing ones, removes the others', () => {
+    const cards = [card('c1', 0), card('c2', 1), card('c3', 2)]
+    const { keep, create, remove } = reconcileCards(cards, [0, 2, 3])
+    expect(ids(keep)).toEqual(['c1', 'c3'])
+    expect(create).toEqual([3])
+    expect(ids(remove)).toEqual(['c2'])
+  })
+
+  it('leaves a note that already matches its content untouched', () => {
+    const cards = [card('b', 1), card('a', 0)]
+    const { keep, create, remove } = reconcileCards(cards, [0, 1])
+    // `keep` follows the ords, `remove` the order given.
+    expect(ids(keep)).toEqual(['a', 'b'])
+    expect([create, remove]).toEqual([[], []])
+  })
+
+  it('creates every card of a note that has none, and removes every card of a note that generates none', () => {
+    expect(reconcileCards([], [0, 1]).create).toEqual([0, 1])
+    const { keep, create, remove } = reconcileCards([card('c1', 0)], [])
+    expect([keep, create, ids(remove)]).toEqual([[], [], ['c1']])
+  })
+
+  it('keeps the most recently reviewed of the cards sharing an ord, then the busiest', () => {
+    const cards = [
+      card('never', 2),
+      card('old', 2, 1000, 9),
+      card('recent', 2, 5000, 1),
+      card('same-day-less', 0, 700, 1),
+      card('same-day-more', 0, 700, 4),
+    ]
+    const { keep, create, remove } = reconcileCards(cards, [0, 2])
+    expect(ids(keep)).toEqual(['same-day-more', 'recent'])
+    expect(create).toEqual([])
+    expect(ids(remove)).toEqual(['never', 'old', 'same-day-less'])
+  })
+
+  it('does not change the cards it is given and orders copies with byRecency', () => {
+    const cards = [card('a', 0, 1), card('b', 0, 2)]
+    reconcileCards(cards, [0])
+    expect(ids(cards)).toEqual(['a', 'b'])
+    expect(byRecency(card('x', 0, 5), card('y', 0, null))).toBeLessThan(0)
+    expect(byRecency(card('x', 0, null, 2), card('y', 0, null, 1))).toBeLessThan(0)
+    expect(byRecency(card('x', 0, 3, 1), card('y', 0, 3, 1))).toBe(0)
+  })
+})
 
 describe('notes and cards', () => {
   it('generates the ords of each model (invariant 2)', () => {

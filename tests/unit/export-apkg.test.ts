@@ -33,7 +33,7 @@ const now = Date.UTC(2026, 8, 25, 10)
 const options = { now, dayStartHour: 4 }
 let seq = 0
 const newId = () => `new-${++seq}`
-const empty: ApkgExisting = { decks: [], notes: [], media: new Map() }
+const empty: ApkgExisting = { decks: [], notes: [], cards: [], media: new Map() }
 const importOptions: ApkgImportOptions = {
   target: { mode: 'anki' },
   importHistory: false,
@@ -509,7 +509,7 @@ describe('round trip through the Recto importer', () => {
     expect(plan.report).toMatchObject({ notesCreated: 0, skipped: 6 })
   })
 
-  it('updates a re-imported note edited in Anki unless its cards would change', async () => {
+  it('updates a re-imported note edited in Anki, its cards following, unless it changed type', async () => {
     const deck = makeDeck({ name: 'Trous' }, 'deck', now)
     const cloze = noteWithCards('cz', deck.id, 'cloze', ['{{c1::a}} {{c2::b}}', ''], now)
     const text = noteWithCards('tx', deck.id, 'cloze', ['{{c1::x}}', 'old'], now + 1)
@@ -532,18 +532,26 @@ describe('round trip through the Recto importer', () => {
     const plan = await planApkgImport(
       readApkg(edited, SQL),
       importOptions,
-      { ...empty, decks: input.decks, notes: input.notes },
+      { ...empty, decks: input.decks, notes: input.notes, cards: input.cards },
       now + 120_000,
       newId,
     )
-    // Only the Extra edit is applied: the other two would need cards added (invariant 2).
+    // The cloze and the Extra edits are applied (Anki's `mod` is in seconds); the cloze gains the
+    // card of its third hole (invariant 2), the note that changed type is left alone.
     expect(plan.updates).toEqual([
-      // Anki's `mod` is in seconds.
+      { ...cloze.note, fields: ['{{c1::a}} {{c2::b}} {{c3::c}}', ''], updatedAt: now + 60_000 },
       { ...text.note, fields: ['{{c1::x}}', 'new'], updatedAt: now + 60_000 },
     ])
     expect(plan.notes).toEqual([])
-    expect(plan.cards).toEqual([])
-    expect(plan.report).toMatchObject({ notesUpdated: 1, skipped: 2 })
+    expect(plan.cards).toHaveLength(1)
+    expect(plan.cards[0]).toMatchObject({ noteId: 'cz', deckId: 'deck', ord: 2, state: 0 })
+    expect(plan.removedCards).toEqual([])
+    expect(plan.report).toMatchObject({
+      notesUpdated: 2,
+      cardsCreated: 1,
+      cardsRemoved: 0,
+      skipped: 1,
+    })
   })
 
   // tests/setup.ts sets TZ=Europe/Paris: the due and `crt` sit on both sides of a DST change.

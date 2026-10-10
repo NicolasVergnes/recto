@@ -32,6 +32,9 @@
     {#if report.notesUpdated > 0}<li>
         {t('importReport.updated', { n: report.notesUpdated })}
       </li>{/if}
+    {#if report.cardsRemoved > 0}<li>
+        {t('importReport.cardsRemoved', { n: report.cardsRemoved })}
+      </li>{/if}
     {#if report.skipped > 0}<li>{t('importReport.skipped', { n: report.skipped })}</li>{/if}
     {#if report.reviewsImported > 0}<li>
         {t('importReport.reviews', { n: report.reviewsImported })}

@@ -1,5 +1,5 @@
 import { makeCard, makeDeck } from '$lib/domain/defaults'
-import type { Card, Deck, DeckSettings } from '$lib/domain/types'
+import type { Card, Deck, DeckSettings, Review } from '$lib/domain/types'
 
 export const paris = (iso: string) => new Date(iso).getTime()
 
@@ -32,4 +32,29 @@ export function card(
   deckId = 'd1',
 ): Card {
   return { ...makeCard({ id: noteId, deckId }, 0, id, paris('2026-01-10T10:00:00Z')), ...patch }
+}
+
+/** A review log row of `card` (a first answer, Good), for tests that only count or move rows. */
+export function review(id: string, card: Pick<Card, 'id' | 'deckId'>, reviewedAt = 1000): Review {
+  return {
+    id,
+    cardId: card.id,
+    deckId: card.deckId,
+    reviewedAt,
+    rating: 3,
+    scheduler: 'fsrs',
+    durationMs: 3000,
+    stateBefore: 0,
+    dueBefore: reviewedAt,
+    stabilityBefore: 0,
+    difficultyBefore: 0,
+    boxBefore: 0,
+    learningStepsBefore: 0,
+    lastReviewBefore: null,
+    stateAfter: 1,
+    dueAfter: reviewedAt,
+    scheduledDays: 0,
+    elapsedDays: 0,
+    boxAfter: 0,
+  }
 }

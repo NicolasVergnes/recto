@@ -13,8 +13,11 @@ export interface ImportError {
 export interface ImportReport {
   decksCreated: string[]
   notesCreated: number
+  /** Cards created: those of the new notes and those an updated note gains. */
   cardsCreated: number
   notesUpdated: number
+  /** Cards deleted because the new content of an updated note no longer generates them. */
+  cardsRemoved: number
   skipped: number
   reviewsImported: number
   mediaImported: number
@@ -39,14 +42,31 @@ export interface ImportMedia {
   mime: string
 }
 
-/** Everything an importer wants to write; applied by `db/importer.ts` in batches. */
+/**
+ * Everything an importer wants to write; applied by `db/importer.ts` in batches of 500 notes,
+ * one transaction per batch.
+ *
+ * Updating an existing note is more than overwriting its fields: its cards must follow the new
+ * content (02-DATA-MODEL §3, invariant 2). A planner that updates notes (`.apkg` re-import, and
+ * any importer that matches existing notes) therefore describes, per updated note:
+ * - the cards its new content adds, in `cards` (with `noteId` and `deckId` of the updated note),
+ *   and their replayed review log, if any, in `reviews`;
+ * - the cards it no longer generates, in `removedCards`; their review log is never touched.
+ * `reconcileCards` (`domain/notes.ts`) tells which is which. The note, its added cards, their
+ * reviews and the removals are written together, in the transaction of the note's batch.
+ */
 export interface ImportPlan {
   decks: Deck[]
+  /** New notes. */
   notes: Note[]
+  /** Cards to create: those of the new notes and those the `updates` notes gain. */
   cards: Card[]
+  /** Review log rows to add, of the cards in `cards`. */
   reviews: Review[]
-  /** Existing notes to overwrite (fields/tags), their cards and log kept. */
+  /** Existing notes to overwrite (fields/tags); cards that keep their `ord` and their log stay. */
   updates: Note[]
+  /** Cards of the `updates` notes to delete (the review log stays, invariant 3). */
+  removedCards?: Pick<Card, 'id' | 'noteId'>[]
   /** Custom note types to create (written before the notes). */
   noteTypes?: NoteType[]
   media: ImportMedia[]
@@ -59,6 +79,7 @@ export function emptyReport(): ImportReport {
     notesCreated: 0,
     cardsCreated: 0,
     notesUpdated: 0,
+    cardsRemoved: 0,
     skipped: 0,
     reviewsImported: 0,
     mediaImported: 0,

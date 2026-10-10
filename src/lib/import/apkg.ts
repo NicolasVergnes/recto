@@ -2,7 +2,7 @@
  * Anki package → Recto import plan (05-IMPORT-EXPORT §2.3). Pure (async only for sha256).
  */
 import { makeCard } from '../domain/defaults'
-import { cardOrds } from '../domain/notes'
+import { cardOrds, reconcileCards, type ReconcilableCard } from '../domain/notes'
 import { labelsFromAnkiComments, occlusionFromAnki, serializeOcclusion } from '../domain/occlusion'
 import { mediaRefs, renameMediaRefs } from '../domain/text'
 import type {
@@ -20,9 +20,9 @@ import { mediaKind, mimeFromName } from '../media/mime'
 import { getScheduler } from '../scheduler'
 import { addDays, startOfDate, studyDate } from '../scheduler/day'
 import { boxFromStability } from '../scheduler/leitner'
-import type { ApkgCard, ApkgModel, ApkgPackage } from './apkg-read'
+import type { ApkgCard, ApkgModel, ApkgNote, ApkgPackage } from './apkg-read'
 import { DeckResolver } from './decks'
-import { emptyReport, type ImportMedia, type ImportPlan } from './plan'
+import { emptyReport, type ImportErrorCode, type ImportMedia, type ImportPlan } from './plan'
 
 export * from './apkg-read'
 
@@ -45,6 +45,8 @@ export interface ApkgExisting {
   notes: readonly Note[]
   /** Custom note types (a re-import reuses the one with the same Anki id and fields). */
   noteTypes?: readonly NoteType[]
+  /** Cards of the existing notes: a re-import reconciles those of the notes it updates. */
+  cards: readonly ReconcilableCard[]
   /** Stored media: name → sha256. */
   media: ReadonlyMap<string, string>
 }
@@ -197,6 +199,12 @@ function convertCardState(
   return card
 }
 
+/** Why a note of this model has no card to make: no cloze, no readable mask, empty question. */
+function noCardError(modelType: ModelType): ImportErrorCode {
+  if (modelType === 'image_occlusion') return 'noMask'
+  return modelType === 'custom' ? 'emptyFront' : 'noCloze'
+}
+
 function uniqueName(name: string, taken: (n: string) => boolean): string {
   const dot = name.lastIndexOf('.')
   const base = dot > 0 ? name.slice(0, dot) : name
@@ -215,12 +223,14 @@ export async function planApkgImport(
   newId: () => string,
 ): Promise<ImportPlan> {
   const report = emptyReport()
+  const removedCards: ReconcilableCard[] = []
   const plan: ImportPlan = {
     decks: [],
     notes: [],
     cards: [],
     reviews: [],
     updates: [],
+    removedCards,
     media: [],
     report,
   }
@@ -235,6 +245,11 @@ export async function planApkgImport(
   }
   // The guid a Recto export writes (05 §4): the Anki guid of imported notes, else the note id.
   const byGuid = new Map(existing.notes.map((n) => [n.sourceGuid ?? n.id, n]))
+  // The cards Recto already has, by note: a re-import reconciles those of the notes it updates.
+  const cardsOfNote = new Map<string, ReconcilableCard[]>()
+  for (const c of existing.cards) {
+    cardsOfNote.set(c.noteId, [...(cardsOfNote.get(c.noteId) ?? []), c])
+  }
   const cardsByNote = new Map<number, ApkgCard[]>()
   for (const c of pkg.cards) cardsByNote.set(c.nid, [...(cardsByNote.get(c.nid) ?? []), c])
   const revlogByCard = new Map<number, { id: number; ease: number; time: number }[]>()
@@ -255,9 +270,51 @@ export async function planApkgImport(
     return resolver.resolve(ankiDecks.get(ankiDeckId) ?? 'Anki')
   }
 
+  /**
+   * Adds to the plan the cards of `ords` for `note`, as for a new note: from Anki's card of the
+   * same ord (its state, or its review log replayed when the history is imported), else a new one.
+   */
+  const addCards = (
+    note: Note,
+    deck: Deck,
+    ords: readonly number[],
+    an: ApkgNote,
+    ankiCards: readonly ApkgCard[],
+  ) => {
+    const scheduler = schedulers[deck.scheduler]
+    for (const ord of ords) {
+      const base = makeCard(note, ord, newId(), an.id + ord)
+      const ac = ankiCards.find((c) => c.ord === ord)
+      if (!ac) {
+        plan.cards.push(base)
+        continue
+      }
+      const history = options.importHistory ? (revlogByCard.get(ac.id) ?? []) : []
+      if (history.length === 0) {
+        plan.cards.push(convertCardState(ac, base, pkg.crt, now, deck, options.dayStartHour))
+        continue
+      }
+      // Replay: the same algorithm as ts-fsrs `reschedule` (replay = next) or Leitner answers.
+      let card = base
+      for (const r of history) {
+        const rating: Rating = r.ease === 1 ? 1 : r.ease === 2 ? 2 : r.ease === 3 ? 3 : 4
+        const outcome = scheduler.answer(card, rating, r.id, deck)
+        const review: Review = {
+          ...outcome.review,
+          id: newId(),
+          durationMs: Math.max(0, Math.min(r.time, MAX_DURATION_MS)),
+        }
+        plan.reviews.push(review)
+        card = outcome.card
+      }
+      plan.cards.push({ ...card, suspended: ac.queue === -1 })
+    }
+  }
+
   const converted = new Set<string>()
+  /** Known notes already updated by an earlier note of the package (one guid listed twice). */
+  const updated = new Set<string>()
   const noteTypes: NoteType[] = []
-  const typeById = new Map((existing.noteTypes ?? []).map((t) => [t.id, t]))
   const typeOfModel = new Map<string, NoteType>()
   for (const an of pkg.notes) {
     const model = models.get(an.mid)
@@ -289,23 +346,42 @@ export async function planApkgImport(
     }
     const updatedAt = an.mod * 1000
     const known = byGuid.get(an.guid)
+    const ankiCards = (cardsByNote.get(an.id) ?? []).sort((a, b) => a.ord - b.ord)
     if (known) {
-      // Re-import (05 §2.3): update the fields when Anki's copy is more recent, unless that would
-      // change the note's cards (other note type, cloze added or removed): an update keeps the
-      // cards as they are (invariant 2), so such a note is left untouched and counted as skipped.
-      const knownType = known.noteTypeId ? typeById.get(known.noteTypeId) : undefined
-      const sameCards =
-        conversion.modelType === known.modelType &&
-        known.noteTypeId === noteType?.id &&
-        cardOrds(known.modelType, fields, knownType).join() ===
-          cardOrds(known.modelType, known.fields, knownType).join()
-      if (updatedAt > known.updatedAt && sameCards) {
-        plan.updates.push({ ...known, fields, tags: an.tags, updatedAt })
+      // Re-import (05 §2.3): Anki's copy replaces the fields and tags when it is more recent and
+      // the note keeps its type (the fields would not mean the same thing otherwise); any other
+      // note is left untouched and counted as skipped.
+      if (
+        updatedAt <= known.updatedAt ||
+        conversion.modelType !== known.modelType ||
+        known.noteTypeId !== noteType?.id ||
+        updated.has(known.id)
+      ) {
+        report.skipped++
+        continue
+      }
+      // Its cards follow the new content (invariant 2): a card whose ord is no longer generated
+      // goes (its log stays), a new ord gets a card made as for a new note, in the deck of the
+      // note; the cards that keep their ord are left as they are, schedule and log included.
+      const knownDeck = deckById.get(known.deckId)
+      if (!knownDeck) {
+        report.errors.push({ line: an.id, code: 'orphanCard' })
+        continue
+      }
+      const wanted = cardOrds(conversion.modelType, fields, noteType)
+      if (wanted.length === 0) {
+        report.errors.push({ line: an.id, code: noCardError(conversion.modelType) })
         countShapes()
-      } else report.skipped++
+        continue
+      }
+      const { create, remove } = reconcileCards(cardsOfNote.get(known.id) ?? [], wanted)
+      updated.add(known.id)
+      plan.updates.push({ ...known, fields, tags: an.tags, updatedAt })
+      removedCards.push(...remove)
+      addCards(known, knownDeck, create, an, ankiCards)
+      countShapes()
       continue
     }
-    const ankiCards = (cardsByNote.get(an.id) ?? []).sort((a, b) => a.ord - b.ord)
     const deck = targetDeck(ankiCards[0]?.did ?? '1')
     if (!deck) {
       report.errors.push({ line: an.id, code: 'orphanCard' })
@@ -313,13 +389,7 @@ export async function planApkgImport(
     }
     const ords = cardOrds(conversion.modelType, fields, noteType)
     if (ords.length === 0) {
-      const code =
-        conversion.modelType === 'image_occlusion'
-          ? 'noMask'
-          : conversion.modelType === 'custom'
-            ? 'emptyFront'
-            : 'noCloze'
-      report.errors.push({ line: an.id, code })
+      report.errors.push({ line: an.id, code: noCardError(conversion.modelType) })
       countShapes()
       continue
     }
@@ -338,34 +408,7 @@ export async function planApkgImport(
     if (noteType) note.noteTypeId = noteType.id
     plan.notes.push(note)
     report.skipped += ankiCards.filter((c) => !ords.includes(c.ord)).length
-    const scheduler = schedulers[deck.scheduler]
-    for (const ord of ords) {
-      const base = makeCard(note, ord, newId(), an.id + ord)
-      const ac = ankiCards.find((c) => c.ord === ord)
-      if (!ac) {
-        plan.cards.push(base)
-        continue
-      }
-      const history = options.importHistory ? (revlogByCard.get(ac.id) ?? []) : []
-      if (history.length === 0) {
-        plan.cards.push(convertCardState(ac, base, pkg.crt, now, deck, options.dayStartHour))
-        continue
-      }
-      // Replay: the same algorithm as ts-fsrs `reschedule` (replay = next) or Leitner answers.
-      let card = base
-      for (const r of history) {
-        const rating: Rating = r.ease === 1 ? 1 : r.ease === 2 ? 2 : r.ease === 3 ? 3 : 4
-        const outcome = scheduler.answer(card, rating, r.id, deck)
-        const review: Review = {
-          ...outcome.review,
-          id: newId(),
-          durationMs: Math.max(0, Math.min(r.time, MAX_DURATION_MS)),
-        }
-        plan.reviews.push(review)
-        card = outcome.card
-      }
-      plan.cards.push({ ...card, suspended: ac.queue === -1 })
-    }
+    addCards(note, deck, ords, an, ankiCards)
   }
 
   // Media: stored under their real names; a name taken by different content gets a suffix and
@@ -424,6 +467,7 @@ export async function planApkgImport(
   report.notesCreated = plan.notes.length
   report.cardsCreated = plan.cards.length
   report.notesUpdated = plan.updates.length
+  report.cardsRemoved = removedCards.length
   report.reviewsImported = plan.reviews.length
   report.mediaImported = plan.media.length
   report.missingMedia = [...missing].sort()

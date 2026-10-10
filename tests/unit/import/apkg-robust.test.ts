@@ -141,7 +141,7 @@ describe('robustness of the Anki reader and converter', () => {
       const noHistory = await planApkgImport(
         pkg,
         { target: { mode: 'anki' }, importHistory: false, scheduler, dayStartHour: 4 },
-        { decks: [], notes: [], media: new Map() },
+        { decks: [], notes: [], cards: [], media: new Map() },
         now,
         newId,
       )
@@ -159,7 +159,7 @@ describe('robustness of the Anki reader and converter', () => {
       const replay = await planApkgImport(
         pkg,
         { target: { mode: 'anki' }, importHistory: true, scheduler, dayStartHour: 4 },
-        { decks: [], notes: [], media: new Map() },
+        { decks: [], notes: [], cards: [], media: new Map() },
         now,
         newId,
       )

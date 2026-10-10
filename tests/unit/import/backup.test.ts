@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { strToU8, zipSync } from 'fflate'
+import { makeCard, makeDeck } from '$lib/domain/defaults'
+import type { Card, Note, Review } from '$lib/domain/types'
 import { restoreBackup } from '$lib/db/restore'
 import { RectoDB, SCHEMA_VERSION, useDatabase } from '$lib/db/schema'
 import { createBackup } from '$lib/export/backup'
-import { BackupError, parseBackup } from '$lib/import/backup'
+import { BackupError, parseBackup, type BackupData, type ParsedBackup } from '$lib/import/backup'
+import { seededRandom } from '$lib/queue/random'
+import { review } from '../../helpers/fixtures'
 import { dumpDatabase, generateCollection } from '../../helpers/generate'
 import { useTestDatabase } from '../../helpers/db'
+import { cardProblems } from '../../helpers/invariants'
 
 const env = useTestDatabase()
 const now = Date.UTC(2026, 8, 25)
@@ -138,6 +143,322 @@ describe('merge', () => {
       for (const c of cards) expect(c.deckId).toBe(notes.get(c.noteId)?.deckId)
     } finally {
       await target.delete()
+    }
+  })
+})
+
+/** A parsed backup holding exactly `data`, as `parseBackup` returns it (no media files). */
+function backupOf(data: Partial<BackupData>): ParsedBackup {
+  const full: BackupData = {
+    decks: [],
+    noteTypes: [],
+    notes: [],
+    cards: [],
+    reviews: [],
+    settings: [],
+    media: [],
+    ...data,
+  }
+  const counts = {
+    decks: full.decks.length,
+    noteTypes: full.noteTypes.length,
+    notes: full.notes.length,
+    cards: full.cards.length,
+    reviews: full.reviews.length,
+    settings: full.settings.length,
+    media: full.media.length,
+  }
+  const manifest = {
+    format: 'recto-backup' as const,
+    schemaVersion: SCHEMA_VERSION,
+    appVersion: 'test',
+    exportedAt: now,
+    device: '',
+    counts,
+  }
+  return { manifest, data: full, files: new Map(), invalid: 0 }
+}
+
+describe('merge: the cards follow the winning content of each note (invariant 2)', () => {
+  const deck = makeDeck({ name: 'Paquet' }, 'deck', now)
+  const cloze = (holes: readonly number[]) => holes.map((i) => `{{c${i}::mot${i}}}`).join(' ')
+  const clozeNote = (id: string, holes: readonly number[], patch: Partial<Note> = {}): Note => ({
+    id,
+    deckId: deck.id,
+    modelType: 'cloze',
+    fields: [cloze(holes), ''],
+    tags: [],
+    createdAt: 1,
+    updatedAt: 10,
+    ...patch,
+  })
+  /** The card of `ord` (hole n°ord+1), id `<note>-<ord>` unless given. */
+  const cardOf = (
+    note: Note,
+    ord: number,
+    id = `${note.id}-${ord}`,
+    patch: Partial<Card> = {},
+  ) => ({
+    ...makeCard(note, ord, id, 1),
+    ...patch,
+  })
+  const cardsOf = (note: Note, ords: readonly number[]) => ords.map((o) => cardOf(note, o))
+
+  async function seedLocal(notes: Note[], cards: Card[], reviews: Review[] = []) {
+    await env.db.decks.add(deck)
+    await env.db.notes.bulkAdd(notes)
+    await env.db.cards.bulkAdd(cards)
+    await env.db.reviews.bulkAdd(reviews)
+  }
+  const ordsOf = async (noteId: string) =>
+    (await env.db.cards.where('noteId').equals(noteId).toArray())
+      .map((c) => c.ord)
+      .sort((a, b) => a - b)
+
+  it('gives a note updated by its Anki guid the cards of the holes the newer copy gained', async () => {
+    const mine = clozeNote('mine', [1, 2], { sourceGuid: 'anki', updatedAt: 10 })
+    await seedLocal(
+      [mine],
+      [
+        cardOf(mine, 0, 'm0', { lastReview: 500, reps: 2 }),
+        cardOf(mine, 1, 'm1', { lastReview: 600 }),
+      ],
+    )
+    // Imported under another id on the other device, where the hole n°3 was added and studied.
+    const theirs = clozeNote('theirs', [1, 2, 3], { sourceGuid: 'anki', updatedAt: 20 })
+    const gained = cardOf(theirs, 2, 't2', { state: 2, reps: 1, lastReview: 900 })
+    const report = await restoreBackup(
+      backupOf({
+        decks: [deck],
+        notes: [theirs],
+        cards: [cardOf(theirs, 0), cardOf(theirs, 1), gained],
+        reviews: [review('review-t2', gained)],
+      }),
+      'merge',
+    )
+    expect(await ordsOf('mine')).toEqual([0, 1, 2])
+    // The card of the new hole is the other device's, moved to the note, with its log (P10).
+    expect(await env.db.cards.get('t2')).toMatchObject({ noteId: 'mine', deckId: 'deck', reps: 1 })
+    expect(await env.db.reviews.get('review-t2')).toBeDefined()
+    // The cards both sides had stay the ones most recently reviewed: the local ones.
+    expect(await env.db.cards.get('m0')).toMatchObject({ reps: 2, lastReview: 500 })
+    expect(await env.db.cards.get('theirs-0')).toBeUndefined()
+    expect(await env.db.notes.get('theirs')).toBeUndefined()
+    expect((await env.db.notes.get('mine'))?.fields[0]).toBe(cloze([1, 2, 3]))
+    expect(await cardProblems(env.db)).toEqual([])
+    expect(report).toMatchObject({
+      notes: 0,
+      notesUpdated: 1,
+      cards: 1,
+      cardsRemoved: 0,
+      reviews: 1,
+    })
+  })
+
+  it('removes the local card of a hole the newer copy no longer has, its log kept', async () => {
+    const mine = clozeNote('n', [1, 2, 3], { updatedAt: 10 })
+    const doomed = cardOf(mine, 1)
+    await seedLocal(
+      [mine],
+      [cardOf(mine, 0), doomed, cardOf(mine, 2)],
+      [review('r1', doomed, 100), review('r2', doomed, 200)],
+    )
+    const theirs = clozeNote('n', [1, 3], { updatedAt: 20 })
+    const report = await restoreBackup(
+      backupOf({ decks: [deck], notes: [theirs], cards: cardsOf(theirs, [0, 2]) }),
+      'merge',
+    )
+    expect(await ordsOf('n')).toEqual([0, 2])
+    expect(await env.db.cards.get('n-1')).toBeUndefined()
+    expect(await env.db.reviews.where('cardId').equals('n-1').count()).toBe(2)
+    expect(await cardProblems(env.db)).toEqual([])
+    expect(report).toMatchObject({ notesUpdated: 1, cards: 0, cardsRemoved: 1, reviews: 0 })
+  })
+
+  it('does not add the card of a hole the winning local copy no longer has, but keeps its log', async () => {
+    const mine = clozeNote('n', [1, 3], { updatedAt: 20 })
+    await seedLocal([mine], cardsOf(mine, [0, 2]))
+    const theirs = clozeNote('n', [1, 2, 3], { updatedAt: 10 })
+    const stale = cardOf(theirs, 1)
+    const report = await restoreBackup(
+      backupOf({
+        decks: [deck],
+        notes: [theirs],
+        cards: [cardOf(theirs, 0), stale, cardOf(theirs, 2)],
+        reviews: [review('review-stale', stale)],
+      }),
+      'merge',
+    )
+    expect(await ordsOf('n')).toEqual([0, 2])
+    expect(await env.db.cards.get('n-1')).toBeUndefined()
+    expect((await env.db.notes.get('n'))?.fields[0]).toBe(cloze([1, 3]))
+    // What was answered on the other device stays in the log, like that of any removed card.
+    expect(await env.db.reviews.get('review-stale')).toBeDefined()
+    expect(await cardProblems(env.db)).toEqual([])
+    expect(report).toMatchObject({ notesUpdated: 0, cards: 0, cardsRemoved: 0, reviews: 1 })
+  })
+
+  it.each([
+    { label: 'the backup one when it was reviewed last', mine: 700, theirs: 900, kept: 't2' },
+    { label: 'the local one when it was reviewed last', mine: 900, theirs: 700, kept: 'm2' },
+  ])('keeps one card when both devices created that of a new hole: $label', async (c) => {
+    const note = clozeNote('n', [1, 2, 3], { updatedAt: 20 })
+    const common = cardsOf(note, [0, 1])
+    const mine = cardOf(note, 2, 'm2', { lastReview: c.mine, reps: 1 })
+    const theirs = cardOf(note, 2, 't2', { lastReview: c.theirs, reps: 1 })
+    await seedLocal([note], [...common, mine], [review('review-m2', mine)])
+    const report = await restoreBackup(
+      backupOf({
+        decks: [deck],
+        notes: [note],
+        cards: [...common, theirs],
+        reviews: [review('review-t2', theirs)],
+      }),
+      'merge',
+    )
+    const withOrd2 = (await env.db.cards.where('noteId').equals('n').toArray()).filter(
+      (card) => card.ord === 2,
+    )
+    expect(withOrd2.map((card) => card.id)).toEqual([c.kept])
+    // The logs of both copies stay.
+    expect((await env.db.reviews.toArray()).map((r) => r.id).sort()).toEqual([
+      'review-m2',
+      'review-t2',
+    ])
+    expect(await cardProblems(env.db)).toEqual([])
+    expect(report.cardsRemoved).toBe(c.kept === 't2' ? 1 : 0)
+    expect(report.cards).toBe(c.kept === 't2' ? 1 : 0)
+  })
+
+  it('makes a card for a hole of the winning content that no copy has a card for', async () => {
+    // A note updated without its cards (before the cards followed the content).
+    const mine = clozeNote('n', [1], { updatedAt: 10 })
+    await seedLocal([mine], cardsOf(mine, [0]))
+    const theirs = clozeNote('n', [1, 2], { updatedAt: 20 })
+    const report = await restoreBackup(
+      backupOf({ decks: [deck], notes: [theirs], cards: cardsOf(theirs, [0]) }),
+      'merge',
+      now,
+    )
+    expect(await ordsOf('n')).toEqual([0, 1])
+    expect(
+      await env.db.cards
+        .where('noteId')
+        .equals('n')
+        .filter((c) => c.ord === 1)
+        .first(),
+    ).toMatchObject({
+      state: 0,
+      due: now,
+      deckId: 'deck',
+    })
+    expect(report).toMatchObject({ notesUpdated: 1, cards: 1, cardsRemoved: 0 })
+  })
+
+  it('keeps every card of a winning content that generates none', async () => {
+    // Not something the app writes: the cards are not deleted on such a note.
+    const mine = clozeNote('n', [1, 2], { updatedAt: 10 })
+    await seedLocal([mine], cardsOf(mine, [0, 1]))
+    const theirs: Note = { ...mine, fields: ['plus de trou', ''], updatedAt: 20 }
+    const report = await restoreBackup(backupOf({ decks: [deck], notes: [theirs] }), 'merge')
+    expect(await ordsOf('n')).toEqual([0, 1])
+    expect(report).toMatchObject({ notesUpdated: 1, cardsRemoved: 0 })
+  })
+
+  it('uses the note types of the merge: those of the backup when newer, to count custom cards', async () => {
+    const type = {
+      id: 'type',
+      name: 'Pays',
+      fields: ['Pays', 'Capitale'],
+      templates: [
+        { name: 'Pays', front: '{{Pays}}', back: '{{Capitale}}' },
+        { name: 'Capitale', front: '{{Capitale}}', back: '{{Pays}}' },
+      ],
+      createdAt: 1,
+      updatedAt: 10,
+    }
+    const custom = (fields: string[], updatedAt: number): Note => ({
+      id: 'p',
+      deckId: deck.id,
+      modelType: 'custom',
+      noteTypeId: type.id,
+      fields,
+      tags: [],
+      createdAt: 1,
+      updatedAt,
+    })
+    // Locally the type has one template; the backup's newer type has two, and the note's
+    // new content fills the second question.
+    const mine = custom(['France', ''], 10)
+    await env.db.noteTypes.add({ ...type, templates: type.templates.slice(0, 1) })
+    await seedLocal([mine], cardsOf(mine, [0]))
+    const theirs = custom(['France', 'Paris'], 20)
+    await restoreBackup(
+      backupOf({
+        decks: [deck],
+        noteTypes: [{ ...type, updatedAt: 20 }],
+        notes: [theirs],
+        cards: cardsOf(theirs, [0, 1]),
+      }),
+      'merge',
+    )
+    expect(await ordsOf('p')).toEqual([0, 1])
+    expect(await cardProblems(env.db)).toEqual([])
+  })
+
+  describe('whatever the two sides did to the holes of their notes', () => {
+    for (const seed of ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta']) {
+      it(`leaves every note with exactly its cards (seed ${seed})`, async () => {
+        const random = seededRandom(`merge-cards-${seed}`)
+        const int = (n: number) => Math.floor(random() * n)
+        /** The holes of a note after a device added or removed some (never none). */
+        const edited = (before: readonly number[]) => {
+          const toggled = () => random() < 0.25
+          const next = [1, 2, 3, 4, 5].filter((h) => before.includes(h) !== toggled())
+          return next.length > 0 ? next : [1]
+        }
+        const device = () => ({ notes: [] as Note[], cards: [] as Card[], reviews: [] as Review[] })
+        const [mine, theirs] = [device(), device()]
+        for (let i = 0; i < 30; i++) {
+          const before = [1, 2, 3, 4, 5].filter(() => random() < 0.5)
+          const kind = (['local', 'backup', 'id', 'id', 'guid', 'guid'] as const)[int(6)]
+          const guid = kind === 'guid' ? { sourceGuid: `guid${i}` } : {}
+          /** A device's copy of the note: edited holes, a card per hole, some of them studied. */
+          const copy = (side: 'l' | 'r', id: string, updatedAt: number, to: typeof mine) => {
+            const holes = edited(before)
+            const note = clozeNote(id, holes, { ...guid, updatedAt })
+            to.notes.push(note)
+            for (const hole of holes) {
+              // A card keeps its id on both devices when it existed before they diverged.
+              const shared = kind === 'id' && before.includes(hole)
+              const studied = random() < 0.5
+              const card = cardOf(
+                note,
+                hole - 1,
+                shared ? `c${i}-${hole}` : `${side}${i}-${hole}`,
+                {
+                  lastReview: studied ? 100 + int(900) : null,
+                  reps: studied ? 1 : 0,
+                },
+              )
+              to.cards.push(card)
+              if (studied) to.reviews.push(review(`${side}-${card.id}`, card))
+            }
+          }
+          // Even `updatedAt` locally, odd in the backup: never a tie.
+          if (kind !== 'backup') copy('l', `n${i}`, 10 + 2 * int(10), mine)
+          if (kind !== 'local')
+            copy('r', kind === 'guid' ? `x${i}` : `n${i}`, 11 + 2 * int(10), theirs)
+        }
+        await seedLocal(mine.notes, mine.cards, mine.reviews)
+        expect(await cardProblems(env.db)).toEqual([])
+
+        await restoreBackup(backupOf({ decks: [deck], ...theirs }), 'merge')
+        expect(await cardProblems(env.db)).toEqual([])
+        // The log only grows: nothing local is lost.
+        const log = new Set((await env.db.reviews.toArray()).map((r) => r.id))
+        for (const r of mine.reviews) expect(log.has(r.id)).toBe(true)
+      })
     }
   })
 })

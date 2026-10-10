@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { strToU8, zipSync } from 'fflate'
 import type { SqlJsStatic } from 'sql.js'
-import { makeDeck } from '$lib/domain/defaults'
+import { makeCard, makeDeck } from '$lib/domain/defaults'
 import type { Note } from '$lib/domain/types'
 import {
   Anki21bUnsupported,
@@ -27,7 +27,7 @@ const now = Date.UTC(2026, 8, 25, 8)
 const CRT = 1699934400
 let seq = 0
 const newId = () => `id-${++seq}`
-const empty: ApkgExisting = { decks: [], notes: [], media: new Map() }
+const empty: ApkgExisting = { decks: [], notes: [], cards: [], media: new Map() }
 const options: ApkgImportOptions = {
   target: { mode: 'anki' },
   importHistory: false,
@@ -312,7 +312,12 @@ describe('planApkgImport', () => {
     const plan = await planApkgImport(
       sample(),
       options,
-      { ...empty, notes: [old, recent] },
+      {
+        ...empty,
+        decks: [makeDeck({ name: 'D' }, 'd', 0)],
+        notes: [old, recent],
+        cards: [makeCard(old, 0, 'c1', 0), makeCard(recent, 0, 'c2', 0)],
+      },
       now,
       newId,
     )
@@ -325,7 +330,10 @@ describe('planApkgImport', () => {
       },
     ])
     expect(plan.notes).toHaveLength(2)
-    expect(plan.report).toMatchObject({ notesUpdated: 1, skipped: 1 })
+    // The updated note keeps the card it has: nothing added, nothing removed.
+    expect(plan.cards.some((c) => c.noteId === 'n1')).toBe(false)
+    expect(plan.removedCards).toEqual([])
+    expect(plan.report).toMatchObject({ notesUpdated: 1, cardsRemoved: 0, skipped: 1 })
     // Same guid, other note type: the fields would not mean the same thing, nothing is written.
     const other = await planApkgImport(
       sample(),
