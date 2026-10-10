@@ -56,6 +56,7 @@ export default defineConfig({
 | Prettier (`prettier-plugin-svelte`) | `npm run format:check` | conforme |
 | Vitest (unitaires, `happy-dom` + `fake-indexeddb` pour Dexie) | `npm run test` | verts ; couverture ≥ 90 % sur `scheduler`, `queue`, `import` |
 | Playwright (e2e, Chromium) | `npm run e2e` | verts |
+| Playwright, Firefox (compatibilité, hors `verify`, M10) | `npm run e2e:firefox` | verts |
 | Build | `npm run build` | OK, taille initiale < 300 Ko gzip hors `.wasm` (vérifier avec `rollup-plugin-visualizer` en option) |
 
 `npm run verify` enchaîne check → lint → format:check → test → build → e2e. C'est la porte de sortie de tout jalon (skill `quality-gate`).
@@ -81,6 +82,8 @@ Horloge : tous les modules reçoivent `now: number` en paramètre ; les tests ut
 4. Import `.apkg` fixture → rapport correct.
 5. Export sauvegarde → effacer → restaurer → mêmes comptes.
 6. Hors ligne : `context.setOffline(true)` → l'app se charge et révise.
+
+Compatibilité (M10, SPEC §6), hors `verify` et hors CI, après `npx playwright install firefox webkit` : `npm run e2e:firefox` passe toute la suite dans Firefox (desktop) ; `npx playwright test --project=webkit` la passe dans le WebKit de Playwright, **au mieux** : sous Windows, son IndexedDB refuse les `Blob` (« Error preparing Blob/File data to be stored in object store » : tous les parcours avec images ou import `.apkg` échouent), il ne recharge pas une page hors ligne (« internal error ») et, comme Safari par défaut, Tab n'y passe pas sur les liens ; ce ne sont pas des défauts de Recto, Safari 17 en mode normal stocke les `Blob`. Plusieurs instances de Firefox ou WebKit côte à côte se figent parfois quelques secondes : leurs projets attendent jusqu'à 15 s.
 
 ## 5. Conventions de code
 

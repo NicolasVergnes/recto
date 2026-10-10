@@ -79,7 +79,10 @@
       const { cards } = await repo.createNote(input, Date.now())
       await setSetting('lastDeckId', draft.deckId)
       toast(t('editor.added', { n: cards.length }))
-      if ((await requestPersistenceOnce()) === false) showPersistAsk = true
+      // Not awaited: Firefox settles persist() only when the user answers its prompt.
+      void requestPersistenceOnce().then((granted) => {
+        if (granted === false) showPersistAsk = true
+      })
       if (close) navigate(`/decks/${draft.deckId}`)
       else {
         draft.clear(input.fields)

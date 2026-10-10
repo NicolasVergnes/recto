@@ -71,6 +71,7 @@ npm run check          # svelte-check + tsc
 npm run lint           # eslint
 npm run test           # vitest (+ couverture ≥ 90 % sur scheduler, queue, import)
 npm run e2e            # playwright (build + preview automatiques)
+npm run e2e:firefox    # la même suite dans Firefox (npx playwright install firefox)
 npm run verify         # porte de qualité complète (check, lint, format, test, build, e2e)
 npm run icons          # icônes PWA depuis public/logo.svg
 ```

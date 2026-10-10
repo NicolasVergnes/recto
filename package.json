@@ -18,7 +18,8 @@
     "format:check": "prettier --check .",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
-    "e2e": "npm run build && playwright test",
+    "e2e": "npm run build && playwright test --project=desktop --project=mobile",
+    "e2e:firefox": "npm run build && playwright test --project=firefox",
     "verify": "npm run check && npm run lint && npm run format:check && npm run test && npm run e2e",
     "icons": "pwa-assets-generator --preset minimal-2023 public/logo.svg"
   },
