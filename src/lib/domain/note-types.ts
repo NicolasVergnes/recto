@@ -96,6 +96,17 @@ export function planNoteTypeEdit(
     templates: edit.templates.map(({ name, front, back }) => ({ name: name.trim(), front, back })),
     updatedAt: now,
   }
+  // Anki's sort field follows its field; a removed one falls back to the first (M10).
+  const sorted = type.anki?.sortField
+  if (next.anki && sorted !== undefined) {
+    next.anki = {
+      ...next.anki,
+      sortField: Math.max(
+        0,
+        edit.fields.findIndex((f) => f.from === sorted),
+      ),
+    }
+  }
   const fieldsChanged =
     edit.fields.length !== type.fields.length || edit.fields.some((f, i) => f.from !== i)
   const newOrd = new Map<number, number>()

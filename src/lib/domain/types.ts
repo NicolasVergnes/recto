@@ -60,6 +60,18 @@ export interface CardTemplate {
 }
 
 /** A note type with named fields and one card per template, like Anki's (02 §2.2, M8). */
+/**
+ * Styling of an Anki note type: Recto renders cards its own way (ADR-010) but keeps these so
+ * that exporting the type back to Anki does not replace them (M10).
+ */
+export interface AnkiTypeExtras {
+  css?: string
+  latexPre?: string
+  latexPost?: string
+  /** Index of the field Anki sorts and searches by (`sortf`). */
+  sortField?: number
+}
+
 export interface NoteType {
   id: string
   name: string
@@ -69,6 +81,8 @@ export interface NoteType {
   templates: CardTemplate[]
   /** Anki note type id on import (re-import reuses the type). */
   sourceId?: number
+  /** What the Anki note type had and Recto does not use, given back by the .apkg export (M10). */
+  anki?: AnkiTypeExtras
   createdAt: number
   updatedAt: number
 }

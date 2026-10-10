@@ -29,6 +29,12 @@ export interface ApkgModel {
   type: number
   fields: string[]
   templates: { name: string; qfmt: string; afmt: string }[]
+  /** Modification time, seconds. */
+  mod?: number
+  css?: string
+  latexPre?: string
+  latexPost?: string
+  sortf?: number
 }
 
 export interface ApkgNote {
@@ -169,6 +175,11 @@ function readModels(json: string): ApkgModel[] {
           qfmt: typeof t.qfmt === 'string' ? t.qfmt : '',
           afmt: typeof t.afmt === 'string' ? t.afmt : '',
         })),
+      ...(typeof m.mod === 'number' && Number.isFinite(m.mod) ? { mod: m.mod } : {}),
+      ...(typeof m.css === 'string' ? { css: m.css } : {}),
+      ...(typeof m.latexPre === 'string' ? { latexPre: m.latexPre } : {}),
+      ...(typeof m.latexPost === 'string' ? { latexPost: m.latexPost } : {}),
+      ...(Number.isInteger(m.sortf) ? { sortf: Number(m.sortf) } : {}),
     })
   }
   return out

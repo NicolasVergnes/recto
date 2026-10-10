@@ -189,6 +189,8 @@ export interface NoteType {
   fields: string[]           // noms uniques (sans casse), sans { } : " ni # ^ / en tête
   templates: CardTemplate[]  // au moins un ; ord d'une carte = indice de son modèle
   sourceId?: number          // id du type Anki à l'import (réimport et réexport le réutilisent)
+  anki?: { css?: string; latexPre?: string; latexPost?: string; sortField?: number }
+                             // M10 : style du type Anki, inutilisé par Recto, rendu par l'export .apkg
   createdAt: number
   updatedAt: number
 }

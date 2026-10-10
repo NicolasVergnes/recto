@@ -187,10 +187,18 @@ const commonModel = (id: number, mod: number) => ({
   vers: [],
 })
 
-/** A custom note type as a standard Anki note type: its fields and templates, as written. */
+/**
+ * A custom note type as a standard Anki note type: its fields and templates, as written, and the
+ * styling it came with from Anki (M10), so that Anki keeps its look when it takes the type back.
+ */
 function customModel(type: NoteType) {
+  const sortField = type.anki?.sortField ?? 0
   return {
     ...commonModel(customModelId(type), Math.floor(type.updatedAt / 1000)),
+    ...(type.anki?.css !== undefined ? { css: type.anki.css } : {}),
+    ...(type.anki?.latexPre !== undefined ? { latexPre: type.anki.latexPre } : {}),
+    ...(type.anki?.latexPost !== undefined ? { latexPost: type.anki.latexPost } : {}),
+    sortf: sortField < type.fields.length ? sortField : 0,
     name: type.name,
     type: 0,
     flds: type.fields.map((name, ord) => field(name, ord)),

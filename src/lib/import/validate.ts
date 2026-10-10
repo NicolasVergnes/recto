@@ -284,5 +284,16 @@ export function readNoteType(x: unknown): NoteType | null {
     updatedAt: x.updatedAt,
   }
   if (isNum(x.sourceId)) type.sourceId = x.sourceId
+  // Anki styling kept for the export (M10): wrong values are dropped, not the type.
+  if (isObj(x.anki)) {
+    const a = x.anki
+    const anki: NonNullable<NoteType['anki']> = {}
+    if (isStr(a.css)) anki.css = a.css
+    if (isStr(a.latexPre)) anki.latexPre = a.latexPre
+    if (isStr(a.latexPost)) anki.latexPost = a.latexPost
+    if (Number.isInteger(a.sortField) && isNum(a.sortField) && a.sortField >= 0)
+      if (a.sortField < x.fields.length) anki.sortField = a.sortField
+    if (Object.keys(anki).length > 0) type.anki = anki
+  }
   return type
 }

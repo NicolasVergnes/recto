@@ -795,6 +795,72 @@ describe('round trip through the Recto importer', () => {
     expect(again.report.skipped).toBe(2)
   })
 
+  it("gives Anki back an imported type's styling and date (M10)", async () => {
+    const deck = makeDeck({ name: 'Styles' }, 'deck', now)
+    const ankiMod = 1477379557
+    const type: NoteType = {
+      id: 'type',
+      name: 'Styled',
+      // Four fields: a custom type, not a basic one.
+      fields: ['Numero', 'Dept', 'Carte', 'Prefecture'],
+      templates: [{ name: 'Q', front: '{{Numero}}', back: '{{FrontSide}}<hr id=answer>{{Dept}}' }],
+      sourceId: 1342705100181,
+      anki: {
+        css: '.card { font-family: arial; }',
+        latexPre: 'PRE',
+        latexPost: 'POST',
+        sortField: 2,
+      },
+      createdAt: now,
+      updatedAt: ankiMod * 1000,
+    }
+    const note: Note = {
+      id: 'n',
+      deckId: deck.id,
+      modelType: 'custom',
+      noteTypeId: type.id,
+      fields: ['01', 'Ain', 'carte', 'Bourg-en-Bresse'],
+      tags: [],
+      createdAt: now,
+      updatedAt: now,
+    }
+    const plain: NoteType = { ...type, id: 'plain', sourceId: 1, name: 'Plain', updatedAt: now }
+    delete plain.anki
+    const other: Note = { ...note, id: 'm', noteTypeId: plain.id }
+    const { bytes, db } = await open({
+      decks: [deck],
+      notes: [note, other],
+      cards: [makeCard(note, 0, 'c', now), makeCard(other, 0, 'd', now)],
+      reviews: [],
+      media: [],
+      noteTypes: [type, plain],
+    })
+    const models = json(rows(db, 'SELECT models FROM col')[0]?.models) as Record<
+      string,
+      Record<string, unknown>
+    >
+    // Anki updates its note type only from a more recent mod: the unchanged type keeps Anki's.
+    expect(models[String(type.sourceId)]).toMatchObject({
+      mod: ankiMod,
+      css: type.anki?.css,
+      latexPre: 'PRE',
+      latexPost: 'POST',
+      sortf: 2,
+    })
+    // A type made in Recto: Recto's styling, first field as sort field.
+    expect(models['1']).toMatchObject({ sortf: 0, mod: Math.floor(now / 1000) })
+    expect(models['1']?.css).not.toBe(type.anki?.css)
+
+    // Imported again: the styling and Anki's date come back with the type.
+    const pkg = readApkg(bytes, SQL)
+    const plan = await planApkgImport(pkg, importOptions, empty, now, newId)
+    const styled = plan.noteTypes?.find((t) => t.name === 'Styled')
+    expect(styled?.updatedAt).toBe(ankiMod * 1000)
+    expect(styled?.anki).toEqual(type.anki)
+    const recto = plan.noteTypes?.find((t) => t.name === 'Plain')
+    expect(recto?.anki?.sortField).toBe(0)
+  })
+
   it('exports an empty selection as a valid package', async () => {
     const { bytes, report } = await buildApkg(
       SQL,

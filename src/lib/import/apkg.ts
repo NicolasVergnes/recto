@@ -58,7 +58,7 @@ export interface ModelConversion {
   converted: boolean
   map: (fields: readonly string[]) => string[]
   /** custom: the note type to create (or reuse), as Anki defines it. */
-  noteType?: Pick<NoteType, 'name' | 'fields' | 'templates'>
+  noteType?: Pick<NoteType, 'name' | 'fields' | 'templates' | 'anki' | 'updatedAt'>
 }
 
 const joinRest = (fields: readonly string[], from: number) =>
@@ -135,6 +135,17 @@ export function convertModel(model: ApkgModel): ModelConversion {
         front: t.qfmt,
         back: t.afmt,
       })),
+      // Kept for the export (M10): Anki updates its note type only from a more recent `mod`, so an
+      // unchanged type keeps Anki's date, and an edited one gives back Anki's styling.
+      updatedAt: (model.mod ?? 0) * 1000,
+      anki: {
+        ...(model.css !== undefined ? { css: model.css } : {}),
+        ...(model.latexPre !== undefined ? { latexPre: model.latexPre } : {}),
+        ...(model.latexPost !== undefined ? { latexPost: model.latexPost } : {}),
+        ...(model.sortf !== undefined && model.sortf >= 0 && model.sortf < model.fields.length
+          ? { sortField: model.sortf }
+          : {}),
+      },
     },
   }
 }
@@ -145,7 +156,7 @@ export function convertModel(model: ApkgModel): ModelConversion {
  */
 function resolveNoteType(
   ankiId: string,
-  shape: Pick<NoteType, 'name' | 'fields' | 'templates'>,
+  shape: NonNullable<ModelConversion['noteType']>,
   existing: readonly NoteType[],
   created: NoteType[],
   now: number,
@@ -159,7 +170,16 @@ function resolveNoteType(
   const taken = new Set([...existing, ...created].map((t) => t.name.toLowerCase()))
   let name = shape.name
   for (let i = 2; taken.has(name.toLowerCase()); i++) name = `${shape.name} (${i})`
-  const type: NoteType = { id: newId(), ...shape, name, createdAt: now, updatedAt: now }
+  const { anki, updatedAt, ...rest } = shape
+  // Anki's date when it has one: re-exporting the unchanged type leaves Anki's own as it is.
+  const type: NoteType = {
+    id: newId(),
+    ...rest,
+    name,
+    createdAt: now,
+    updatedAt: updatedAt > 0 ? updatedAt : now,
+  }
+  if (anki && Object.keys(anki).length > 0) type.anki = anki
   if (Number.isSafeInteger(sourceId)) type.sourceId = sourceId
   created.push(type)
   return type

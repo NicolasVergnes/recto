@@ -8,6 +8,7 @@ import {
   readManifest,
   readMediaMeta,
   readNote,
+  readNoteType,
   readObject,
   readReview,
   readSetting,
@@ -82,6 +83,26 @@ describe('backup validators', () => {
         device: 'd',
       }),
     ).toEqual({ schemaVersion: 1, appVersion: '0.1.0', exportedAt: 5, device: 'd' })
+  })
+
+  it('keeps the Anki styling of a note type, dropping wrong values (M10)', () => {
+    const type = {
+      id: 't',
+      name: 'T',
+      fields: ['A', 'B'],
+      templates: [{ name: 'C', front: '{{A}}', back: '{{B}}' }],
+      createdAt: 1,
+      updatedAt: 2,
+    }
+    expect(readNoteType(type)?.anki).toBeUndefined()
+    expect(
+      readNoteType({
+        ...type,
+        anki: { css: '.card {}', latexPre: 'P', latexPost: 7, sortField: 1 },
+      })?.anki,
+    ).toEqual({ css: '.card {}', latexPre: 'P', sortField: 1 })
+    expect(readNoteType({ ...type, anki: { sortField: 2 } })?.anki).toBeUndefined()
+    expect(readNoteType({ ...type, anki: 'x' })?.name).toBe('T')
   })
 
   it('accepts every note type, image occlusion included', () => {

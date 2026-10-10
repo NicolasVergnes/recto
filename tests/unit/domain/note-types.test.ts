@@ -243,3 +243,27 @@ describe('reordering fields and templates (M10)', () => {
     }
   })
 })
+
+describe("Anki's sort field (M10)", () => {
+  const styled: NoteType = { ...TYPE, anki: { css: '.card {}', sortField: 1 } }
+
+  it('follows its field when fields move, and falls back to the first when removed', () => {
+    const edit = editOf(styled)
+    edit.fields = [edit.fields[1], edit.fields[2], edit.fields[0]].filter((f) => f !== undefined)
+    expect(planNoteTypeEdit(styled, edit, [], [], 2, newId).type.anki).toEqual({
+      css: '.card {}',
+      sortField: 0,
+    })
+    const removed = editOf(styled)
+    removed.fields.splice(1, 1)
+    removed.fields.unshift({ name: 'Nouveau', from: null })
+    expect(planNoteTypeEdit(styled, removed, [], [], 2, newId).type.anki?.sortField).toBe(0)
+    const kept = editOf(styled)
+    kept.fields.unshift({ name: 'Nouveau', from: null })
+    expect(planNoteTypeEdit(styled, kept, [], [], 2, newId).type.anki?.sortField).toBe(2)
+  })
+
+  it('leaves a type without Anki styling as it is', () => {
+    expect(planNoteTypeEdit(TYPE, editOf(TYPE), [], [], 2, newId).type.anki).toBeUndefined()
+  })
+})

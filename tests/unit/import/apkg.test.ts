@@ -155,11 +155,18 @@ describe('convertModel', () => {
     const conversion = convertModel(wide)
     expect(conversion).toMatchObject({ modelType: 'custom', converted: false, mergedFields: 0 })
     expect(conversion.map(['a', 'b', 'c', 'd', 'e'])).toEqual(['a', 'b', 'c', 'd'])
-    expect(conversion.noteType).toEqual({
+    expect(conversion.noteType).toMatchObject({
       name: 'Pays',
       fields: ['Front', 'Back', 'Note', 'Source'],
       templates: [{ name: 'Carte', front: '{{Front}}', back: '{{Back}} {{Source}}' }],
     })
+    // Anki's date and styling are kept for the export (M10); an out-of-range sort field is not.
+    const styled = convertModel({ ...wide, mod: 1477379557, css: '.card {}', sortf: 2 })
+    expect(styled.noteType).toMatchObject({
+      updatedAt: 1477379557000,
+      anki: { css: '.card {}', sortField: 2 },
+    })
+    expect(convertModel({ ...wide, sortf: 9 }).noteType?.anki?.sortField).toBeUndefined()
     // Two templates that do not ask the two sides: kept as they are.
     const odd = {
       ...basic,
