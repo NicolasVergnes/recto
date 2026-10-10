@@ -272,6 +272,9 @@ export const fr = {
     fieldName: 'Nom du champ {n}',
     addField: 'Ajouter un champ',
     removeField: 'Retirer le champ « {name} »',
+    moveFieldUp: 'Monter le champ « {name} »',
+    moveFieldDown: 'Descendre le champ « {name} »',
+    fieldMoved: 'Champ « {name} » en position {n} sur {total}',
     newField: 'Champ {n}',
     cards: 'Cartes',
     cardsHelp:
@@ -281,6 +284,9 @@ export const fr = {
     answer: 'Verso (réponse)',
     addCard: 'Ajouter une carte',
     removeCard: 'Retirer la carte « {name} »',
+    moveCardUp: 'Monter la carte « {name} »',
+    moveCardDown: 'Descendre la carte « {name} »',
+    cardMoved: 'Carte « {name} » en position {n} sur {total}',
     newCard: 'Carte {n}',
     syntax:
       'Syntaxe : {{Champ}} insère un champ ; {{FrontSide}} reprend la question au verso ; {{#Champ}}…{{/Champ}} n’affiche son contenu que si le champ est rempli, {{^Champ}}…{{/Champ}} que s’il est vide ; {{type:Champ}} demande de taper la réponse ; {{text:Champ}} insère le champ sans mise en forme.',

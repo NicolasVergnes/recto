@@ -2,12 +2,26 @@
   import { t } from '$lib/i18n'
   import Icon from '../Icon.svelte'
   import type { NoteTypeDraft } from './draft.svelte'
+  import MoveButtons, { focusMoved } from './MoveButtons.svelte'
 
   interface Props {
     draft: NoteTypeDraft
   }
   let { draft }: Props = $props()
   const uid = $props.id()
+  /** Spoken after a move; the live region stays in the page (inserted ones are often skipped). */
+  let announcement = $state('')
+
+  function move(i: number, by: -1 | 1) {
+    const to = draft.moveField(i, by)
+    if (to === i) return
+    announcement = t('noteTypes.fieldMoved', {
+      name: draft.edit.fields[to]?.name ?? '',
+      n: to + 1,
+      total: draft.edit.fields.length,
+    })
+    void focusMoved(`${uid}-${to}`, by)
+  }
 </script>
 
 <section class="stack" aria-labelledby="{uid}-title">
@@ -26,6 +40,14 @@
           maxlength="60"
           onchange={(e) => draft.renameField(i, e.currentTarget.value)}
         />
+        <MoveButtons
+          id="{uid}-{i}"
+          upLabel={t('noteTypes.moveFieldUp', { name: field.name })}
+          downLabel={t('noteTypes.moveFieldDown', { name: field.name })}
+          first={i === 0}
+          last={i === draft.edit.fields.length - 1}
+          onmove={(by) => move(i, by)}
+        />
         <button
           class="btn btn-sm btn-ghost"
           type="button"
@@ -38,6 +60,7 @@
       </li>
     {/each}
   </ol>
+  <p class="visually-hidden" role="status" aria-live="polite">{announcement}</p>
   <div>
     <button class="btn btn-sm" type="button" onclick={() => draft.addField()}>
       <Icon name="plus" />

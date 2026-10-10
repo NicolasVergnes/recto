@@ -12,6 +12,7 @@ import {
   undoReview,
 } from '$lib/db/study'
 import { getScheduler } from '$lib/scheduler'
+import { editOf } from '$lib/domain/note-types'
 import type { Card } from '$lib/domain/types'
 import { paris } from '../../helpers/fixtures'
 import { useTestDatabase } from '../../helpers/db'
@@ -88,6 +89,48 @@ describe('recordReview / undoReview', () => {
     const restored = await undoReview(cards[0], kept.id)
     expect(restored).toEqual({ ...cards[0], deckId: other.id })
     expect(await repo.getCard(cards[0].id)).toEqual(restored)
+  })
+
+  it('keeps the new ord of a card whose template moved since the answer (M10)', async () => {
+    const deck = await repo.createDeck({ name: 'D' }, now - 30 * DAY)
+    const type = await repo.createNoteType(
+      {
+        name: 'Pays',
+        fields: ['Pays', 'Capitale'],
+        templates: [
+          { name: 'Pays', front: '{{Pays}}', back: '{{Capitale}}' },
+          { name: 'Capitale', front: '{{Capitale}}', back: '{{Pays}}' },
+        ],
+      },
+      now - 30 * DAY,
+    )
+    const { cards } = await repo.createNote(
+      {
+        deckId: deck.id,
+        modelType: 'custom',
+        noteTypeId: type.id,
+        fields: ['France', 'Paris'],
+        tags: [],
+      },
+      now - 30 * DAY,
+    )
+    const [first, second] = cards
+    if (!first || !second) throw new Error('cards')
+    const answer = await recordReview(fsrs.answer(first, 3, now, deck), 1000)
+    // The templates swap places in the type editor: the answered card follows its template.
+    const edit = editOf(type)
+    edit.templates.reverse()
+    await repo.updateNoteType(type.id, edit, now + 1)
+    expect((await repo.getCard(first.id))?.ord).toBe(1)
+
+    const restored = await undoReview(first, answer.id)
+    expect(restored).toEqual({ ...first, ord: 1 })
+    // Two templates, two cards: the ords stay distinct.
+    const ords = (await repo.getCardsOfNote(first.noteId)).map((c) => [c.id, c.ord])
+    expect(ords).toEqual([
+      [second.id, 0],
+      [first.id, 1],
+    ])
   })
 })
 

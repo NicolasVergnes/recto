@@ -4,6 +4,20 @@ import { renameFieldRefs } from '$lib/domain/templates'
 import type { NoteType } from '$lib/domain/types'
 import { t } from '$lib/i18n'
 
+/**
+ * Swaps entry `i` with its neighbour, above (`by` -1) or below (1), and returns where the entry
+ * is now (`i` itself at an end). The entry travels whole, with its `from`.
+ */
+function swapWithNeighbour<T>(list: T[], i: number, by: -1 | 1): number {
+  const j = i + by
+  const entry = list[i]
+  const neighbour = list[j]
+  if (entry === undefined || neighbour === undefined) return i
+  list[i] = neighbour
+  list[j] = entry
+  return j
+}
+
 /** A note type being edited: its fields and templates, each remembering where it came from. */
 export class NoteTypeDraft {
   edit = $state<NoteTypeEdit>({ name: '', fields: [], templates: [] })
@@ -47,6 +61,14 @@ export class NoteTypeDraft {
     if (this.edit.fields.length > 1) this.edit.fields.splice(i, 1)
   }
 
+  /**
+   * Moves field `i` one place up (`by` -1) or down (1) and returns its new index. Nothing else
+   * changes: the templates name their fields, and saving moves each note's values by `from`.
+   */
+  moveField(i: number, by: -1 | 1): number {
+    return swapWithNeighbour(this.edit.fields, i, by)
+  }
+
   /** A new card asks the first field and answers with the second. */
   addTemplate(): void {
     const [first = '', second = first] = this.shape.fields
@@ -60,6 +82,11 @@ export class NoteTypeDraft {
 
   removeTemplate(i: number): void {
     if (this.edit.templates.length > 1) this.edit.templates.splice(i, 1)
+  }
+
+  /** Moves template `i` one place up or down and returns its new index; saving moves its cards. */
+  moveTemplate(i: number, by: -1 | 1): number {
+    return swapWithNeighbour(this.edit.templates, i, by)
   }
 
   /** Plain copy for the repository (no reactive proxies in IndexedDB). */

@@ -1,9 +1,11 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import type { SqlJsStatic } from 'sql.js'
 import { gatherApkgExport } from '$lib/db/export-apkg'
+import * as repo from '$lib/db/repo'
 import { setSetting } from '$lib/db/settings'
 import { buildApkg } from '$lib/export/apkg'
 import { readApkg } from '$lib/import/apkg'
+import { NoteTypeDraft } from '$lib/ui/note-types/draft.svelte'
 import { representativeCollection, PNG } from '../../helpers/apkg-collection'
 import { useTestDatabase } from '../../helpers/db'
 
@@ -80,5 +82,73 @@ describe('gatherApkgExport', () => {
     const pkg = readApkg(bytes, SQL)
     expect(pkg.decks.map((d) => d.name).sort()).toEqual(['Boîte', 'Default', 'Géo'])
     expect(pkg.media.map((m) => m.name)).toEqual(['lune.png', 'bip.mp3'])
+  })
+})
+
+describe('a note type whose fields and cards were moved (M10)', () => {
+  it('is written in its new order: model, notes and the ord of each card', async () => {
+    const deck = await repo.createDeck({ name: 'Monde' }, now)
+    const type = await repo.createNoteType(
+      {
+        name: 'Pays',
+        fields: ['Pays', 'Capitale', 'Drapeau'],
+        templates: [
+          {
+            name: 'Capitale',
+            front: 'Capitale de {{Pays}} ?',
+            back: '{{FrontSide}}<hr id=answer>{{Capitale}}',
+          },
+          { name: 'Pays', front: '{{Capitale}} est la capitale de ?', back: '{{Pays}}' },
+          { name: 'Drapeau', front: '{{Drapeau}}', back: '{{Pays}}' },
+        ],
+      },
+      now,
+    )
+    const note = (fields: string[]) =>
+      repo.createNote(
+        { deckId: deck.id, modelType: 'custom', noteTypeId: type.id, fields, tags: [] },
+        now,
+      )
+    await note(['France', 'Paris', 'bleu blanc rouge'])
+    await note(['Italie', 'Rome', ''])
+    // « Drapeau » to the top of the fields and of the cards.
+    const draft = new NoteTypeDraft()
+    draft.load(type)
+    draft.moveField(2, -1)
+    draft.moveField(1, -1)
+    draft.moveTemplate(2, -1)
+    draft.moveTemplate(1, -1)
+    await repo.updateNoteType(type.id, draft.snapshot(), now + 1)
+
+    const { input, dayStartHour } = await gatherApkgExport()
+    const { bytes } = await buildApkg(SQL, input, { now, dayStartHour })
+    const pkg = readApkg(bytes, SQL)
+    const model = pkg.models.find((m) => m.name === 'Pays')
+    if (!model) throw new Error('model')
+    expect(model.fields).toEqual(['Drapeau', 'Pays', 'Capitale'])
+    expect(model.templates.map((t) => t.name)).toEqual(['Drapeau', 'Capitale', 'Pays'])
+    expect(model.templates.map((t) => t.qfmt)).toEqual([
+      '{{Drapeau}}',
+      'Capitale de {{Pays}} ?',
+      '{{Capitale}} est la capitale de ?',
+    ])
+    // Each note keeps its values under the same names, in the new order.
+    const values = pkg.notes
+      .map((n) => n.fields)
+      .sort((a, b) => (a[1] ?? '').localeCompare(b[1] ?? ''))
+    expect(values).toEqual([
+      ['bleu blanc rouge', 'France', 'Paris'],
+      ['', 'Italie', 'Rome'],
+    ])
+    // The cards sit at the index of their template: Italie, without flag, has no card 0.
+    const ordsOf = (country: string) => {
+      const anki = pkg.notes.find((n) => n.fields[1] === country)
+      return pkg.cards
+        .filter((c) => c.nid === anki?.id)
+        .map((c) => c.ord)
+        .sort((a, b) => a - b)
+    }
+    expect(ordsOf('France')).toEqual([0, 1, 2])
+    expect(ordsOf('Italie')).toEqual([1, 2])
   })
 })
