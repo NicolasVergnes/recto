@@ -1,10 +1,26 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-10-10 · Branche : m9-review-tweaks (créée depuis `m8-note-types`, non fusionnée ni poussée) · **V1 (M6) fusionnée sur `main` (PR #1)** · **M7 (vue mosaïque), M8 (types de notes multi-cartes) et M9 (jumelles, Memory Box sans calendrier) livrés**, en attente de relecture et de fusion par Nicolas
+Dernière mise à jour : 2026-10-10 · Branche : m10-tech-debt (créée depuis `m9-review-tweaks`, non fusionnée ni poussée) · **V1 (M6) fusionnée sur `main` (PR #1)** · **M7 (vue mosaïque), M8 (types de notes multi-cartes) et M9 (jumelles, Memory Box sans calendrier) livrés**, en attente de relecture et de fusion par Nicolas · Jalon en cours : M10
 
 ## Jalon en cours
 
-Aucun : M9 est terminé, en attente de relecture et de fusion (après M7 et M8, dont il dépend). Suivant : V2 (synchronisation par fichier, empaquetage Android — voir « Écarts »), et la dette ci-dessous.
+### M10 — Dette technique (2026-10-10)
+
+Demande de Nicolas du 2026-10-10 : « Continue les étapes de dev qui ne nécessitent pas mon intervention ». Périmètre retenu : la dette de « Reste à faire » qui ne demande ni décision produit ni manipulation de Nicolas. La V2 (synchronisation par fichier, empaquetage Android) attend sa confirmation (« Écarts », M6 ; l'empaquetage demande aussi des comptes et des clés de signature) : non commencée. Branche créée depuis `m9-review-tweaks` (M10 touche au code de M8 et M9, non fusionnés).
+
+Plan :
+
+1. Réimport `.apkg` et fusion de sauvegarde : les cartes des notes mises à jour sont réconciliées (trou, masque ou modèle ajouté ou retiré) au lieu d'ignorer la note ou de laisser des cartes en trop — `src/lib/import/{apkg,plan}.ts`, `src/lib/db/{importer,restore}.ts` ; tests `tests/unit/import/apkg*.test.ts`, `tests/unit/db/importer.test.ts`, `tests/unit/import/backup.test.ts`.
+2. Éditeur de types : monter et descendre un champ ou un modèle de carte — `src/lib/ui/note-types/` ; tests `tests/unit/domain/note-types.test.ts`, E2E `tests/e2e/note-types.spec.ts`.
+3. Formules : `[$]…[/$]` et `[$$]…[/$$]` d'Anki rendues par KaTeX ; aide de syntaxe dans l'éditeur — `src/lib/domain/math.ts`, `src/lib/ui/editor/` ; tests `tests/unit/domain/{math,typed}.test.ts`, E2E `tests/e2e/math.spec.ts`.
+4. Import CSV vers un type personnalisé (colonnes → champs du type) ; une ligne d'un type intégré ne met plus jamais à jour une note personnalisée — `src/lib/import/csv.ts`, `src/lib/ui/import/CsvImport.svelte` ; tests `tests/unit/import/csv.test.ts`, E2E.
+5. Composants de plus de 200 lignes découpés sans changement de comportement (svelte5-conventions §3) : `Settings`, `Home`, `Deck`, `CsvImport`, `Stats`, `App`, `Heatmap`, `ApkgImport`, `Cards`, `ColumnChart`, `CardMosaic`, `Editor` ; E2E existants inchangés.
+6. Favicon dans `index.html` sans requête (hors ligne, plus d'échec de `logo.svg`).
+7. Interopérabilité : export d'un type personnalisé vérifié avec le moteur d'Anki (`tests/interop/`).
+8. Firefox et WebKit : suite E2E lancée hors `verify` ; écarts corrigés ou consignés.
+9. Relecture adversariale de l'ensemble, `npm run verify`, docs (02, 04, 05, 08, STATUS, CHANGELOG).
+
+Méthode : comme en M6, chaque point est développé sur une branche de travail `m10-*` (copie de travail isolée), relu par des relecteurs indépendants puis corrigé, et intégré à `m10-tech-debt` en un commit par point.
 
 ## Terminé
 

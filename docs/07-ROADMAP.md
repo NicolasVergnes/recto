@@ -67,17 +67,17 @@ Critères d'acceptation : chaque ligne « ✔ » doit être vérifiable par un t
 Hors roadmap initiale. Dans « Cartes », afficher les cartes en liste (existant) ou en mosaïque de tuiles montrant le rendu réel : une face retournable au clic, ou recto et verso côte à côte. Style de retournement choisi dans Paramètres.
 
 Critères d'acceptation :
-- [ ] Contrôle « Affichage » (Liste, Mosaïque, Mosaïque recto-verso) mémorisé (`browserView`).
-- [ ] Tuile : contenu rendu (HTML, formules, images, occlusion), case de sélection, « Retourner », « Modifier » ; verso hors du DOM avant le premier retournement.
-- [ ] Barre de la mosaïque : « Tout sélectionner », « Trier par », « Ordre ».
-- [ ] 5 styles de retournement dont « Sans animation » (`flipStyle`), ≤ 400 ms, instantané avec `prefers-reduced-motion`.
-- [ ] Mosaïque virtualisée : 5 000 cartes gardent un DOM borné ; 1 colonne sur mobile (recto-verso empilé).
-- [ ] `Cards.svelte` découpé (CardTable, BulkActions) sans changement de comportement ; tests E2E bureau et mobile.
+- [x] Contrôle « Affichage » (Liste, Mosaïque, Mosaïque recto-verso) mémorisé (`browserView`).
+- [x] Tuile : contenu rendu (HTML, formules, images, occlusion), case de sélection, « Retourner », « Modifier » ; verso hors du DOM avant le premier retournement.
+- [x] Barre de la mosaïque : « Tout sélectionner », « Trier par », « Ordre ».
+- [x] 5 styles de retournement dont « Sans animation » (`flipStyle`), ≤ 400 ms, instantané avec `prefers-reduced-motion`.
+- [x] Mosaïque virtualisée : 5 000 cartes gardent un DOM borné ; 1 colonne sur mobile (recto-verso empilé).
+- [x] `Cards.svelte` découpé (CardTable, BulkActions) sans changement de comportement ; tests E2E bureau et mobile.
 
 Retours de Nicolas (2026-09-30) :
-- [ ] Rotation : la question ne transparaît jamais en miroir derrière la réponse.
-- [ ] Le contenu d'une tuile tient sans barre de défilement (réduit si besoin) ; « Taille » des tuiles (petites, moyennes, grandes) mémorisée (`tileSize`).
-- [ ] « Déplacer » : bouton « Nouveau paquet » dans la fenêtre.
+- [x] Rotation : la question ne transparaît jamais en miroir derrière la réponse.
+- [x] Le contenu d'une tuile tient sans barre de défilement (réduit si besoin) ; « Taille » des tuiles (petites, moyennes, grandes) mémorisée (`tileSize`).
+- [x] « Déplacer » : bouton « Nouveau paquet » dans la fenêtre.
 
 ## M8 — Types de notes multi-cartes (demande de Nicolas, 2026-10-02)
 
@@ -101,3 +101,17 @@ Critères d'acceptation :
 - [x] Memory Box : plus de choix de mode ; intervalles réglables ; sauvegardes et paquets plus anciens en mode calendrier lus en intervalles.
 - [x] Changement de planificateur : confirmation, aucun téléchargement.
 - [x] Tests unitaires (jumelles, file, chargement de la file, validation) et E2E mis à jour.
+
+## M10 — Dette technique (session autonome, 2026-10-10)
+
+Hors roadmap initiale. Nicolas demande de poursuivre sans lui les étapes qui ne demandent pas son intervention : la dette de `STATUS.md` (« Reste à faire »), sans la V2, qui attend sa confirmation.
+
+Critères d'acceptation :
+- [ ] Réimport `.apkg` : une note plus récente dans Anki dont les cartes changent (trou, masque ou modèle ajouté ou retiré) est mise à jour avec ses cartes (nouvelles cartes converties comme à l'import, cartes en trop supprimées, journal conservé), sans changer de type ; une note qui changerait de type reste ignorée et comptée.
+- [ ] Fusion de sauvegarde : chaque note fusionnée a exactement les cartes de son contenu (invariant 2) ; deux cartes d'une même note pour le même `ord` n'en font plus qu'une.
+- [ ] Éditeur de types : monter et descendre un champ ou un modèle de carte, au clavier comme à la souris ; les notes et les cartes suivent (planification et journal conservés).
+- [ ] Formules `[$]…[/$]` et `[$$]…[/$$]` d'Anki rendues par KaTeX ; aide de syntaxe des formules dans l'éditeur.
+- [ ] Import CSV vers un type personnalisé (colonnes → champs du type, doublons et mise à jour parmi les notes du même type) ; une ligne d'un type intégré ne met jamais à jour une note d'un type personnalisé.
+- [ ] Aucun composant de plus de 200 lignes ; comportement inchangé (E2E existants verts).
+- [ ] Favicon sans requête réseau ; export d'un type personnalisé vérifié avec le moteur d'Anki ; suite E2E lancée dans Firefox et WebKit, écarts corrigés ou consignés.
+- [ ] `npm run verify` vert.
