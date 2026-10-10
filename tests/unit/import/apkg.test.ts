@@ -138,7 +138,8 @@ describe('convertModel', () => {
         { name: '2', qfmt: '{{Back}}', afmt: '{{Front}}' },
       ],
     }
-    expect(convertModel(rev)).toMatchObject({ modelType: 'basic_reverse', converted: false })
+    // Anki's reversed type: one basic card asked both ways (M11), not two twin cards.
+    expect(convertModel(rev)).toMatchObject({ modelType: 'basic', converted: false })
     expect(convertModel(rev).map(['a', 'b', 'c', 'd'])).toEqual(['a', 'b', 'c<br>d'])
   })
 

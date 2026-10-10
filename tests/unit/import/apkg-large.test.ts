@@ -72,7 +72,7 @@ function buildPackage(n: number): Uint8Array {
 }
 
 describe('large .apkg (≥ 1 000 cards, 07-ROADMAP M4)', () => {
-  it('imports 5 000 notes / 10 000 cards with history in batches', async () => {
+  it('imports 5 000 notes with history in batches, one card each for a reversed type', async () => {
     const t0 = performance.now()
     const pkg = readApkg(buildPackage(5000), SQL)
     expect(pkg.cards).toHaveLength(10_000)
@@ -85,10 +85,11 @@ describe('large .apkg (≥ 1 000 cards, 07-ROADMAP M4)', () => {
     )
     const batches: number[] = []
     const report = await applyImportPlan(plan, { onProgress: (done) => batches.push(done) })
-    expect(report).toMatchObject({ notesCreated: 5000, cardsCreated: 10_000 })
-    expect(report.reviewsImported).toBe(1667 * 2 * 2)
+    // Anki's reversed type: one Recto card asked both ways (M11), with the history of Anki's first.
+    expect(report).toMatchObject({ notesCreated: 5000, cardsCreated: 5000 })
+    expect(report.reviewsImported).toBe(1667 * 2)
     expect(batches).toEqual([0, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000])
-    expect(await env.db.cards.count()).toBe(10_000)
+    expect(await env.db.cards.count()).toBe(5000)
     expect((await env.db.decks.toArray()).map((d) => d.name).sort()).toEqual(['Anglais', 'Langues'])
     expect(performance.now() - t0).toBeLessThan(60_000)
   }, 120_000)

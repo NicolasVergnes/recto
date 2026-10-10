@@ -1,6 +1,6 @@
 <script lang="ts">
   import * as repo from '$lib/db/repo'
-  import { validateNoteType } from '$lib/domain/note-types'
+  import { unknownReference, validateNoteType } from '$lib/domain/note-types'
   import type { Note, NoteType } from '$lib/domain/types'
   import { t } from '$lib/i18n'
   import { href, navigate, type RouteProps } from '$lib/router.svelte'
@@ -47,18 +47,22 @@
     const edit = draft.snapshot()
     const invalid = validateNoteType({ name: edit.name, ...draft.shape })
     if (invalid) {
-      toast(t(`errors.${invalid}`), 'error')
+      const unknown = invalid === 'noteTypeUnknownField' ? unknownReference(draft.shape) : null
+      toast(unknown ? t('noteTypes.unknownField', unknown) : t(`errors.${invalid}`), 'error')
       return
     }
     busy = true
     try {
-      const { added, removed } = await repo.previewNoteTypeEdit(type.id, edit)
-      if (added + removed > 0) {
+      const { added, removed, lost } = await repo.previewNoteTypeEdit(type.id, edit)
+      if (added + removed + lost.length > 0) {
         const ok = await confirmAction({
           title: t('noteTypes.confirmTitle'),
-          message: t('noteTypes.confirm', { added, removed }),
+          message: [
+            ...(added + removed > 0 ? [t('noteTypes.confirm', { added, removed })] : []),
+            ...lost.map((l) => t('noteTypes.fieldLost', { name: l.field, n: l.notes })),
+          ].join(' '),
           confirmLabel: t('noteTypes.save'),
-          danger: removed > 0,
+          danger: removed + lost.length > 0,
         })
         if (!ok) return
       }

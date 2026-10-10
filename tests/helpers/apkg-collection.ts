@@ -13,7 +13,7 @@ const MIN = 60_000
 const DAY = 86_400_000
 
 /**
- * A small but representative collection for the Anki export (05 §4): basic, reverse and cloze
+ * A small but representative collection for the Anki export (05 §4): basic and cloze
  * notes, a sub-deck, FSRS and Leitner decks, histories replayed by the real schedulers (card
  * states and reviews agree), a suspended, a retired and a flagged card, media (one absent, one
  * unreferenced).
@@ -72,17 +72,11 @@ export function representativeCollection(now: number): ApkgExportInput {
     [3, t0 + 5 * DAY],
     [3, now - 9 * DAY],
   ])
-  const reverse = note(dep, 'basic_reverse', ['75', 'Paris', 'Préfecture'], {
+  const paris = note(dep, 'basic', ['75', 'Paris', 'Préfecture'], {
     tags: ['dep'],
     sourceGuid: 'aB3dE5fG7h',
   })
-  study(reverse, 0, [[3, now - 2 * MIN]]) // learning
-  const lapse: [Rating, number][] = [
-    [3, t0 + 2 * DAY],
-    [3, t0 + 2 * DAY + 10 * MIN],
-    [1, now - MIN],
-  ]
-  study(reverse, 1, lapse, { flag: 2 }) // relearning
+  study(paris, 0, [[3, now - 2 * MIN]]) // learning
   const cloze = note(geo, 'cloze', [
     'La {{c1::Lune}} et la {{c2::Terre::planète}}<br><img src="lune.png" alt="Lune">',
     'Extra [sound:bip.mp3]',
@@ -105,6 +99,13 @@ export function representativeCollection(now: number): ApkgExportInput {
     [3, t0 + DAY],
     [1, now - 3 * MIN],
   ])
+  const lyon = note(dep, 'basic', ['69', 'Lyon', 'Préfecture'], { tags: ['dep'] })
+  const lapse: [Rating, number][] = [
+    [3, t0 + 2 * DAY],
+    [3, t0 + 2 * DAY + 10 * MIN],
+    [1, now - MIN],
+  ]
+  study(lyon, 0, lapse, { flag: 2 }) // relearning
 
   return {
     decks: [geo, dep, box],

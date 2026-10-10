@@ -100,7 +100,7 @@ async function twinsOf(cards: readonly Card[]): Promise<QueueInput['twins']> {
   const noteById = new Map(notes.map((n) => [n.id, n]))
   return (noteId, a, b) => {
     const note = noteById.get(noteId)
-    return areTwins(note?.modelType ?? 'basic_reverse', a, b, typeById.get(note?.noteTypeId ?? ''))
+    return areTwins(note?.modelType ?? 'cloze', a, b, typeById.get(note?.noteTypeId ?? ''))
   }
 }
 

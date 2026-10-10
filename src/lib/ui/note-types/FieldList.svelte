@@ -1,5 +1,6 @@
 <script lang="ts">
   import { t } from '$lib/i18n'
+  import { toast } from '$lib/state/toast.svelte'
   import Icon from '../Icon.svelte'
   import type { NoteTypeDraft } from './draft.svelte'
   import MoveButtons, { focusMoved } from './MoveButtons.svelte'
@@ -21,6 +22,15 @@
       total: draft.edit.fields.length,
     })
     void focusMoved(`${uid}-${to}`, by)
+  }
+
+  /** A field used by a card stays: the reason is given (the button keeps its focus). */
+  function remove(i: number) {
+    const name = draft.edit.fields[i]?.name.trim() ?? ''
+    const users = draft.removeField(i)
+    if (users.length === 0) return
+    const cards = users.map((u) => `« ${u} »`).join(', ')
+    toast(t('noteTypes.fieldInUse', { name, cards, n: users.length }), 'error')
   }
 </script>
 
@@ -52,7 +62,7 @@
           class="btn btn-sm btn-ghost"
           type="button"
           disabled={draft.edit.fields.length === 1}
-          onclick={() => draft.removeField(i)}
+          onclick={() => remove(i)}
         >
           <Icon name="trash" />
           <span class="visually-hidden">{t('noteTypes.removeField', { name: field.name })}</span>

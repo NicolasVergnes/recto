@@ -79,9 +79,10 @@ export function isAnkiImageOcclusion(model: ApkgModel): boolean {
 /**
  * Note types (05 §2.3): image occlusion → [Image, masks, Header, Back Extra + Comments];
  * cloze → [Texte, Extra + rest]. A standard note type with at most 3 fields becomes basic when
- * its only template asks the first field, basic_reverse when its two templates ask the first
- * and the second; any other standard note type is kept as a custom note type (M8): same fields,
- * one card per template. Model CSS is ignored.
+ * its only template asks the first field, or when its two templates ask the first and the second
+ * (Anki's reversed type: one Recto card asked both ways, M11, the reverse card is not imported);
+ * any other standard note type is kept as a custom note type (M8): same fields, one card per
+ * template.
  */
 export function convertModel(model: ApkgModel): ModelConversion {
   const n = model.fields.length
@@ -116,7 +117,7 @@ export function convertModel(model: ApkgModel): ModelConversion {
   const reverse = model.templates.length === 2 && asks(0, 0) && asks(1, 1)
   if (n <= 3 && (basic || reverse)) {
     return {
-      modelType: reverse ? 'basic_reverse' : 'basic',
+      modelType: 'basic',
       mergedFields: 0,
       converted: false,
       map: (f) => [f[0] ?? '', f[1] ?? '', joinRest(f, 2)],

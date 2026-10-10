@@ -25,7 +25,7 @@ describe('CSV export', () => {
       note: note('a', 'basic', ['Chien', 'Dog; "wouf"', 'extra\nligne'], ['animal', 'en']),
       deckPath: 'Langues::Anglais',
     },
-    { note: note('b', 'basic_reverse', ['Chat', 'Cat', '']), deckPath: 'Langues::Anglais' },
+    { note: note('b', 'basic', ['Chat', 'Cat', '']), deckPath: 'Langues::Anglais' },
     { note: note('c', 'cloze', ['La {{c1::Lune}}', 'satellite']), deckPath: 'Astro' },
     { note: note('d', 'basic', ['<img src="flag-fr.svg">', 'France', '']), deckPath: 'Astro' },
   ]

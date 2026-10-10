@@ -64,14 +64,15 @@ export interface ApkgExportResult {
 
 /**
  * Fixed note type ids, names and modification time: a second import into Anki reuses the note
- * types (no "Basic+" copies) and never overwrites one the user edited there.
+ * types (no "Basic+" copies) and never overwrites one the user edited there. A basic note asked
+ * both ways leaves as Anki's Basic (one card; Anki cannot alternate, M11): its note type never
+ * changes in Anki from one export to the next. (1758758400002 was the reversed type, until M11.)
  */
 type BuiltIn = Exclude<ModelType, 'custom'>
 const BUILT_IN = MODEL_TYPES.filter((t): t is BuiltIn => t !== 'custom')
 
 export const ANKI_MODEL_IDS: Record<BuiltIn, number> = {
   basic: 1758758400001,
-  basic_reverse: 1758758400002,
   cloze: 1758758400003,
   image_occlusion: 1758758400004,
 }
@@ -253,22 +254,13 @@ function model(type: BuiltIn) {
       tmpls: [template('Texte à trous', 0, '{{cloze:Texte}}', `{{cloze:Texte}}${extra}`)],
       req: [[0, 'any', [0]]],
     }
-  const reverse = type === 'basic_reverse'
-  const forward = template('Recto → Verso', 0, '{{Recto}}', back('Verso'))
   return {
     ...common,
-    name: reverse ? 'Recto · Basique et inversée' : 'Recto · Basique',
+    name: 'Recto · Basique',
     type: 0,
     flds: [field('Recto', 0), field('Verso', 1), field('Extra', 2)],
-    tmpls: reverse
-      ? [forward, template('Verso → Recto', 1, '{{Verso}}', back('Recto'))]
-      : [forward],
-    req: reverse
-      ? [
-          [0, 'any', [0]],
-          [1, 'any', [1]],
-        ]
-      : [[0, 'any', [0]]],
+    tmpls: [template('Recto → Verso', 0, '{{Recto}}', back('Verso'))],
+    req: [[0, 'any', [0]]],
   }
 }
 
@@ -319,7 +311,7 @@ const DECK_CONF = {
 /**
  * Unique integer ids derived from timestamps (Anki ids are ms), bumped on collision. Callers ask
  * in ascending order (rows sorted by time), so the next free id is the last one + 1: O(1), even
- * when thousands of cards share a timestamp (CSV reverse and cloze notes). Ids stay > `floor`.
+ * when thousands of cards share a timestamp (CSV cloze notes). Ids stay > `floor`.
  */
 export function idAllocator(floor = 0) {
   let last = floor

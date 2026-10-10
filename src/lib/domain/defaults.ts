@@ -10,6 +10,7 @@ export function defaultDeckSettings(): DeckSettings {
     typedAnswer: false,
     autoplayAudio: true,
     burySiblings: true,
+    alternateSides: true,
     fsrs: {
       requestRetention: 0.9,
       maximumInterval: 365,
@@ -21,7 +22,6 @@ export function defaultDeckSettings(): DeckSettings {
     },
     leitner: {
       intervals: [...DEFAULT_LEITNER_INTERVALS],
-      alternateSides: true,
       allowSure: true,
       failToBox: 1,
     },
@@ -32,7 +32,6 @@ export interface NewDeckInput {
   name: string
   parentId?: string | null
   description?: string
-  emoji?: string
   scheduler?: SchedulerKind
 }
 
@@ -47,7 +46,6 @@ export function makeDeck(input: NewDeckInput, id: string, now: number): Deck {
     updatedAt: now,
   }
   if (input.description) deck.description = input.description
-  if (input.emoji) deck.emoji = input.emoji
   return deck
 }
 

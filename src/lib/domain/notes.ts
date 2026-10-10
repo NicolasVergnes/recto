@@ -47,7 +47,7 @@ export function normalizeFields(
 }
 
 /**
- * Card ords a note must have (02-DATA-MODEL §3 invariant 2): basic → [0], basic_reverse → [0, 1],
+ * Card ords a note must have (02-DATA-MODEL §3 invariant 2): basic → [0] (one card for both sides),
  * cloze → one per distinct index (ord = index - 1), image_occlusion → one per mask group
  * (ord = group - 1), custom → one per template whose question is not empty (none without its
  * note type).
@@ -60,8 +60,6 @@ export function cardOrds(
   switch (modelType) {
     case 'basic':
       return [0]
-    case 'basic_reverse':
-      return [0, 1]
     case 'cloze':
       return clozeIndices(fields[0] ?? '').map((i) => i - 1)
     case 'image_occlusion':
@@ -170,7 +168,7 @@ export interface RenderedCard {
   extra: string
   /** Cloze: the answer replaces the question instead of being shown below it. */
   answerReplacesQuestion: boolean
-  /** Leitner alternateSides: the back is asked (04-UI §2.2, "↔" indicator). */
+  /** Deck alternateSides: the back is asked (04-UI §2.2, "↔" indicator). */
   flipped: boolean
   /** Expected text for typed answers (empty: nothing to type). */
   expected: string
@@ -212,11 +210,12 @@ function renderCustom(
 }
 
 /**
- * Question/answer of a card. `flip` applies Leitner `sideFlipped` (ignored for cloze and custom
- * notes, 03 §3.3). A custom note needs its note type.
+ * Question/answer of a card. `flip` (the deck's `alternateSides`) applies `sideFlipped` to a basic
+ * note that is not `oneWay`; cloze, occlusion and custom notes keep their templates' side (03 §1.1).
+ * A custom note needs its note type.
  */
 export function renderCard(
-  note: Pick<Note, 'modelType' | 'fields'>,
+  note: Pick<Note, 'modelType' | 'fields' | 'oneWay'>,
   card: Pick<Card, 'ord' | 'sideFlipped'>,
   flip = false,
   noteType?: TypeShape,
@@ -257,11 +256,9 @@ export function renderCard(
       expected: clozeAnswers(f0, index).join(', '),
     }
   }
-  const reverse = card.ord === 1
-  const flipped = flip && card.sideFlipped
-  const askBack = reverse !== flipped
-  const question = askBack ? f1 : f0
-  const answer = askBack ? f0 : f1
+  const flipped = flip && card.sideFlipped && !note.oneWay
+  const question = flipped ? f1 : f0
+  const answer = flipped ? f0 : f1
   return {
     question,
     answer,

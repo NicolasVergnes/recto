@@ -60,7 +60,7 @@
 {#snippet deckRow(deck: Deck)}
   {@const c = dueOf(deck)}
   <div class="deck">
-    <a class="name" href={`#/decks/${deck.id}`}>{deck.emoji ?? ''} {deck.name}</a>
+    <a class="name" href={`#/decks/${deck.id}`}>{deck.name}</a>
     <span class="row small tabular">
       {#if c.learning + c.review + c.new > 0}
         <span class="due" title={t('home.dueTitle')}>{c.learning + c.review}</span>

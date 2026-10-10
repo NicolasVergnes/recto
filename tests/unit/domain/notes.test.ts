@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { makeCard, makeDeck, resetScheduling } from '$lib/domain/defaults'
+import { canTypeAnswer } from '$lib/domain/typed'
 import {
   byRecency,
   cardOrds,
@@ -67,7 +68,6 @@ describe('reconcileCards (invariant 2)', () => {
 describe('notes and cards', () => {
   it('generates the ords of each model (invariant 2)', () => {
     expect(cardOrds('basic', ['a', 'b'])).toEqual([0])
-    expect(cardOrds('basic_reverse', ['a', 'b'])).toEqual([0, 1])
     expect(cardOrds('cloze', ['{{c1::a}} {{c3::b}} {{c1::c}}'])).toEqual([0, 2])
     expect(cardOrds('cloze', ['rien'])).toEqual([])
   })
@@ -79,8 +79,8 @@ describe('notes and cards', () => {
     expect(normalizeFields('cloze', ['a', 'b', 'c'])).toEqual(['a', 'b'])
   })
 
-  it('renders basic, reverse and flipped cards', () => {
-    const note = { modelType: 'basic_reverse' as const, fields: ['Recto', 'Verso', 'Extra'] }
+  it('renders a basic card on either side (one card, both ways: M11)', () => {
+    const note = { modelType: 'basic' as const, fields: ['Recto', 'Verso', 'Extra'] }
     expect(renderCard(note, { ord: 0, sideFlipped: false })).toMatchObject({
       question: 'Recto',
       answer: 'Verso',
@@ -88,20 +88,30 @@ describe('notes and cards', () => {
       flipped: false,
       expected: 'Verso',
     })
-    expect(renderCard(note, { ord: 1, sideFlipped: false })).toMatchObject({
-      question: 'Verso',
-      answer: 'Recto',
-    })
-    // Leitner alternateSides: only applied when `flip` is enabled.
+    // The deck's alternateSides: only applied when `flip` is enabled.
     expect(renderCard(note, { ord: 0, sideFlipped: true })).toMatchObject({ question: 'Recto' })
     expect(renderCard(note, { ord: 0, sideFlipped: true }, true)).toMatchObject({
       question: 'Verso',
       answer: 'Recto',
       flipped: true,
+      expected: 'Recto',
     })
-    expect(renderCard(note, { ord: 1, sideFlipped: true }, true)).toMatchObject({
-      question: 'Recto',
-    })
+    // A one-way note is always asked front → back.
+    expect(
+      renderCard({ ...note, oneWay: true }, { ord: 0, sideFlipped: true }, true),
+    ).toMatchObject({ question: 'Recto', answer: 'Verso', flipped: false })
+  })
+
+  it('types the side that is not asked: nothing to type when it is a picture', () => {
+    const note = { modelType: 'basic' as const, fields: ['Ain', '<img src="ain.png">', ''] }
+    // Name asked, picture expected: no typed answer (canTypeAnswer, typed.ts).
+    const front = renderCard(note, { ord: 0, sideFlipped: false }, true)
+    expect(canTypeAnswer(front.expected)).toBe(false)
+    // Picture asked, name expected: the name is typed.
+    const back = renderCard(note, { ord: 0, sideFlipped: true }, true)
+    expect(back.question).toBe('<img src="ain.png">')
+    expect(canTypeAnswer(back.expected)).toBe(true)
+    expect(back.expected).toBe('Ain')
   })
 
   it('renders cloze cards and ignores flipping', () => {
@@ -118,7 +128,7 @@ describe('notes and cards', () => {
   })
 
   it('builds decks and cards with defaults', () => {
-    const deck = makeDeck({ name: '  Géo ', emoji: '🌍' }, 'd1', 1000)
+    const deck = makeDeck({ name: '  Géo ' }, 'd1', 1000)
     expect(deck).toMatchObject({ id: 'd1', name: 'Géo', parentId: null, scheduler: 'fsrs' })
     expect(deck.settings.fsrs.learningSteps).toEqual(['10m', '10m'])
     expect(deck.settings.leitner.intervals).toEqual([1, 2, 7, 30, 90, 180, 365])
@@ -143,7 +153,6 @@ describe('notes and cards', () => {
 describe('convertFields', () => {
   it('keeps front and extra across basic ↔ cloze', async () => {
     const { convertFields } = await import('$lib/domain/notes')
-    expect(convertFields('basic', 'basic_reverse', ['a', 'b', 'c'])).toEqual(['a', 'b', 'c'])
     expect(convertFields('basic', 'cloze', ['a', 'b', 'c'])).toEqual(['a', 'c'])
     expect(convertFields('basic', 'cloze', ['a', 'b', ''])).toEqual(['a', 'b'])
     expect(convertFields('cloze', 'basic', ['t', 'x'])).toEqual(['t', '', 'x'])

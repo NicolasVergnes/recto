@@ -1,6 +1,6 @@
 /** Domain types (02-DATA-MODEL §2). All dates are epoch milliseconds (UTC). */
 export type SchedulerKind = 'fsrs' | 'leitner'
-export const MODEL_TYPES = ['basic', 'basic_reverse', 'cloze', 'image_occlusion', 'custom'] as const
+export const MODEL_TYPES = ['basic', 'cloze', 'image_occlusion', 'custom'] as const
 export type ModelType = (typeof MODEL_TYPES)[number]
 
 export interface FsrsSettings {
@@ -20,8 +20,6 @@ export interface FsrsSettings {
 export interface LeitnerSettings {
   /** Days per box, default [1, 2, 7, 30, 90, 180, 365]. */
   intervals: number[]
-  /** Default true (faithful to the booklet). */
-  alternateSides: boolean
   /** Default true: "Sûr" button (+2 boxes). */
   allowSure: boolean
   /** Fixed in V0. */
@@ -36,6 +34,8 @@ export interface DeckSettings {
   autoplayAudio: boolean
   /** Default true: no two twin cards of a note the same day (03 §5.2, notes.ts `areTwins`). */
   burySiblings: boolean
+  /** Default true: a success turns the card over, both schedulers (03 §1.1, scheduler/sides.ts). */
+  alternateSides: boolean
   fsrs: FsrsSettings
   leitner: LeitnerSettings
 }
@@ -45,7 +45,6 @@ export interface Deck {
   name: string
   description?: string
   parentId?: string | null
-  emoji?: string
   scheduler: SchedulerKind
   settings: DeckSettings
   createdAt: number
@@ -99,6 +98,8 @@ export interface Note {
    */
   fields: string[]
   tags: string[]
+  /** basic only: always asked front → back, even in a deck that alternates (M11). */
+  oneWay?: boolean
   source?: string
   /** Anki guid on import (deduplication). */
   sourceGuid?: string
@@ -118,8 +119,8 @@ export interface Card {
   /** Denormalised copy of note.deckId for indexes. */
   deckId: string
   /**
-   * 0: front→back, 1: back→front, cloze: index - 1, image_occlusion: mask group - 1,
-   * custom: template index.
+   * basic: 0 (both sides through `sideFlipped`), cloze: index - 1, image_occlusion: mask
+   * group - 1, custom: template index.
    */
   ord: number
   due: number
@@ -138,7 +139,7 @@ export interface Card {
   // Leitner
   /** 0 = not applicable / new, 1..7. */
   box: number
-  /** Leitner alternateSides: true = asks back→front. */
+  /** Deck `alternateSides`: true = asks back→front (basic notes only). */
   sideFlipped: boolean
   createdAt: number
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { makeCard } from '$lib/domain/defaults'
-import { planNoteTypeEdit } from '$lib/domain/note-types'
+import { planNoteTypeEdit, unknownReference } from '$lib/domain/note-types'
 import type { Note, NoteType } from '$lib/domain/types'
 import { NoteTypeDraft } from '$lib/ui/note-types/draft.svelte'
 
@@ -71,11 +71,29 @@ describe('moving fields and cards in the note type editor (M10)', () => {
       '{{Capitale}} est la capitale de ?',
       '{{Flag}}',
     ])
-    draft.removeField(0)
+    // A field a card uses stays (M11): « Flag » is asked by « Drapeau ».
+    expect(draft.removeField(1)).toEqual(['Drapeau'])
+    expect(names(draft)).toEqual(['Pays', 'Flag', 'Capitale'])
+    draft.removeTemplate(2)
+    expect(draft.removeField(1)).toEqual([])
     expect(draft.edit.fields.map((f) => [f.name, f.from])).toEqual([
-      ['Flag', 2],
+      ['Pays', 0],
       ['Capitale', 1],
     ])
+  })
+
+  it('never lets a rename take the references of another field (M11)', () => {
+    const draft = draftOf(TYPE)
+    // « Drapeau » renamed to a name already taken (any case): nothing is rewritten …
+    draft.renameField(2, 'pays')
+    expect(draft.edit.templates.map((t) => t.front)).toEqual(TYPE.templates.map((t) => t.front))
+    // … nor when the clash is renamed again: « Pays » keeps its references.
+    draft.renameField(2, 'Flag')
+    expect(draft.edit.templates.map((t) => [t.front, t.back])).toEqual(
+      TYPE.templates.map((t) => [t.front, t.back]),
+    )
+    // The template still asks « Drapeau »: saving names what is left to fix.
+    expect(unknownReference(draft.shape)).toEqual({ field: 'Drapeau', card: 'Drapeau' })
   })
 
   it('a field added at the end can be moved up; it still has no origin', () => {

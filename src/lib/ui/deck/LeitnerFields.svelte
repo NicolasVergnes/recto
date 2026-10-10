@@ -28,11 +28,6 @@
   </div>
   <p class="muted small">{t('deckSettings.intervalsHelp')}</p>
   <label class="check">
-    <input type="checkbox" bind:checked={leitner.alternateSides} />
-    {t('scheduler.alternateSides')}
-  </label>
-  <p class="muted small">{t('deckSettings.alternateHelp')}</p>
-  <label class="check">
     <input type="checkbox" bind:checked={leitner.allowSure} />
     {t('deckSettings.allowSure')}
   </label>

@@ -130,8 +130,9 @@ export function detectModelType(data: CsvData, mapping: readonly CsvColumn[], ha
 const TYPE_VALUES: Record<string, ModelType> = {
   basic: 'basic',
   basique: 'basic',
-  basic_reverse: 'basic_reverse',
-  'basique + inverse': 'basic_reverse',
+  // The reversed type was removed in M11: one basic card is asked both ways (03 §1.1).
+  basic_reverse: 'basic',
+  'basique + inverse': 'basic',
   cloze: 'cloze',
   'texte à trous': 'cloze',
 }

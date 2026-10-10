@@ -6,7 +6,7 @@ Vérifie qu'un `.apkg` produit par l'export de Recto (`src/lib/export/apkg.ts`, 
 
 | Fichier | Rôle |
 |---|---|
-| `build-sample.test.ts` | Écrit `test-results/interop/recto-sample.apkg` (ou `$RECTO_APKG_OUT` ; heure de début du jour d'étude : `$RECTO_DAY_START`, 4 par défaut) à partir de la collection représentative de `tests/helpers/apkg-collection.ts` : basique, inversée, texte à trous, sous-paquet, paquets FSRS et Memory Box, historique, carte suspendue, carte retirée, drapeau, médias (un absent). |
+| `build-sample.test.ts` | Écrit `test-results/interop/recto-sample.apkg` (ou `$RECTO_APKG_OUT` ; heure de début du jour d'étude : `$RECTO_DAY_START`, 4 par défaut) à partir de la collection représentative de `tests/helpers/apkg-collection.ts` : basique (dont une posée dans les deux sens, M11), texte à trous, sous-paquet, paquets FSRS et Memory Box, historique, carte suspendue, carte retirée, drapeau, médias (un absent). |
 | `build-dst-sample.test.ts` | Écrit `recto-dst-h4.apkg`, `recto-dst-h22.apkg` et `recto-dst-h23.apkg` (dans `$RECTO_APKG_DIR`, par défaut `test-results/interop`) : une carte en retard depuis l'autre côté d'un changement d'heure (donc `crt` aussi) et une carte due dans 3 jours, pour trois heures de début de journée ; écrit les `due − today` attendus dans `recto-dst-expected.json`. |
 | `build-occlusion-sample.test.ts` | Écrit `recto-occlusion.apkg` : une note d'occlusion d'image (4 masques, groupes 1, 2 et 4, réponses, mode « tout cacher ») avec l'image de `data/samples/image-occlusion.apkg`. `check_apkg.py` vérifie alors qu'Anki relit les masques (`get_image_occlusion_note`) et crée une carte par groupe. |
 | `build-custom-sample.test.ts` | Écrit `recto-custom.apkg` à partir de `customTypeCollection` (`tests/helpers/apkg-collection.ts`) : un type personnalisé « Mot de vocabulaire » (4 champs, 3 modèles de carte dont un derrière une section `{{#Exemple}}…{{/Exemple}}` et un à réponse saisie `{{type:Mot}}`), 4 notes dont une sans exemple (son modèle à section rend une question vide : pas de carte, 11 cartes en tout), historique rejoué par les vrais planificateurs, une carte suspendue, un paquet FSRS et un paquet Memory Box. Écrit aussi `recto-custom-expected.json` : comptes, cartes par modèle (`ord`), questions et réponses telles que Recto les rend. |
@@ -72,10 +72,10 @@ Pour un paquet réel : exporter depuis Recto (Paramètres › « Exporter pour A
 
 ## Attendu (anki 26.9.3, 2026-09-25)
 
-- Import 1 : 6 notes nouvelles, 8 cartes, 15 entrées `revlog` identiques à la source (`ease`, `ivl`, `lastIvl`, `type`, `time`), médias `bip.mp3` et `lune.png`.
-- Paquets `Boîte`, `Géo`, `Géo::Départements` ; types de notes « Recto · Basique », « Recto · Basique et inversée », « Recto · Texte à trous » sans copie « + ».
+- Import 1 : 7 notes nouvelles, 8 cartes, 15 entrées `revlog` identiques à la source (`ease`, `ivl`, `lastIvl`, `type`, `time`), médias `bip.mp3` et `lune.png`.
+- Paquets `Boîte`, `Géo`, `Géo::Départements` ; types de notes « Recto · Basique », « Recto · Texte à trous » sans copie « + » (« Recto · Basique et inversée » n'est plus écrit depuis M11 ; revérifié le 2026-10-11 : verdict OK pour l'échantillon, `--fsrs`, le type personnalisé et l'aller-retour des départements).
 - États : révision (`type 2`, échéance en jours recalée), apprentissage et réapprentissage (`queue 1`, échéance en secondes), nouvelles (`due` = position), suspendue et retirée (`queue -1`), drapeau conservé ; état mémoire FSRS (stabilité, difficulté) conservé pour les paquets FSRS, absent pour Memory Box.
-- Import 2 (`--twice`) : 0 nouvelle, 6 doublons.
+- Import 2 (`--twice`) : 0 nouvelle, 7 doublons.
 - « Vérifier la base de données » : aucun problème (hors la ligne « Database rebuilt and optimized. »).
 - Verdict `OK`, code de sortie 0.
 - Occlusion d'image (`recto-occlusion.apkg`, `--twice`) : 1 note nouvelle puis 1 doublon, type « Recto · Occlusion d'image » (type natif d'Anki, `originalStockKind` 6), 4 formes relues par `get_image_occlusion_note`, cartes `ord` 0, 1 et 3 = groupes 1, 2 et 4, image `carte-france.png` (6 308 octets), « Vérifier la base de données » sans problème. L'affichage des masques dans Anki desktop (script du modèle) n'est pas vérifiable sans interface : à contrôler à la main.

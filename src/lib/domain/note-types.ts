@@ -3,10 +3,11 @@
  * and cards of the type. Pure: the repository applies the plan in one transaction.
  */
 import { makeCard } from './defaults'
-import { templateOrds } from './templates'
+import { isEmptyField, referencedFields, templateOrds } from './templates'
 import type { Card, CardTemplate, Note, NoteType } from './types'
 
-export type NoteTypeErrorCode = 'noteTypeName' | 'noteTypeFields' | 'noteTypeTemplates'
+export type NoteTypeErrorCode =
+  'noteTypeName' | 'noteTypeFields' | 'noteTypeTemplates' | 'noteTypeUnknownField'
 
 /** A field or template of an edited type: `from` is its index in the stored type, null if new. */
 export interface EditedField {
@@ -31,12 +32,36 @@ export const DEFAULT_NOTE_TYPE: Pick<NoteType, 'fields' | 'templates'> = {
   ],
 }
 
+/** Anki's special fields: a template may use them without a field of that name. */
+const SPECIAL_FIELDS = new Set(['FrontSide', 'Tags', 'Type', 'Deck', 'Subdeck', 'Card', 'CardFlag'])
+
+const usesField = (template: CardTemplate, name: string) =>
+  referencedFields(template.front).includes(name) || referencedFields(template.back).includes(name)
+
+/** Names of the templates whose question or answer uses field `name` (M11: it cannot be removed). */
+export function fieldUsers(templates: readonly CardTemplate[], name: string): string[] {
+  return templates.filter((t) => usesField(t, name.trim())).map((t) => t.name)
+}
+
+/** The first template reference to a field the type does not have (a removed or renamed one). */
+export function unknownReference(
+  input: Pick<NoteType, 'fields' | 'templates'>,
+): { field: string; card: string } | null {
+  const known = new Set(input.fields.map((f) => f.trim()))
+  for (const t of input.templates) {
+    for (const field of [...referencedFields(t.front), ...referencedFields(t.back)]) {
+      if (!known.has(field) && !SPECIAL_FIELDS.has(field)) return { field, card: t.name }
+    }
+  }
+  return null
+}
+
 /** Characters a field name cannot hold: they would end or change a `{{…}}` reference. */
 const BAD_FIELD_NAME = /[{}:"]|^[#^/]/
 
 /**
  * A type needs a name, at least one field, every field named once (case-insensitive, like Anki)
- * with a name usable in a template, and at least one named template.
+ * with a name usable in a template, and at least one named template, using existing fields only.
  */
 export function validateNoteType(
   input: Pick<NoteType, 'name' | 'fields' | 'templates'>,
@@ -48,6 +73,7 @@ export function validateNoteType(
   if (names.some((n) => !n || BAD_FIELD_NAME.test(n))) return 'noteTypeFields'
   if (input.templates.length === 0 || input.templates.some((t) => !t.name.trim()))
     return 'noteTypeTemplates'
+  if (unknownReference(input)) return 'noteTypeUnknownField'
   return null
 }
 
@@ -74,6 +100,8 @@ export interface NoteTypeEditPlan {
   /** Cards of a removed template, or whose question became empty; their review log is kept. */
   removed: string[]
   added: Card[]
+  /** Removed fields that held something, with the number of notes losing that content. */
+  lost: { field: string; notes: number }[]
 }
 
 /**
@@ -116,24 +144,38 @@ export function planNoteTypeEdit(
   const cardsByNote = new Map<string, Card[]>()
   for (const c of cards) cardsByNote.set(c.noteId, [...(cardsByNote.get(c.noteId) ?? []), c])
 
-  const plan: NoteTypeEditPlan = { type: next, notes: [], moved: [], removed: [], added: [] }
+  const plan: NoteTypeEditPlan = {
+    type: next,
+    notes: [],
+    moved: [],
+    removed: [],
+    added: [],
+    lost: [],
+  }
+  const kept = new Set(edit.fields.map((f) => f.from))
+  type.fields.forEach((field, i) => {
+    if (kept.has(i)) return
+    const n = notes.filter((note) => !isEmptyField(note.fields[i] ?? '')).length
+    if (n > 0) plan.lost.push({ field, notes: n })
+  })
   for (const note of notes) {
     const fields = fieldsChanged
       ? edit.fields.map((f) => (f.from === null ? '' : (note.fields[f.from] ?? '')))
       : note.fields
     if (fieldsChanged) plan.notes.push({ ...note, fields, updatedAt: now })
     const wanted = new Set(templateOrds(next, fields))
-    const kept = new Set<number>()
+    const keptOrds = new Set<number>()
     for (const card of cardsByNote.get(note.id) ?? []) {
       const ord = newOrd.get(card.ord)
-      if (ord === undefined || !wanted.has(ord) || kept.has(ord)) {
+      if (ord === undefined || !wanted.has(ord) || keptOrds.has(ord)) {
         plan.removed.push(card.id)
         continue
       }
-      kept.add(ord)
+      keptOrds.add(ord)
       if (ord !== card.ord) plan.moved.push({ ...card, ord })
     }
-    for (const ord of wanted) if (!kept.has(ord)) plan.added.push(makeCard(note, ord, newId(), now))
+    for (const ord of wanted)
+      if (!keptOrds.has(ord)) plan.added.push(makeCard(note, ord, newId(), now))
   }
   return plan
 }

@@ -18,5 +18,5 @@ it('writes a representative .apkg for the real-Anki check', async () => {
   const out = resolve(process.env.RECTO_APKG_OUT ?? 'test-results/interop/recto-sample.apkg')
   mkdirSync(dirname(out), { recursive: true })
   writeFileSync(out, bytes)
-  expect(report).toMatchObject({ notes: 6, cards: 8, reviews: 15, media: 2 })
+  expect(report).toMatchObject({ notes: 7, cards: 8, reviews: 15, media: 2 })
 })

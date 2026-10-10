@@ -41,6 +41,7 @@ function readSettings(x: unknown): DeckSettings | null {
     typedAnswer: isBool(x.typedAnswer) ? x.typedAnswer : d.typedAnswer,
     autoplayAudio: isBool(x.autoplayAudio) ? x.autoplayAudio : d.autoplayAudio,
     burySiblings: isBool(x.burySiblings) ? x.burySiblings : d.burySiblings,
+    alternateSides: isBool(x.alternateSides) ? x.alternateSides : d.alternateSides,
     fsrs: {
       requestRetention: isNum(f.requestRetention) ? f.requestRetention : d.fsrs.requestRetention,
       maximumInterval: isNum(f.maximumInterval) ? f.maximumInterval : d.fsrs.maximumInterval,
@@ -52,7 +53,6 @@ function readSettings(x: unknown): DeckSettings | null {
     leitner: {
       intervals:
         isNumArray(l.intervals) && l.intervals.length === 7 ? l.intervals : d.leitner.intervals,
-      alternateSides: isBool(l.alternateSides) ? l.alternateSides : d.leitner.alternateSides,
       allowSure: isBool(l.allowSure) ? l.allowSure : d.leitner.allowSure,
       failToBox: 1,
     },
@@ -67,7 +67,7 @@ export function readDeck(x: unknown): Deck | null {
   }
   if (!oneOf(['fsrs', 'leitner'] as const, x.scheduler)) return null
   if (!(x.parentId === undefined || x.parentId === null || isStr(x.parentId))) return null
-  if (!optStr(x.description) || !optStr(x.emoji)) return null
+  if (!optStr(x.description)) return null
   const settings = readSettings(x.settings)
   if (!settings) return null
   const deck: Deck = {
@@ -80,7 +80,6 @@ export function readDeck(x: unknown): Deck | null {
     updatedAt: x.updatedAt,
   }
   if (isStr(x.description)) deck.description = x.description
-  if (isStr(x.emoji)) deck.emoji = x.emoji
   return deck
 }
 
@@ -109,6 +108,7 @@ export function readNote(x: unknown): Note | null {
   }
   if (isStr(x.source)) note.source = x.source
   if (isStr(x.sourceGuid)) note.sourceGuid = x.sourceGuid
+  if (x.modelType === 'basic' && x.oneWay === true) note.oneWay = true
   if (x.modelType === 'custom') {
     if (!isStr(x.noteTypeId)) return null
     note.noteTypeId = x.noteTypeId

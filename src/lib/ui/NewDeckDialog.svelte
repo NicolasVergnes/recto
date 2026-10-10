@@ -16,7 +16,6 @@
   const id = $props.id()
 
   let name = $state('')
-  let emoji = $state('')
   let parent = $state('')
   let error = $state('')
   let busy = $state(false)
@@ -24,7 +23,6 @@
   $effect(() => {
     if (open) {
       name = ''
-      emoji = ''
       error = ''
       parent = parentId
     }
@@ -34,10 +32,7 @@
     e.preventDefault()
     busy = true
     try {
-      const deck = await repo.createDeck(
-        { name, parentId: parent || null, ...(emoji.trim() ? { emoji: emoji.trim() } : {}) },
-        Date.now(),
-      )
+      const deck = await repo.createDeck({ name, parentId: parent || null }, Date.now())
       open = false
       oncreated(deck)
     } catch (err) {
@@ -54,10 +49,6 @@
       <label for={`${id}-name`}>{t('deck.name')}</label>
       <!-- svelte-ignore a11y_autofocus -->
       <input id={`${id}-name`} type="text" bind:value={name} required autofocus maxlength="120" />
-    </div>
-    <div class="field">
-      <label for={`${id}-emoji`}>{t('deck.emoji')}</label>
-      <input id={`${id}-emoji`} type="text" bind:value={emoji} maxlength="8" />
     </div>
     {#if decks.length > 0}
       <div class="field">

@@ -29,6 +29,16 @@ function run(c: Card, ratings: Rating[], start = now, gapMs = DAY): Card {
 }
 
 describe('FSRS adapter (03 §2)', () => {
+  it('turns the card over on success only, when the deck alternates (M11)', () => {
+    const c = card('c', { state: 2, due: now, stability: 5, difficulty: 5, lastReview: now - DAY })
+    expect(f.answer(c, 3, now, d).card.sideFlipped).toBe(true)
+    expect(f.answer(c, 2, now, d).card.sideFlipped).toBe(true)
+    expect(f.answer({ ...c, sideFlipped: true }, 4, now, d).card.sideFlipped).toBe(false)
+    expect(f.answer({ ...c, sideFlipped: true }, 1, now, d).card.sideFlipped).toBe(true)
+    const oneSide = deck('d2', 'fsrs', { alternateSides: false })
+    expect(f.answer(c, 3, now, oneSide).card.sideFlipped).toBe(false)
+  })
+
   it('round-trips Card ↔ ts-fsrs Card', () => {
     const c = card('c', {
       state: 2,

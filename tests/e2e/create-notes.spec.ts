@@ -1,8 +1,8 @@
 import { expect, test } from './fixtures'
 
-// E2E 1 (06 §4): first launch → create a deck → add 3 notes (basic, reverse, cloze)
-// → 5 cards visible in the card browser.
-test('create a deck and three notes, then see five cards', async ({ page }) => {
+// E2E 1 (06 §4): first launch → create a deck → add 3 notes (basic, basic one way, cloze)
+// → 4 cards visible in the card browser.
+test('create a deck and three notes, then see four cards', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Créer un paquet' }).click()
   const dialog = page.getByRole('dialog', { name: 'Nouveau paquet' })
@@ -22,12 +22,18 @@ test('create a deck and three notes, then see five cards', async ({ page }) => {
   await expect(page.getByLabel('Recto')).toHaveValue('')
   await expect(page.getByLabel('Recto')).toBeFocused()
 
-  // Basic + reverse, submitted with Ctrl+Enter
-  await page.getByLabel('Type').selectOption({ label: 'Basique + inverse' })
+  // The deck asks both sides with one card (M11): this note only front → back, Ctrl+Enter.
+  await expect(page.getByLabel('Type').locator('option')).toHaveText([
+    'Basique',
+    'Texte à trous',
+    'Occlusion d’image',
+  ])
+  await page.getByLabel('Ne jamais retourner cette note').check()
   await page.getByLabel('Recto').fill('Chien')
   await page.getByLabel('Verso', { exact: true }).fill('Dog')
   await page.getByLabel('Verso', { exact: true }).press('Control+Enter')
-  await expect(page.getByText('Note ajoutée (2 cartes)')).toBeVisible()
+  await expect(page.getByText('Note ajoutée (1 carte)').last()).toBeVisible()
+  await expect(page.getByLabel('Recto')).toHaveValue('')
 
   // Cloze with two deletions
   await page.getByLabel('Type').selectOption({ label: 'Texte à trous' })
@@ -37,12 +43,12 @@ test('create a deck and three notes, then see five cards', async ({ page }) => {
   await expect(page.getByText('Cette note produira 2 cartes.')).toBeVisible()
   await page.getByRole('button', { name: 'Ajouter et fermer' }).click()
   await expect(page.getByRole('heading', { level: 1, name: /Géographie/ })).toBeVisible()
-  await expect(page.getByText('5 cartes')).toBeVisible()
+  await expect(page.getByText('4 cartes')).toBeVisible()
 
   await page.getByRole('link', { name: 'Voir les cartes' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Cartes' })).toBeVisible()
-  await expect(page.getByText('5 cartes')).toBeVisible()
-  await expect(page.getByRole('row')).toHaveCount(6)
+  await expect(page.getByText('4 cartes')).toBeVisible()
+  await expect(page.getByRole('row')).toHaveCount(5)
   await expect(page.getByRole('link', { name: 'La […] tourne autour de la Terre.' })).toBeVisible()
 })
 

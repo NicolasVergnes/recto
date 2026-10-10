@@ -12,6 +12,7 @@ export type RepoErrorCode =
   | 'noteTypeName'
   | 'noteTypeFields'
   | 'noteTypeTemplates'
+  | 'noteTypeUnknownField'
   | 'noteTypeNotFound'
   | 'noteTypeInUse'
   | 'undoGone'

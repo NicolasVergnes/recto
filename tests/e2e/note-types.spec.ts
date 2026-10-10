@@ -76,7 +76,7 @@ test('a note type is created, used and given a second card', async ({ page }) =>
   await page.getByLabel('Recto (question)').nth(1).fill('{{Capitale}} est la capitale de ?')
   await page.getByLabel('Verso (réponse)').nth(1).fill('{{Pays}}')
   await page.getByRole('button', { name: 'Enregistrer' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Modifier les cartes de ce type' })
+  const dialog = page.getByRole('dialog', { name: 'Modifier les notes et les cartes de ce type' })
   await expect(dialog).toContainText('créera 1 carte(s) et en supprimera 0')
   await dialog.getByRole('button', { name: 'Enregistrer' }).click()
   await expect(dialog).toBeHidden()
@@ -315,4 +315,43 @@ test('an answer given before the cards moved is undone under the new place of it
   await expect(tiles).toHaveCount(2)
   await expect(tiles.filter({ hasText: 'Nouvelle' })).toHaveCount(2)
   await expect(tiles.filter({ hasText: 'Paris est la capitale de ?' })).toHaveCount(1)
+})
+
+// M11: a field a card uses cannot be removed (its card would show nothing); removing a field
+// that holds something is announced before saving.
+test('a field used by a card stays; removing a filled field asks first', async ({ page }) => {
+  await capitales(page)
+  const removeField = (name: string) =>
+    page.getByRole('button', { name: `Retirer le champ « ${name} »` })
+  await removeField('Pays').click()
+  await expect(
+    page.getByText(
+      'Le champ « Pays » est utilisé par les cartes « Carte 1 », « Carte 2 » : retirez-le de leurs modèles avant de supprimer le champ.',
+    ),
+  ).toBeVisible()
+  await expect(page.getByLabel('Nom du champ 1')).toHaveValue('Pays')
+  await expect(removeField('Pays')).toBeFocused()
+
+  // « Continent » is in no template, but France has one: saving says what will be lost.
+  await removeField('Continent').click()
+  await expect(page.getByLabel('Nom du champ 3')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Enregistrer' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Modifier les notes et les cartes de ce type' })
+  await expect(dialog).toContainText(
+    'Le champ « Continent » sera supprimé : 1 note perdra son contenu.',
+  )
+  await expect(dialog).not.toContainText('créera')
+  await dialog.getByRole('button', { name: 'Enregistrer' }).click()
+  await expect(page.getByText('Type de note enregistré')).toBeVisible()
+  await page.reload()
+  await expect(page.getByLabel('Nom du champ 3')).toHaveCount(0)
+
+  // A template naming a field that does not exist is refused, with the card and the field.
+  await page.getByLabel('Recto (question)').first().fill('{{Pays}} {{Continent}}')
+  await page.getByRole('button', { name: 'Enregistrer' }).click()
+  await expect(
+    page.getByText(
+      'La carte « Carte 1 » utilise le champ « Continent », qui n’existe pas : corrigez son modèle ou recréez ce champ.',
+    ),
+  ).toBeVisible()
 })

@@ -115,6 +115,11 @@
       {t('deckSettings.typedAnswer')}</label
     >
     <label class="check"
+      ><input type="checkbox" bind:checked={settings.alternateSides} />
+      {t('deckSettings.alternateSides')}</label
+    >
+    <p class="muted small">{t('deckSettings.alternateHelp')}</p>
+    <label class="check"
       ><input type="checkbox" bind:checked={settings.autoplayAudio} />
       {t('deckSettings.autoplay')}</label
     >

@@ -59,14 +59,14 @@ describe('gatherApkgExport', () => {
     const c = await seed()
     const geo = await gatherApkgExport({ deckId: 'deck-geo' })
     expect(ids(geo.input.decks)).toEqual(['deck-dep', 'deck-geo'])
-    expect(ids(geo.input.notes)).toEqual(['note-1', 'note-2', 'note-3', 'note-4'])
+    expect(ids(geo.input.notes)).toEqual(['note-1', 'note-2', 'note-3', 'note-4', 'note-7'])
     expect(geo.input.cards).toHaveLength(6)
     const geoCards = new Set(geo.input.cards.map((x) => x.id))
     expect(ids(geo.input.reviews)).toEqual(ids(c.reviews.filter((r) => geoCards.has(r.cardId))))
 
     const dep = await gatherApkgExport({ deckId: 'deck-dep' })
     expect(ids(dep.input.decks)).toEqual(['deck-dep', 'deck-geo'])
-    expect(ids(dep.input.notes)).toEqual(['note-2'])
+    expect(ids(dep.input.notes)).toEqual(['note-2', 'note-7'])
     expect(dep.input.media).toEqual([])
   })
 

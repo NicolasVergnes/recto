@@ -52,12 +52,8 @@ describe('decks', () => {
     const a = await repo.createDeck({ name: 'A' }, T0)
     const b = await repo.createDeck({ name: 'B' }, T0)
     const c = await repo.createDeck({ name: 'C', parentId: a.id }, T0)
-    const renamed = await repo.updateDeck(
-      b.id,
-      { name: 'B2', emoji: '🌍', description: 'd' },
-      T0 + 1,
-    )
-    expect(renamed).toMatchObject({ name: 'B2', emoji: '🌍', description: 'd', updatedAt: T0 + 1 })
+    const renamed = await repo.updateDeck(b.id, { name: 'B2', description: 'd' }, T0 + 1)
+    expect(renamed).toMatchObject({ name: 'B2', description: 'd', updatedAt: T0 + 1 })
     await expectCode(repo.moveDeck(a.id, b.id, T0), 'deckNesting') // a has a child
     await expectCode(repo.moveDeck(b.id, b.id, T0), 'deckNesting')
     await expectCode(repo.moveDeck(b.id, c.id, T0), 'deckNesting') // c is a sub-deck
@@ -73,7 +69,7 @@ describe('decks', () => {
     const child = await repo.createDeck({ name: 'Child', parentId: src.id }, T0)
     const dst = await repo.createDeck({ name: 'Dst' }, T0)
     const { note } = await repo.createNote(
-      { deckId: src.id, modelType: 'basic_reverse', fields: ['a', 'b'], tags: [] },
+      { deckId: src.id, modelType: 'cloze', fields: ['{{c1::a}} {{c2::b}}', ''], tags: [] },
       T0,
     )
     await expectCode(repo.mergeDecks(src.id, src.id, T0), 'deckMergeSelf')
@@ -95,7 +91,7 @@ describe('decks', () => {
       T0,
     )
     await repo.createNote(
-      { deckId: sub.id, modelType: 'basic_reverse', fields: ['2', '2'], tags: [] },
+      { deckId: sub.id, modelType: 'cloze', fields: ['{{c1::2}} {{c2::2}}', ''], tags: [] },
       T0,
     )
     await repo.createNote({ deckId: keep.id, modelType: 'basic', fields: ['3', '3'], tags: [] }, T0)
@@ -125,12 +121,13 @@ describe('notes and cards', () => {
     )
     expect(basic.cards.map((c) => c.ord)).toEqual([0])
     expect(basic.note.source).toBe('livre')
-    const rev = await repo.createNote(
-      { deckId: d.id, modelType: 'basic_reverse', fields: ['a', 'b'], tags: [] },
+    // One card for both sides (M11); a one-way note keeps its single card too.
+    const oneWay = await repo.createNote(
+      { deckId: d.id, modelType: 'basic', fields: ['a', 'b'], tags: [], oneWay: true },
       T0,
     )
-    expect(rev.cards.map((c) => c.ord)).toEqual([0, 1])
-    expect(rev.note.fields).toEqual(['a', 'b', ''])
+    expect(oneWay.cards.map((c) => c.ord)).toEqual([0])
+    expect(oneWay.note).toMatchObject({ fields: ['a', 'b', ''], oneWay: true })
     const cloze = await repo.createNote(
       { deckId: d.id, modelType: 'cloze', fields: ['{{c1::a}} {{c2::b}} {{c2::c}}', ''], tags: [] },
       T0,
@@ -144,7 +141,7 @@ describe('notes and cards', () => {
       repo.createNote({ deckId: 'missing', modelType: 'basic', fields: ['a'], tags: [] }, T0),
       'deckNotFound',
     )
-    for (const card of [...basic.cards, ...rev.cards, ...cloze.cards]) {
+    for (const card of [...basic.cards, ...oneWay.cards, ...cloze.cards]) {
       expect(card).toMatchObject({ state: 0, box: 0, stability: 0, difficulty: 0, deckId: d.id })
     }
   })
@@ -239,20 +236,26 @@ describe('notes and cards', () => {
     )
     const res = await repo.updateNote(
       note.id,
-      { deckId: d2.id, modelType: 'basic_reverse', fields: ['a', 'b'], tags: [] },
+      { deckId: d2.id, modelType: 'basic', fields: ['a', 'b'], tags: [], oneWay: true },
       T0 + 1,
     )
     expect(res.note.source).toBeUndefined()
+    expect(res.note.oneWay).toBe(true)
     const cards = await repo.getCardsOfNote(note.id)
-    expect(cards.map((c) => [c.ord, c.deckId])).toEqual([
-      [0, d2.id],
-      [1, d2.id],
-    ])
-    await repo.updateNote(
+    expect(cards.map((c) => [c.ord, c.deckId])).toEqual([[0, d2.id]])
+    const back = await repo.updateNote(
       note.id,
       { deckId: d2.id, modelType: 'basic', fields: ['a', 'b'], tags: [] },
       T0 + 2,
     )
+    expect(back.note.oneWay).toBeUndefined()
+    // Only basic notes are asked both ways: a cloze note never keeps the option.
+    const cloze = await repo.updateNote(
+      note.id,
+      { deckId: d2.id, modelType: 'cloze', fields: ['{{c1::a}}', ''], tags: [], oneWay: true },
+      T0 + 3,
+    )
+    expect(cloze.note.oneWay).toBeUndefined()
     expect((await repo.getCardsOfNote(note.id)).map((c) => c.ord)).toEqual([0])
     await expectCode(
       repo.updateNote('missing', { deckId: d2.id, modelType: 'basic', fields: [], tags: [] }, T0),
@@ -268,7 +271,7 @@ describe('notes and cards', () => {
       T0,
     )
     const b = await repo.createNote(
-      { deckId: d1.id, modelType: 'basic_reverse', fields: ['Lyon', 'y'], tags: [] },
+      { deckId: d1.id, modelType: 'cloze', fields: ['{{c1::Lyon}} {{c2::y}}', ''], tags: [] },
       T0,
     )
     expect((await repo.findDuplicate(d1.id, ' paris '))?.id).toBe(a.note.id)
@@ -297,7 +300,7 @@ describe('notes and cards', () => {
   it('suspends, flags and resets cards without touching the log', async () => {
     const d = await repo.createDeck({ name: 'D' }, T0)
     const { cards } = await repo.createNote(
-      { deckId: d.id, modelType: 'basic_reverse', fields: ['a', 'b'], tags: [] },
+      { deckId: d.id, modelType: 'cloze', fields: ['{{c1::a}} {{c2::b}}', ''], tags: [] },
       T0,
     )
     const ids = cards.map((c) => c.id)

@@ -11,7 +11,6 @@
   let { deck }: Props = $props()
 
   let name = $state('')
-  let emoji = $state('')
   let description = $state('')
   // The form is filled once per deck: a later re-read of the same deck never overwrites edits.
   let loadedFor = ''
@@ -19,7 +18,6 @@
     if (loadedFor !== deck.id) {
       loadedFor = deck.id
       name = deck.name
-      emoji = deck.emoji ?? ''
       description = deck.description ?? ''
     }
   })
@@ -27,7 +25,7 @@
   async function save(e: SubmitEvent) {
     e.preventDefault()
     try {
-      await repo.updateDeck(deck.id, { name, emoji: emoji.trim(), description }, Date.now())
+      await repo.updateDeck(deck.id, { name, description }, Date.now())
       toast(t('deck.saved'))
     } catch (err) {
       toast(errorMessage(err), 'error')
@@ -41,10 +39,6 @@
     <div class="field">
       <label for="deck-name">{t('deck.name')}</label>
       <input id="deck-name" type="text" bind:value={name} required maxlength="120" />
-    </div>
-    <div class="field">
-      <label for="deck-emoji">{t('deck.emoji')}</label>
-      <input id="deck-emoji" type="text" bind:value={emoji} maxlength="8" />
     </div>
     <div class="field">
       <label for="deck-description">{t('deck.description')}</label>

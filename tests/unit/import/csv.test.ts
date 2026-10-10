@@ -127,34 +127,27 @@ describe('planCsvImport', () => {
     ])
   })
 
-  it('merges a back column into extra for cloze and honours basic_reverse', () => {
+  it('merges a back column into extra for cloze', () => {
     const data = parseCsv('Le {{c1::chat}};miaou;félin\nchien;dog;')
-    const plan = planCsvImport(
-      data,
-      { ...options(data), modelType: 'basic_reverse' },
-      empty,
-      now,
-      newId,
-    )
+    const plan = planCsvImport(data, { ...options(data), modelType: 'basic' }, empty, now, newId)
     expect(plan.notes[0]).toMatchObject({
       modelType: 'cloze',
       fields: ['Le {{c1::chat}}', 'félin<br>miaou'],
     })
-    expect(plan.notes[1]).toMatchObject({
-      modelType: 'basic_reverse',
-      fields: ['chien', 'dog', ''],
-    })
-    expect(plan.cards).toHaveLength(3)
+    expect(plan.notes[1]).toMatchObject({ modelType: 'basic', fields: ['chien', 'dog', ''] })
+    expect(plan.cards).toHaveLength(2)
   })
 
   it('uses a type column when present (CSV export round trip)', () => {
+    // Files written before M11 may say basic_reverse: one basic card, asked both ways.
     const data = parseCsv(
-      'Recto;Verso;Extra;Tags;Paquet;Type\nchien;dog;;;;basic_reverse\n{{c1::x}};;;;;cloze\na;b;;;;inconnu',
+      'Recto;Verso;Extra;Tags;Paquet;Type\nchien;dog;;;;basic_reverse\n{{c1::x}};;;;;cloze\na;b;;;;inconnu\nc;d;;;;Basique + inverse',
     )
     const opts = { ...options(data), modelType: 'basic' as const }
     expect(opts.mapping).toEqual(['front', 'back', 'extra', 'tags', 'deck', 'type'])
     const plan = planCsvImport(data, opts, empty, now, newId)
-    expect(plan.notes.map((n) => n.modelType)).toEqual(['basic_reverse', 'cloze', 'basic'])
+    expect(plan.notes.map((n) => n.modelType)).toEqual(['basic', 'cloze', 'basic', 'basic'])
+    expect(plan.cards).toHaveLength(4)
   })
 
   it('reports errors with their line numbers', () => {

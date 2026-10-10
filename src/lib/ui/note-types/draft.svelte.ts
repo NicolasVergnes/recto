@@ -1,4 +1,4 @@
-import { editOf, type NoteTypeEdit } from '$lib/domain/note-types'
+import { editOf, fieldUsers, type NoteTypeEdit } from '$lib/domain/note-types'
 import type { TypeShape } from '$lib/domain/notes'
 import { renameFieldRefs } from '$lib/domain/templates'
 import type { NoteType } from '$lib/domain/types'
@@ -33,8 +33,9 @@ export class NoteTypeDraft {
   }
 
   /**
-   * Renames field `i` and the references to it in every template, unless the new name is empty
-   * or already taken (saving then reports it, and no reference has been merged).
+   * Renames field `i` and the references to it in every template, unless the new or the old name
+   * is empty or shared with another field (case-insensitive, like the validation): no reference
+   * is merged nor taken from another field, and saving reports what is left to fix.
    */
   renameField(i: number, next: string): void {
     const field = this.edit.fields[i]
@@ -42,8 +43,9 @@ export class NoteTypeDraft {
     const old = field.name.trim()
     const name = next.trim()
     field.name = next
-    const taken = this.edit.fields.some((f, j) => j !== i && f.name.trim() === name)
-    if (!name || !old || name === old || taken) return
+    const shared = (n: string) =>
+      this.edit.fields.some((f, j) => j !== i && f.name.trim().toLowerCase() === n.toLowerCase())
+    if (!name || !old || name === old || shared(name) || shared(old)) return
     for (const tpl of this.edit.templates) {
       tpl.front = renameFieldRefs(tpl.front, old, name)
       tpl.back = renameFieldRefs(tpl.back, old, name)
@@ -57,8 +59,16 @@ export class NoteTypeDraft {
     this.edit.fields.push({ name: t('noteTypes.newField', { n }), from: null })
   }
 
-  removeField(i: number): void {
-    if (this.edit.fields.length > 1) this.edit.fields.splice(i, 1)
+  /**
+   * Removes field `i`, unless a template uses it: returns those templates' names (nothing is
+   * removed then, M11), else an empty list.
+   */
+  removeField(i: number): string[] {
+    const field = this.edit.fields[i]
+    if (!field || this.edit.fields.length === 1) return []
+    const users = fieldUsers(this.shape.templates, field.name)
+    if (users.length === 0) this.edit.fields.splice(i, 1)
+    return users
   }
 
   /**

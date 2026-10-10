@@ -87,7 +87,7 @@ export const fr = {
     cardLabel: 'Carte',
     flipped: 'Sens inversé',
     flippedHelp:
-      'Memory Box : la carte est retournée après chaque réussite, on vous interroge sur l’autre face.',
+      'La carte est retournée après chaque réussite : on vous interroge sur l’autre face.',
     typedLabel: 'Tapez votre réponse',
     shortcutsQuestion: 'Espace ou Entrée : afficher la réponse · R : réécouter · E : modifier',
     shortcutsAnswer: 'Touches 1 à {n} : noter · Ctrl+Z : annuler · R : réécouter',
@@ -107,7 +107,6 @@ export const fr = {
     title: 'Paquet',
     newTitle: 'Nouveau paquet',
     name: 'Nom',
-    emoji: 'Emoji (facultatif)',
     description: 'Description',
     parent: 'Paquet parent',
     noParent: 'Aucun (paquet principal)',
@@ -206,7 +205,9 @@ export const fr = {
     deck: 'Paquet',
     type: 'Type',
     basic: 'Basique',
-    basicReverse: 'Basique + inverse',
+    oneWay: 'Ne jamais retourner cette note',
+    oneWayHelp:
+      'Ce paquet interroge dans les deux sens. Cochez pour que la question soit toujours la première face, par exemple quand on ne peut pas répondre en partant de la seconde.',
     cloze: 'Texte à trous',
     front: 'Recto',
     back: 'Verso',
@@ -258,7 +259,7 @@ export const fr = {
   },
   noteTypes: {
     title: 'Types de notes',
-    help: 'Un type de note a des champs nommés et produit une carte par modèle de carte, comme dans Anki. Les types importés d’un paquet Anki apparaissent ici. Basique, Basique + inverse, Texte à trous et Occlusion d’image restent toujours disponibles.',
+    help: 'Un type de note a des champs nommés et produit une carte par modèle de carte, comme dans Anki. Les types importés d’un paquet Anki apparaissent ici. Basique, Texte à trous et Occlusion d’image restent toujours disponibles.',
     empty: 'Aucun type personnalisé pour l’instant.',
     new: 'Nouveau type',
     newName: 'Nouveau type',
@@ -299,9 +300,15 @@ export const fr = {
     previewSample: 'Aperçu avec le nom des champs',
     save: 'Enregistrer',
     saved: 'Type de note enregistré',
-    confirmTitle: 'Modifier les cartes de ce type',
+    confirmTitle: 'Modifier les notes et les cartes de ce type',
     confirm:
       'Enregistrer créera {added} carte(s) et en supprimera {removed} (leur historique de révision est conservé).',
+    fieldLost:
+      'Le champ « {name} » sera supprimé : {n} note perdra son contenu.|Le champ « {name} » sera supprimé : {n} notes perdront son contenu.',
+    fieldInUse:
+      'Le champ « {name} » est utilisé par la carte {cards} : retirez-le de son modèle avant de supprimer le champ.|Le champ « {name} » est utilisé par les cartes {cards} : retirez-le de leurs modèles avant de supprimer le champ.',
+    unknownField:
+      'La carte « {card} » utilise le champ « {field} », qui n’existe pas : corrigez son modèle ou recréez ce champ.',
     notFound: 'Ce type de note n’existe plus.',
   },
   occlusion: {
@@ -332,7 +339,6 @@ export const fr = {
     retention: 'Rétention cible',
     retentionHelp:
       '90 % : vous oublierez une carte sur dix à chaque révision. Au-dessus de 95 %, la charge explose.',
-    alternateSides: 'Alterner recto/verso à chaque réussite',
     box: 'Compartiment {n}',
     boxTarget: '→ C{n} · {when}',
   },
@@ -480,6 +486,7 @@ export const fr = {
     noteTypeFields:
       'Chaque champ a un nom, différent des autres, sans accolades, deux-points ni guillemets.',
     noteTypeTemplates: 'Le type a besoin d’au moins une carte, chacune nommée.',
+    noteTypeUnknownField: 'Un modèle de carte utilise un champ qui n’existe pas.',
     noteTypeNotFound: 'Ce type de note n’existe plus.',
     noteTypeInUse: 'Des notes utilisent ce type : supprimez-les ou changez-les de type d’abord.',
     undoGone:
@@ -549,8 +556,9 @@ export const fr = {
     intervals: 'Intervalles des compartiments',
     intervalsHelp:
       'Jours avant la prochaine révision pour une carte arrivant dans chaque compartiment.',
+    alternateSides: 'Interroger dans les deux sens (la carte est retournée après chaque réussite)',
     alternateHelp:
-      'Après un échec, la carte est reposée dans le même sens : réessayer la même question est plus efficace.',
+      'Une seule carte pour les deux sens. Après un échec, la carte est reposée dans le même sens : réessayer la même question est plus efficace. Les textes à trous, les masques et les types personnalisés gardent le sens de leurs modèles.',
     allowSure: 'Bouton « Sûr » (+2 compartiments)',
     saved: 'Paramètres enregistrés',
     invalid: 'Paramètres invalides.',

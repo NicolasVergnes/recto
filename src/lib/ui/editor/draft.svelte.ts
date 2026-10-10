@@ -18,6 +18,8 @@ export class NoteDraft {
   noteType = $state.raw<NoteType>()
   fields = $state<string[]>(['', '', ''])
   tagsText = $state('')
+  /** basic notes: never asked back → front, even in a deck that alternates. */
+  oneWay = $state(false)
   source = $state('')
   loaded = $state(false)
   /** Highest mask group of the note as loaded: a new mask never takes over an existing card. */
@@ -57,6 +59,7 @@ export class NoteDraft {
       this.modelType = note.modelType
       this.fields = [...note.fields]
       this.tagsText = note.tags.join(' ')
+      this.oneWay = note.oneWay === true
       this.source = note.source ?? ''
       if (note.modelType === 'custom' && note.noteTypeId) {
         this.noteType = await repo.getNoteType(note.noteTypeId)
@@ -85,6 +88,7 @@ export class NoteDraft {
       ...(this.modelType === 'custom' && this.noteType ? { noteTypeId: this.noteType.id } : {}),
       fields: [...this.fields],
       tags: parseTags(this.tagsText),
+      ...(this.modelType === 'basic' && this.oneWay ? { oneWay: true } : {}),
       ...(this.source.trim() ? { source: this.source.trim() } : {}),
     }
   }

@@ -126,7 +126,11 @@ describe('custom note types', () => {
     await env.db.cards.update(pays.id, { reps: 4 })
     const edit = editOf(type)
     edit.templates.splice(0, 1)
-    expect(await repo.previewNoteTypeEdit(type.id, edit)).toEqual({ added: 0, removed: 1 })
+    expect(await repo.previewNoteTypeEdit(type.id, edit)).toEqual({
+      added: 0,
+      removed: 1,
+      lost: [],
+    })
     await repo.updateNoteType(type.id, edit, T0 + 1)
     const cards = await repo.getCardsOfNote(france.note.id)
     expect(cards.map((c) => [c.id, c.ord])).toEqual([
@@ -233,7 +237,11 @@ describe('moving fields and cards of a note type (M10)', () => {
       d.moveField(2, -1)
       d.moveField(1, -1)
     })
-    expect(await repo.previewNoteTypeEdit(type.id, edit)).toEqual({ added: 0, removed: 0 })
+    expect(await repo.previewNoteTypeEdit(type.id, edit)).toEqual({
+      added: 0,
+      removed: 0,
+      lost: [],
+    })
     await repo.updateNoteType(type.id, edit, T0 + 1)
 
     const saved = await repo.getNoteType(type.id)
@@ -271,7 +279,11 @@ describe('moving fields and cards of a note type (M10)', () => {
       d.moveTemplate(2, -1)
       d.moveTemplate(1, -1)
     })
-    expect(await repo.previewNoteTypeEdit(type.id, edit)).toEqual({ added: 0, removed: 0 })
+    expect(await repo.previewNoteTypeEdit(type.id, edit)).toEqual({
+      added: 0,
+      removed: 0,
+      lost: [],
+    })
     await repo.updateNoteType(type.id, edit, T0 + 1)
 
     const saved = await repo.getNoteType(type.id)
@@ -337,7 +349,11 @@ describe('moving fields and cards of a note type (M10)', () => {
       d.removeTemplate(1) // « Pays », with its card
       d.moveTemplate(1, -1) // Drapeau, Capitale
     })
-    expect(await repo.previewNoteTypeEdit(type.id, edit)).toEqual({ added: 0, removed: 1 })
+    expect(await repo.previewNoteTypeEdit(type.id, edit)).toEqual({
+      added: 0,
+      removed: 1,
+      lost: [],
+    })
     await repo.updateNoteType(type.id, edit, T0 + 1)
 
     const saved = await repo.getNoteType(type.id)

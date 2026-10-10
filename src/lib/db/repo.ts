@@ -78,7 +78,6 @@ export async function createDeck(input: NewDeckInput, now: number): Promise<Deck
 export interface DeckPatch {
   name?: string
   description?: string
-  emoji?: string
   settings?: DeckSettings
 }
 
@@ -91,7 +90,6 @@ export async function updateDeck(id: string, patch: DeckPatch, now: number): Pro
       next.name = patch.name.trim()
     }
     if (patch.description !== undefined) next.description = patch.description
-    if (patch.emoji !== undefined) next.emoji = patch.emoji
     if (patch.settings !== undefined) next.settings = patch.settings
     await db.decks.put(next)
     return next
@@ -189,12 +187,13 @@ export interface NoteInput {
   noteTypeId?: string
   fields: string[]
   tags: string[]
+  /** basic notes only: never asked back → front (M11). */
+  oneWay?: boolean
   source?: string
 }
 
 const NO_CARD: Record<ModelType, 'noteNoCloze' | 'noteNoMask' | 'noteNoCard'> = {
   basic: 'noteNoCard',
-  basic_reverse: 'noteNoCard',
   cloze: 'noteNoCloze',
   image_occlusion: 'noteNoMask',
   custom: 'noteNoCard',
@@ -240,6 +239,7 @@ export async function createNote(
       updatedAt: now,
     }
     if (noteType) note.noteTypeId = noteType.id
+    if (input.oneWay && input.modelType === 'basic') note.oneWay = true
     if (input.source) note.source = input.source
     const cards = ords.map((ord) => makeCard(note, ord, newId(), now))
     await db.notes.add(note)
@@ -290,6 +290,8 @@ export async function updateNote(
     }
     if (noteType) note.noteTypeId = noteType.id
     else delete note.noteTypeId
+    if (input.oneWay && input.modelType === 'basic') note.oneWay = true
+    else delete note.oneWay
     if (input.source) note.source = input.source
     else delete note.source
     const cards = await db.cards.where('noteId').equals(id).toArray()
@@ -479,12 +481,12 @@ async function planEdit(id: string, edit: NoteTypeEdit, now: number) {
   return planNoteTypeEdit(type, edit, notes, cards, now, newId)
 }
 
-/** Cards created and deleted if `edit` were saved (nothing written). */
+/** Cards created and deleted, field contents lost, if `edit` were saved (nothing written). */
 export async function previewNoteTypeEdit(id: string, edit: NoteTypeEdit) {
   const plan = await db.transaction('r', db.noteTypes, db.notes, db.cards, () =>
     planEdit(id, edit, 0),
   )
-  return { added: plan.added.length, removed: plan.removed.length }
+  return { added: plan.added.length, removed: plan.removed.length, lost: plan.lost }
 }
 
 /**

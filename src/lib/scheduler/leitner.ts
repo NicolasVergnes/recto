@@ -6,6 +6,7 @@ import type { Card, CardState, Deck, Rating } from '../domain/types'
 import { formatInterval } from '../i18n/format'
 import { t } from '../i18n/t'
 import { daysBetween } from './day'
+import { flipAfter } from './sides'
 import type { PreviewItem, Scheduler, SchedulerOptions, SchedulerOutcome } from './types'
 
 export const MAX_BOX = 7
@@ -56,8 +57,7 @@ export function createLeitnerScheduler(options: Pick<SchedulerOptions, 'dayStart
       lapses: !success && card.state !== 3 ? card.lapses + 1 : card.lapses,
       lastReview: now,
       scheduledDays,
-      // alternateSides: flip after each success only (ignored when rendering cloze notes).
-      sideFlipped: success && s.alternateSides ? !card.sideFlipped : card.sideFlipped,
+      sideFlipped: flipAfter(card, rating, deck),
     }
     return {
       card: next,

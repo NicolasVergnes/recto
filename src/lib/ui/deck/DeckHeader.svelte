@@ -17,7 +17,7 @@
   {#if parent}
     <a class="small link-target" href={`#/decks/${parent.id}`}>← {parent.name}</a>
   {/if}
-  <h1 tabindex="-1">{deck.emoji ?? ''} {deck.name}</h1>
+  <h1 tabindex="-1">{deck.name}</h1>
   {#if deck.description}<p class="muted">{deck.description}</p>{/if}
   <p class="muted tabular">{t('home.cardCount', { n: cardCount })}</p>
   <div class="row">

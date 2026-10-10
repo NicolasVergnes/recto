@@ -132,6 +132,7 @@
         <NoteTypeRow
           decks={decks.value}
           bind:deckId={draft.deckId}
+          bind:oneWay={draft.oneWay}
           modelType={draft.modelType}
           noteType={draft.noteType}
           noteTypes={noteTypes.value}

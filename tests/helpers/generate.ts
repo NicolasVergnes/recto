@@ -25,7 +25,7 @@ export async function generateCollection(db: RectoDB, seed: string) {
   const decks: Deck[] = []
   for (let i = 0; i < 1 + int(3); i++) {
     const parent = makeDeck(
-      { name: `Deck ${i} é`, scheduler: pick(['fsrs', 'leitner'] as const), emoji: '🌍' },
+      { name: `Deck ${i} é`, scheduler: pick(['fsrs', 'leitner'] as const) },
       id(),
       t0 + i,
     )
@@ -68,13 +68,7 @@ export async function generateCollection(db: RectoDB, seed: string) {
   const cards: Card[] = []
   const reviews: Review[] = []
   for (let i = 0; i < 5 + int(20); i++) {
-    const modelType = pick<ModelType>([
-      'basic',
-      'basic_reverse',
-      'cloze',
-      'image_occlusion',
-      'custom',
-    ])
+    const modelType = pick<ModelType>(['basic', 'cloze', 'image_occlusion', 'custom'])
     const deck = pick(decks)
     const img =
       media.length > 0 && random() < 0.3 ? `<img src="${pick(media).name}" alt="a « b »">` : ''
@@ -102,6 +96,7 @@ export async function generateCollection(db: RectoDB, seed: string) {
       updatedAt: t0 + i * 2,
     }
     if (modelType === 'custom') note.noteTypeId = noteType.id
+    if (modelType === 'basic' && random() < 0.3) note.oneWay = true
     if (random() < 0.3) note.source = 'https://example.org'
     if (random() < 0.2) note.sourceGuid = `guid-${i}`
     notes.push(note)

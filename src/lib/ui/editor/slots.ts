@@ -27,7 +27,6 @@ const BASIC: readonly FieldSlot[] = [
  */
 export const SLOTS: Record<ModelType, readonly FieldSlot[]> = {
   basic: BASIC,
-  basic_reverse: BASIC,
   cloze: [
     { label: 'editor.text', index: 0 },
     { label: 'editor.extra', index: 1 },

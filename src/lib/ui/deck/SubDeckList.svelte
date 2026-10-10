@@ -24,7 +24,7 @@
     <ul class="list">
       {#each subDecks as child (child.id)}
         <li>
-          <a href={`#/decks/${child.id}`}>{child.emoji ?? ''} {child.name}</a>
+          <a href={`#/decks/${child.id}`}>{child.name}</a>
           <span class="muted small tabular">{t('home.cardCount', { n: countCards(child) })}</span>
         </li>
       {/each}

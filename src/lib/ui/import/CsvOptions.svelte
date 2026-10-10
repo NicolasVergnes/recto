@@ -36,7 +36,6 @@
 
   const TYPES: { value: string; label: MessageKey }[] = [
     { value: 'basic', label: 'editor.basic' },
-    { value: 'basic_reverse', label: 'editor.basicReverse' },
     { value: 'cloze', label: 'editor.cloze' },
   ]
   const STRATEGIES: { value: DuplicateStrategy; label: MessageKey }[] = $derived([

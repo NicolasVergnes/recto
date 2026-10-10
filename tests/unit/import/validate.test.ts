@@ -14,7 +14,7 @@ import {
   readSetting,
 } from '$lib/import/validate'
 
-const deck = makeDeck({ name: 'D', description: 'x', emoji: '🌍' }, 'd', 1)
+const deck = makeDeck({ name: 'D', description: 'x' }, 'd', 1)
 const note = {
   id: 'n',
   deckId: 'd',
@@ -65,6 +65,9 @@ describe('backup validators', () => {
     // The booklet calendar mode (removed in M9) is dropped from older backups.
     const old = { ...deck.settings.leitner, mode: 'calendar' }
     expect(readDeck({ ...deck, settings: { ...deck.settings, leitner: old } })).toEqual(deck)
+    // The deck emoji (removed in M11) is dropped from older backups, whatever its value.
+    expect(readDeck({ ...deck, emoji: '🌍' })).toEqual(deck)
+    expect(readDeck({ ...deck, emoji: 1 })).toEqual(deck)
     expect(readNote(note)).toEqual(note)
     expect(readCard(card)).toEqual(card)
     expect(readCard({ ...card, flag: undefined })?.flag).toBe(0)
@@ -109,11 +112,22 @@ describe('backup validators', () => {
     expect(readNote({ ...note, modelType: 'image_occlusion' })?.modelType).toBe('image_occlusion')
   })
 
+  it('reads the sides of basic notes and decks (M11)', () => {
+    expect(readNote({ ...note, oneWay: true })?.oneWay).toBe(true)
+    expect(readNote({ ...note, oneWay: 'oui' })).toEqual(note)
+    expect(readNote({ ...note, modelType: 'cloze', oneWay: true })?.oneWay).toBeUndefined()
+    // The reversed type was removed in M11 (no migration: test phase).
+    expect(readNote({ ...note, modelType: 'basic_reverse' })).toBeNull()
+    const off = { ...deck.settings, alternateSides: false }
+    expect(readDeck({ ...deck, settings: off })?.settings.alternateSides).toBe(false)
+    const { alternateSides: _, ...older } = deck.settings
+    expect(readDeck({ ...deck, settings: older })?.settings.alternateSides).toBe(true)
+  })
+
   it('rejects malformed rows', () => {
     const bad = [
       readDeck(null),
       readDeck({ ...deck, parentId: 3 }),
-      readDeck({ ...deck, emoji: 1 }),
       readDeck({ ...deck, settings: null }),
       readDeck({ ...deck, scheduler: 'sm2' }),
       readNote({ ...note, modelType: 'diagram' }),

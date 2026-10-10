@@ -8,6 +8,8 @@
   interface Props {
     decks: readonly Deck[]
     deckId: string
+    /** basic notes in a deck that asks both sides: always asked front → back. */
+    oneWay: boolean
     modelType: ModelType
     noteType: NoteType | undefined
     noteTypes: readonly NoteType[]
@@ -18,6 +20,7 @@
   let {
     decks,
     deckId = $bindable(),
+    oneWay = $bindable(),
     modelType,
     noteType,
     noteTypes,
@@ -32,6 +35,9 @@
   /** Cloze, occlusion and custom fields mean something else: an existing note keeps its family. */
   const locked = (m: ModelType) => m === 'cloze' || m === 'image_occlusion' || m === 'custom'
   const value = $derived(modelType === 'custom' ? `custom:${noteType?.id ?? ''}` : modelType)
+  const bothWays = $derived(
+    modelType === 'basic' && !!decks.find((d) => d.id === deckId)?.settings.alternateSides,
+  )
 
   function change(next: string) {
     const custom = noteTypes.find((nt) => `custom:${nt.id}` === next)
@@ -70,6 +76,15 @@
     <a class="small" href={href('/note-types')}>{t('editor.manageTypes')}</a>
   </div>
 </div>
+{#if bothWays}
+  <div>
+    <label class="check">
+      <input type="checkbox" bind:checked={oneWay} aria-describedby="editor-one-way-help" />
+      {t('editor.oneWay')}
+    </label>
+    <p id="editor-one-way-help" class="muted small">{t('editor.oneWayHelp')}</p>
+  </div>
+{/if}
 
 <style>
   .grow {

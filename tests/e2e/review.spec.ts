@@ -122,3 +122,30 @@ test('typed answers are compared and editing a card resumes the session', async 
   await expect(card).toContainText('Capitale du Portugal (Europe)')
   await expect(page.getByText('1 nouvelle', { exact: true })).toBeVisible()
 })
+
+// M11: one card for both sides, in FSRS decks too: a success turns it over, a failure does not.
+test('an FSRS deck asks a basic card both ways, without a second card', async ({ page }) => {
+  await page.clock.install()
+  await deckWithNotes(page, 'Sens', [['Capitale de l’Italie', 'Rome']])
+  await page.goto('/#/')
+  await page.getByRole('link', { name: 'Sens', exact: true }).click()
+  await expect(
+    page.getByLabel('Interroger dans les deux sens (la carte est retournée après chaque réussite)'),
+  ).toBeChecked()
+
+  await page.getByRole('link', { name: 'Réviser ce paquet' }).click()
+  const card = page.getByRole('article', { name: 'Carte' })
+  await expect(card).toContainText('Capitale de l’Italie')
+  await expect(page.getByText('Sens inversé')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Afficher la réponse' }).click()
+  await page.getByRole('button', { name: /^Bien/ }).click()
+
+  // Back after its 10-minute learning step, turned over: Rome is now the question.
+  await page.getByRole('button', { name: 'Attendre' }).click()
+  await page.clock.fastForward('11:00')
+  await expect(card).toContainText('Rome')
+  await expect(card).not.toContainText('Capitale de l’Italie')
+  await expect(page.getByText('Sens inversé')).toBeVisible()
+  await page.getByRole('button', { name: 'Afficher la réponse' }).click()
+  await expect(card).toContainText('Capitale de l’Italie')
+})

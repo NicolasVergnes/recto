@@ -51,12 +51,7 @@ export class ReviewController {
   readonly scheduler = $derived(this.deck ? this.schedulers[this.deck.scheduler] : undefined)
   readonly rendered = $derived(
     this.card && this.note && this.deck
-      ? renderCard(
-          this.note,
-          this.card,
-          this.deck.scheduler === 'leitner' && this.deck.settings.leitner.alternateSides,
-          this.noteType,
-        )
+      ? renderCard(this.note, this.card, this.deck.settings.alternateSides, this.noteType)
       : undefined,
   )
   readonly ratings = $derived(this.scheduler && this.deck ? this.scheduler.ratings(this.deck) : [])

@@ -26,7 +26,7 @@ const leitner = getScheduler('leitner')
 async function setup(scheduler: 'fsrs' | 'leitner' = 'fsrs') {
   const deck = await repo.createDeck({ name: 'D', scheduler }, now - 30 * DAY)
   const { note, cards } = await repo.createNote(
-    { deckId: deck.id, modelType: 'basic_reverse', fields: ['a', 'b'], tags: [] },
+    { deckId: deck.id, modelType: 'cloze', fields: ['{{c1::a}} {{c2::b}}', ''], tags: [] },
     now - 30 * DAY,
   )
   return { deck, note, cards: cards as [Card, Card] }
@@ -148,7 +148,7 @@ describe('daily queue from the database', () => {
       now - DAY,
     )
     const all = await loadTodayQueue(now)
-    // basic_reverse siblings are buried: one of the two cards today.
+    // Cloze siblings are buried: one of the two cards today.
     expect(all.result.ids).toHaveLength(3)
     expect(all.result.ids).toContain(cards[0].id)
     const one = await loadTodayQueue(now, deck.id)

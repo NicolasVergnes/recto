@@ -77,7 +77,7 @@ describe('Leitner transitions (03 §3.3)', () => {
     expect(answer(2, 3).card.sideFlipped).toBe(true)
     expect(answer(2, 3, { sideFlipped: true }).card.sideFlipped).toBe(false)
     expect(answer(2, 1, { sideFlipped: true }).card.sideFlipped).toBe(true)
-    const noAlt = deck('d1', 'leitner', { leitner: { alternateSides: false } })
+    const noAlt = deck('d1', 'leitner', { alternateSides: false })
     expect(leitner.answer(card('c', { box: 2, state: 2 }), 3, now, noAlt).card.sideFlipped).toBe(
       false,
     )

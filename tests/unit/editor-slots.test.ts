@@ -10,7 +10,6 @@ const custom: readonly FieldSlot[] = [
 describe('editor field slots', () => {
   it('lists every note field of the current types, main text first', () => {
     expect(SLOTS.basic.map((s) => s.index)).toEqual([0, 1, 2])
-    expect(SLOTS.basic_reverse).toBe(SLOTS.basic)
     expect(SLOTS.cloze.map((s) => s.index)).toEqual([0, 1])
     // Occlusion: image and masks (0–1) belong to the mask editor, never to the text form.
     expect(SLOTS.image_occlusion.map((s) => s.index)).toEqual([2, 3])

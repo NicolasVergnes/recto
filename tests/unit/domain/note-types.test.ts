@@ -3,7 +3,9 @@ import { makeCard } from '$lib/domain/defaults'
 import {
   DEFAULT_NOTE_TYPE,
   editOf,
+  fieldUsers,
   planNoteTypeEdit,
+  unknownReference,
   validateNoteType,
 } from '$lib/domain/note-types'
 import { areTwins, renderCard } from '$lib/domain/notes'
@@ -58,6 +60,37 @@ describe('note types', () => {
     ).toBe('noteTypeTemplates')
   })
 
+  it('refuses a template that uses a field the type does not have (M11)', () => {
+    // « Drapeau » removed while its card still asks it: that card would show nothing.
+    const removed = { ...TYPE, fields: ['Pays', 'Capitale'] }
+    expect(validateNoteType(removed)).toBe('noteTypeUnknownField')
+    expect(unknownReference(removed)).toEqual({ field: 'Drapeau', card: 'Drapeau' })
+    // Sections and filters count; Anki's special fields are always there.
+    const special = {
+      ...TYPE,
+      templates: [
+        {
+          name: 'A',
+          front: '{{#Pays}}{{text:Pays}}{{/Pays}} {{Tags}} {{Deck}}',
+          back: '{{FrontSide}}',
+        },
+      ],
+    }
+    expect(unknownReference(special)).toBeNull()
+    const hidden = {
+      ...TYPE,
+      templates: [{ name: 'B', front: '{{Pays}}', back: '{{^Langue}}-{{/Langue}}' }],
+    }
+    expect(unknownReference(hidden)).toEqual({ field: 'Langue', card: 'B' })
+    expect(validateNoteType(TYPE)).toBeNull()
+  })
+
+  it('lists the templates that use a field, whatever the side', () => {
+    expect(fieldUsers(TYPE.templates, 'Pays')).toEqual(['Capitale', 'Pays', 'Drapeau'])
+    expect(fieldUsers(TYPE.templates, ' Drapeau ')).toEqual(['Drapeau'])
+    expect(fieldUsers(TYPE.templates, 'Langue')).toEqual([])
+  })
+
   it('changes nothing when nothing is edited', () => {
     const plan = planNoteTypeEdit(TYPE, editOf(TYPE), [france, italie], cards, 2, newId)
     expect(plan).toMatchObject({ notes: [], moved: [], removed: [], added: [] })
@@ -95,9 +128,12 @@ describe('note types', () => {
       ['', 'France', 'Paris'],
       ['', 'Italie', 'Rome'],
     ])
-    // The flag card asked a field that no longer exists: its question is empty.
+    // The flag card asked a field that no longer exists: its question is empty (the editor now
+    // refuses such a save, validateNoteType; the plan stays consistent all the same).
     expect(plan.removed).toEqual(['f2'])
     expect(plan.type.fields).toEqual(['Langue', 'Pays', 'Capitale'])
+    // France had a flag, Italy none: one note loses something (announced before saving, M11).
+    expect(plan.lost).toEqual([{ field: 'Drapeau', notes: 1 }])
   })
 })
 

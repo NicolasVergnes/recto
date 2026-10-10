@@ -29,9 +29,9 @@ const departements = {
 }
 
 describe('areTwins (03 §5.2)', () => {
-  it('pairs the two directions of a reversed note, never a card with itself', () => {
-    expect(areTwins('basic_reverse', 0, 1)).toBe(true)
-    expect(areTwins('basic_reverse', 1, 1)).toBe(false)
+  it('never pairs a card with itself', () => {
+    expect(areTwins('basic', 0, 0)).toBe(false)
+    expect(areTwins('cloze', 1, 1)).toBe(false)
   })
 
   it('keeps cloze and occlusion siblings twins: they reveal each other', () => {

@@ -17,6 +17,7 @@ import {
 import type { Card, Deck, FsrsSettings, Rating, Review } from '../domain/types'
 import { formatInterval } from '../i18n/format'
 import { DAY_MS, daysBetween } from './day'
+import { flipAfter } from './sides'
 import type { PreviewItem, Scheduler, SchedulerOptions, SchedulerOutcome } from './types'
 
 const STEP_RE = /^\d+(\.\d+)?[mhd]$/
@@ -123,7 +124,7 @@ export function createFsrsScheduler(options: SchedulerOptions): Scheduler {
 
   function answer(card: Card, rating: Rating, now: number, deck: Deck): SchedulerOutcome {
     const { card: f } = get(deck).next(toFsrsCard(card), new Date(now), grade(rating))
-    const next = fromFsrsCard(card, f)
+    const next = { ...fromFsrsCard(card, f), sideFlipped: flipAfter(card, rating, deck) }
     return {
       card: next,
       review: {

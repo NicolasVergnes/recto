@@ -125,7 +125,7 @@ describe('buildApkg: legacy schema 11 package', () => {
     expect(columns('revlog')).toEqual('id cid usn ease ivl lastIvl factor time type'.split(' '))
     expect(report).toEqual({
       decks: 3,
-      notes: 6,
+      notes: 7,
       cards: 8,
       reviews: 15,
       media: 2,
@@ -141,7 +141,6 @@ describe('buildApkg: legacy schema 11 package', () => {
     const models = Object.values(json(col?.models) as Record<string, { name: string }>)
     expect(models.map((m) => m.name)).toEqual([
       'Recto · Basique',
-      'Recto · Basique et inversée',
       'Recto · Texte à trous',
       'Recto · Occlusion d’image',
     ])
@@ -158,7 +157,7 @@ describe('buildApkg: legacy schema 11 package', () => {
     expect(decks.find((d) => d.name === 'Default')?.id).toBe(1)
 
     const notes = rows(db, 'SELECT *, typeof(id) AS tid, typeof(sfld) AS tsfld FROM notes')
-    expect(notes).toHaveLength(6)
+    expect(notes).toHaveLength(7)
     expect(notes[0]).toMatchObject({
       guid: 'note-1',
       mid: ANKI_MODEL_IDS.basic,
@@ -171,7 +170,8 @@ describe('buildApkg: legacy schema 11 package', () => {
     })
     expect(notes[1]).toMatchObject({
       guid: 'aB3dE5fG7h',
-      mid: ANKI_MODEL_IDS.basic_reverse,
+      // Asked both ways in Recto, one Basic card in Anki (M11: Anki cannot alternate).
+      mid: ANKI_MODEL_IDS.basic,
       sfld: 75,
       tsfld: 'integer',
       tags: ' dep ',
@@ -185,7 +185,7 @@ describe('buildApkg: legacy schema 11 package', () => {
     const input = representativeCollection(now)
     const { db } = await open(input)
     const cards = rows(db, 'SELECT * FROM cards ORDER BY nid, ord')
-    const [capital, forward, backward, moon, earth, fresh, dog, cat] = cards
+    const [capital, forward, moon, earth, fresh, dog, cat, backward] = cards
     const [col] = rows(db, 'SELECT crt FROM col')
     const crt = Number(col?.crt) * 1000
     const original = (noteId: string, ord = 0) =>
@@ -312,7 +312,7 @@ describe('buildApkg: legacy schema 11 package', () => {
   it('allocates ids in constant time when thousands of rows share a timestamp', () => {
     const next = idAllocator()
     const start = performance.now()
-    // Two rows per millisecond (CSV reverse notes): a probing allocator would walk ~n²/4 ids.
+    // Two rows per millisecond (CSV cloze notes): a probing allocator would walk ~n²/4 ids.
     const ids = Array.from({ length: 200_000 }, (_, i) => next(now + Math.floor(i / 2)))
     expect(performance.now() - start).toBeLessThan(1000)
     expect(ids.slice(0, 3)).toEqual([now, now + 1, now + 2])
@@ -323,13 +323,19 @@ describe('buildApkg: legacy schema 11 package', () => {
     expect([deckIds(0), deckIds(1), deckIds(Number.NaN), deckIds(50)]).toEqual([2, 3, 4, 50])
   })
 
-  it('exports thousands of CSV-imported reverse notes sharing timestamps with unique ids', async () => {
+  it('exports thousands of CSV-imported cloze notes sharing timestamps with unique ids', async () => {
     const deck = makeDeck({ name: 'CSV' }, 'csv', now)
     const notes: Note[] = []
     const cards: Card[] = []
     // The CSV importer: createdAt = now + line, both cards of a note at the same instant.
     for (let i = 0; i < 3000; i++) {
-      const made = noteWithCards(`n${i}`, deck.id, 'basic_reverse', [`Q${i}`, `R${i}`, ''], now + i)
+      const made = noteWithCards(
+        `n${i}`,
+        deck.id,
+        'cloze',
+        [`{{c1::Q${i}}}{{c2::R${i}}}`, ''],
+        now + i,
+      )
       notes.push(made.note)
       cards.push(...made.cards)
     }
@@ -344,10 +350,10 @@ describe('buildApkg: legacy schema 11 package', () => {
     // Card ids keep the creation order, then the ord: Anki's "order added".
     const sorted = [...byNote].sort((a, b) => Number(a.id) - Number(b.id))
     expect(sorted.slice(0, 4).map((c) => [c.sfld, c.ord])).toEqual([
-      ['Q0', 0],
-      ['Q0', 1],
-      ['Q1', 0],
-      ['Q1', 1],
+      ['{{c1::Q0}}{{c2::R0}}', 0],
+      ['{{c1::Q0}}{{c2::R0}}', 1],
+      ['{{c1::Q1}}{{c2::R1}}', 0],
+      ['{{c1::Q1}}{{c2::R1}}', 1],
     ])
     db.close()
   })
@@ -390,7 +396,6 @@ describe('round trip through the Recto importer', () => {
     expect(pkg.format).toBe('anki21')
     expect(pkg.models.map((m) => convertModel(m)).map((c) => [c.modelType, c.converted])).toEqual([
       ['basic', false],
-      ['basic_reverse', false],
       ['cloze', false],
       ['image_occlusion', false],
     ])
@@ -409,6 +414,7 @@ describe('round trip through the Recto importer', () => {
       'note-4',
       'note-5',
       'note-6',
+      'note-7',
     ])
     expect(plan.cards).toHaveLength(input.cards.length)
     const states = (cards: readonly Card[]) =>
@@ -506,7 +512,7 @@ describe('round trip through the Recto importer', () => {
     )
     expect(plan.notes).toEqual([])
     expect(plan.updates).toEqual([])
-    expect(plan.report).toMatchObject({ notesCreated: 0, skipped: 6 })
+    expect(plan.report).toMatchObject({ notesCreated: 0, skipped: 7 })
   })
 
   it('updates a re-imported note edited in Anki, its cards following, unless it changed type', async () => {
@@ -523,11 +529,11 @@ describe('round trip through the Recto importer', () => {
       media: [],
     }
     const { bytes } = await open(input)
-    // In Anki: a third cloze, an edited Extra, a note type changed to "basic and reversed".
+    // In Anki: a third cloze, an edited Extra, a note type changed to cloze.
     const edited = editPackage(bytes, [
       "UPDATE notes SET flds = '{{c1::a}} {{c2::b}} {{c3::c}}' || char(31), mod = mod + 60 WHERE guid = 'cz'",
       "UPDATE notes SET flds = '{{c1::x}}' || char(31) || 'new', mod = mod + 60 WHERE guid = 'tx'",
-      `UPDATE notes SET mid = ${ANKI_MODEL_IDS.basic_reverse}, mod = mod + 60 WHERE guid = 'bs'`,
+      `UPDATE notes SET mid = ${ANKI_MODEL_IDS.cloze}, mod = mod + 60 WHERE guid = 'bs'`,
     ])
     const plan = await planApkgImport(
       readApkg(edited, SQL),

@@ -150,8 +150,9 @@ describe('robustness of the Anki reader and converter', () => {
       expect(learning.every((c) => c.due === now)).toBe(true)
       expect(learning.every((c) => c.box === (scheduler === 'leitner' ? 1 : 0))).toBe(true)
       expect(noHistory.cards.find((c) => c.suspended)?.state).toBe(1)
-      // Reverse notes get both cards; the Anki card of ord 5 is dropped; the note without cards gets new ones.
-      expect(noHistory.cards).toHaveLength(6)
+      // Reversed notes get one card (M11): Anki's cards of ord 1 and 5 are dropped; the note
+      // without cards gets a new one.
+      expect(noHistory.cards).toHaveLength(3)
       expect(noHistory.report.skipped).toBe(1)
       expect(noHistory.report.errors).toEqual([{ line: 4, code: 'noCloze' }])
       expect(noHistory.media.map((m) => m.name)).toEqual(['son.mp3'])

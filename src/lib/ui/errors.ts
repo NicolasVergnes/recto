@@ -14,6 +14,7 @@ const KEYS: Record<RepoErrorCode, MessageKey> = {
   noteTypeName: 'errors.noteTypeName',
   noteTypeFields: 'errors.noteTypeFields',
   noteTypeTemplates: 'errors.noteTypeTemplates',
+  noteTypeUnknownField: 'errors.noteTypeUnknownField',
   noteTypeNotFound: 'errors.noteTypeNotFound',
   noteTypeInUse: 'errors.noteTypeInUse',
   undoGone: 'errors.undoGone',
