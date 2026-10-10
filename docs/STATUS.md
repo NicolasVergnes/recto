@@ -1,10 +1,15 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-10-10 · Branche : m10-tech-debt (créée depuis `m9-review-tweaks`, non fusionnée ni poussée) · **V1 (M6) fusionnée sur `main` (PR #1)** · **M7 (vue mosaïque), M8 (types de notes multi-cartes) et M9 (jumelles, Memory Box sans calendrier) livrés**, en attente de relecture et de fusion par Nicolas · Jalon en cours : M10
+Dernière mise à jour : 2026-10-10 · Branche : m10-tech-debt (créée depuis `m9-review-tweaks`, non fusionnée ni poussée) · **V1 (M6) fusionnée sur `main` (PR #1)** · **M7 (vue mosaïque), M8 (types de notes multi-cartes) et M9 (jumelles, Memory Box sans calendrier) livrés**, en attente de relecture et de fusion par Nicolas · **M10 (dette technique) livré**, en attente de relecture et de fusion (après M7, M8 et M9)
 
 ## Jalon en cours
 
+Aucun : M10 est terminé, en attente de relecture et de fusion (après M7, M8 et M9, dont il dépend). Suivant : V2 (synchronisation par fichier, empaquetage Android), à confirmer par Nicolas, et la dette ci-dessous.
+
+## Terminé
+
 ### M10 — Dette technique (2026-10-10)
+
 
 Demande de Nicolas du 2026-10-10 : « Continue les étapes de dev qui ne nécessitent pas mon intervention ». Périmètre retenu : la dette de « Reste à faire » qui ne demande ni décision produit ni manipulation de Nicolas. La V2 (synchronisation par fichier, empaquetage Android) attend sa confirmation (« Écarts », M6 ; l'empaquetage demande aussi des comptes et des clés de signature) : non commencée. Branche créée depuis `m9-review-tweaks` (M10 touche au code de M8 et M9, non fusionnés).
 
@@ -20,9 +25,19 @@ Plan :
 8. Firefox et WebKit : suite E2E lancée hors `verify` ; écarts corrigés ou consignés.
 9. Relecture adversariale de l'ensemble, `npm run verify`, docs (02, 04, 05, 08, STATUS, CHANGELOG).
 
-Méthode : comme en M6, chaque point est développé sur une branche de travail `m10-*` (copie de travail isolée), relu par des relecteurs indépendants puis corrigé, et intégré à `m10-tech-debt` en un commit par point.
+Déroulement : points 1 à 3, l'interopérabilité et les découpages de `Home`, `Stats`, `Settings`, `Deck` et `App` développés sur des branches de travail `m10-*` (copies isolées) puis intégrés un commit par point ; les relectures automatiques prévues n'ont pas abouti (agents interrompus par les limites d'usage de la session) : chaque branche a été relue et vérifiée par l'intégrateur (contrôles, E2E, captures). Points 4, Firefox et fidélité Anki faits directement sur `m10-tech-debt`.
 
-## Terminé
+Critères (07-ROADMAP M10) :
+
+- ✔ Réimport `.apkg` avec réconciliation des cartes (créées comme à l'import, supprimées avec journal conservé, type changé toujours ignoré) — `tests/unit/import/apkg-reimport.test.ts`, `tests/unit/db/importer.test.ts`, E2E `tests/e2e/apkg-reimport.spec.ts`.
+- ✔ Fusion de sauvegarde : invariant 2 sur toute la base après fusion, doublons d'`ord` réduits, carte de la sauvegarde adoptée — `tests/unit/import/backup.test.ts` › merge, `tests/helpers/invariants.ts`, E2E `tests/e2e/backup-merge.spec.ts`.
+- ✔ Éditeur de types : « Monter » / « Descendre » (souris, clavier, focus suivi, annonce) ; champs des notes et `ord` des cartes suivent ; annuler une réponse après un déplacement garde le nouvel `ord` — `tests/unit/domain/note-types.test.ts`, `tests/unit/db/note-types.test.ts`, `tests/unit/note-type-draft.test.ts`, `tests/unit/db/study.test.ts`, E2E `tests/e2e/note-types.spec.ts`.
+- ✔ Formules `[$]…[/$]` et `[$$]…[/$$]` rendues (révision, aperçu, mosaïque, réponse tapée), `[latex]` en source, aide repliable dans l'éditeur — `tests/unit/domain/math.test.ts`, `tests/unit/domain/typed.test.ts`, E2E `tests/e2e/math.spec.ts`.
+- ✔ Import CSV vers un type personnalisé ; une ligne d'un type intégré ne met plus à jour une note personnalisée (défaut corrigé : « mettre à jour » remplaçait ses champs par Recto/Verso/Extra) — `tests/unit/import/csv.test.ts` › custom note types, E2E `tests/e2e/csv-custom.spec.ts`.
+- ◐ Composants ≤ 200 lignes : `Home`, `Stats`, `Settings`, `Deck`, `App`, `CsvImport` découpés (captures avant/après identiques au pixel près, bureau et mobile, clair et sombre — sauf un décalage sous le pixel dans un état du dialogue « Nouveau paquet » de l'écran Paquet —, E2E complets verts) ; restent `Heatmap` (271), `ApkgImport` (249), `Cards` (223), `ColumnChart` (210), `Editor` (205), `CardMosaic` (203), voir « Reste à faire ».
+- ✔ Interopérabilité : export d'un type personnalisé et aller-retour du vrai paquet des départements vérifiés avec le moteur d'Anki 26.9.3 (`tests/interop/README.md`, verdict OK) ; défaut trouvé et corrigé : l'export remplaçait le style du type dans Anki (CSS, champ de tri, préambule LaTeX) — `tests/unit/export-apkg.test.ts` › « gives Anki back… ».
+- ✔ Firefox : suite E2E entière verte (`npm run e2e:firefox`, 49 tests) ; défaut corrigé : l'éditeur attendait la demande de persistance, que Firefox laisse en suspens jusqu'à la réponse de l'utilisateur (formulaire non vidé, éditeur bloqué) — `tests/unit/db/storage.test.ts`. WebKit de Playwright : au mieux, échecs expliqués (06 §4). Favicon hors ligne : non reproductible avec Playwright, non modifié (voir « Écarts »).
+- ✔ `npm run verify` vert : check 0 erreur 0 avertissement, lint, format, 510 tests unitaires (couverture 91,8 % des lignes, seuils tenus), build (bundle initial ≈ 188 Ko gzip), E2E 99 réussis et 1 ignoré (bureau et mobile).
 
 ### M9 — Jumelles, Memory Box sans calendrier, conversion sans sauvegarde (2026-10-10)
 
@@ -218,16 +233,24 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 ## Reste à faire / dettes
 
 - V2 (SPEC §2, §3) : synchronisation par fichier (dossier choisi par File System Access API, un fichier par appareil, et surtout des « pierres tombales » pour propager les suppressions : sans elles, une fusion ressuscite les notes supprimées ; étude faite en M6, non implémentée) et empaquetage Android (TWA ou Capacitor ; l'hébergement sous `/recto/` impose un `assetlinks.json` à la racine du domaine pour une TWA).
-- Composants de plus de 200 lignes restants : `Settings.svelte` (352), `Cards.svelte` (219, découpé en M7), `Home.svelte` (307), `Deck.svelte` (298), `CsvImport.svelte` (295), `Stats.svelte` (275), `Heatmap.svelte` (271), `ApkgImport.svelte` (246), `ColumnChart.svelte` (210). Review, Editor et les paramètres de paquet ont été découpés en M6.
-- Réimport Anki d'une note dont les cartes changeraient (trou ou masque ajouté ou retiré dans Anki) : ignorée et comptée plutôt que réconciliée ; la réconciliation demanderait à `db/importer.ts` d'écrire aussi les cartes des notes mises à jour. Même limite pour la fusion de sauvegarde (mise à jour des champs sans les cartes), antérieure à M6.
-- Optimiseur : évaluation sur les révisions mêmes de l'entraînement (pas de validation croisée) ; Firefox et Safari non testés (mémoire WASM partagée : l'optimisation se déclare indisponible si le navigateur la refuse).
-- L'éditeur n'explique pas la syntaxe des formules ; les syntaxes Anki `[$]…[/$]`, `[$$]…[/$$]` et `[latex]` restent en source.
-- M8 : pas de réordonnancement des champs ni des modèles de cartes dans l'éditeur de types (ajout, renommage, suppression seulement) ; les filtres avancés d'Anki (`furigana:`, `tts:`…) rendent la valeur brute ; le CSS des types Anki est ignoré ; l'import CSV ne crée pas de note d'un type personnalisé.
-- M8 : `NoteTypeEditor.svelte` et `NoteTypes.svelte` restent sous 200 lignes ; `CardPreview` sert à la fois l'éditeur de notes et celui de types.
-- E2E `export-apkg.spec.ts` (mobile) : a dépassé une fois son délai de 5 s pendant `npm run verify` (M9) ; à surveiller, sans changer le délai tant que ce n'est pas reproductible.
-- Couverture globale ≈ 91 % des lignes (seuils de 90 % appliqués au domaine : scheduler, queue, import) ; `db/`, `export/` et `domain/` couverts sans seuil.
+- Composants de plus de 200 lignes restants : `Heatmap.svelte` (271), `ApkgImport.svelte` (249), `Cards.svelte` (223), `ColumnChart.svelte` (210), `Editor.svelte` (205), `CardMosaic.svelte` (203). Une copie de travail M10 a commencé l'extraction de la navigation clavier commune des deux graphiques (`src/lib/ui/charts/keys.ts`, non intégrée).
+- Optimiseur : évaluation sur les révisions mêmes de l'entraînement (pas de validation croisée, comme Anki) ; il fonctionne dans Firefox (M10) ; Safari non testé (le WebKit de Playwright refuse les `Blob` dans IndexedDB).
+- Les filtres avancés d'Anki (`furigana:`, `tts:`…) rendent la valeur brute ; `[latex]…[/latex]` reste en source (LaTeX en mode texte, que KaTeX ne rend pas).
+- Réimport Anki : un type dont on a réordonné ou modifié les champs dans Recto n'est plus reconnu (ses notes sont ignorées et comptées) ; un type dont Anki a changé les champs aussi. L'export rend le style d'un type importé, pas les options de ses champs (police, taille).
+- CSV : l'export laisse de côté les notes des types personnalisés (pas de colonnes communes), alors que l'import sait désormais en créer.
+- E2E : Firefox et WebKit côte à côte se figent parfois quelques secondes (projets à 15 s d'attente) ; `export-apkg.spec.ts` (mobile) avait dépassé une fois son délai en M9, pas revu en M10.
+- Couverture globale ≈ 92 % des lignes (seuils de 90 % appliqués au domaine : scheduler, queue, import) ; `db/`, `export/` et `domain/` couverts sans seuil.
 
 ## Décisions prises en session
+
+- 2026-10-10 (M10) : périmètre de la session autonome = la dette de « Reste à faire » sans décision produit ; la V2 attend la confirmation de Nicolas (empaquetage : comptes et clés de signature). Branche créée depuis `m9-review-tweaks`.
+- 2026-10-10 (M10) : une seule fonction pure `reconcileCards` (`domain/notes.ts`) décide des cartes gardées, créées et supprimées d'une note pour l'éditeur, le réimport, la fusion et le CSV ; à `ord` égal, la carte la plus récemment révisée reste. Le plan d'import porte `removedCards`, écrits avec la note dans la transaction de son lot.
+- 2026-10-10 (M10) : fusion de sauvegarde, `ord` manquant : la carte de la sauvegarde est adoptée (remappée sur la note locale si celle-ci a été trouvée par guid Anki), avec ses révisions (P10), plutôt qu'une carte neuve ; un contenu qui ne produit aucune carte laisse les cartes telles quelles.
+- 2026-10-10 (M10) : CSV vers un type personnalisé : le type choisi vaut pour toutes les lignes (pas de colonne Type) ; « mettre à jour » remplace les champs qui ont une colonne et garde les autres (une mise à jour qui viderait les champs absents du fichier serait destructrice), les tags sont remplacés comme pour les types intégrés ; nouvelle erreur « aucune carte ».
+- 2026-10-10 (M10) : style des types Anki gardé dans un champ facultatif `NoteType.anki` (CSS, préambules LaTeX, champ de tri), jamais appliqué par Recto, rendu par l'export ; date du type = `mod` du modèle Anki. Alternatives écartées : garder seulement la date (un type modifié dans Recto aurait encore écrasé le style), stocker le modèle Anki brut (fusion délicate avec les champs modifiés). Pas de version Dexie ni de `schemaVersion`.
+- 2026-10-10 (M10) : la demande de persistance n'est plus attendue par l'éditeur et est notée avant sa réponse (`persistGranted = false`, puis la réponse) : demandée une seule fois même si Firefox ne répond jamais.
+- 2026-10-10 (M10) : projets Playwright `firefox` et `webkit` définis dans la configuration mais hors `verify` et hors CI (`npm run e2e` cible `desktop` et `mobile`) ; `npm run e2e:firefox` ; WebKit seulement à la main, ses échecs connus venant du portage de Playwright.
+- 2026-10-10 (M10) : éditeur de types, boutons « Monter » / « Descendre » en flèche avec libellé masqué, comme « Retirer » : le jeu d'icônes est à son maximum de 20.
 
 - 2026-10-10 (M9) : deux cartes sont **jumelles** quand la question de chacune montre ce que l'autre demande. Type personnalisé : la question de A contient un champ que la réponse de B ajoute (champs du verso absents du recto) et réciproquement. Trous et occlusion restent toujours jumeaux (chaque question montre les réponses des autres ; en occlusion « tout cacher » c'est moins vrai, mais la règle reste simple et prudente). Alternative écartée : une liste de paires à cocher dans l'éditeur de types (plus de réglages, rien d'automatique à l'import).
 - 2026-10-10 (M9) : le réglage `burySiblings` garde son nom et sa valeur par défaut (`true`) mais n'enterre plus que les jumelles ; désactivé, toutes les sœurs restent, espacées. Pas de migration : les paquets existants passent d'eux-mêmes au nouveau comportement. Alternative écartée : un choix à trois valeurs (aucune / jumelles / toutes).
@@ -327,6 +350,9 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## Écarts par rapport aux docs
 
+- M10 : 05 §1 disait que l'import CSV ne crée jamais de note d'un type personnalisé, 05 §2.3 qu'une note réimportée dont les cartes changent est ignorée, ADR-010 que le CSS des types Anki est ignoré (il l'est encore à l'affichage) : docs mises à jour (02, 04, 05, 06, ADR-005, ADR-009, ADR-010), comportement décrit tel qu'il est.
+- M10 : favicon hors ligne (écart noté en M5, plus bas) non reproduit avec Playwright (Chromium sans tête et nouveau mode sans tête : aucune requête en échec ni erreur console) ; `index.html` non modifié. À observer dans un vrai Chrome.
+
 - M9 : 03 §3.2 (calendrier du coffret), §4 (sauvegarde automatique avant conversion) et §5.2 (une carte par note et par jour) ainsi que SPEC §5 changent à la demande de Nicolas ; docs mises à jour. `07-ROADMAP` M2 garde son historique avec une mention du retrait.
 
 - M8 : 05 §2.3 disait qu'un type Anki à plus de 3 champs ou aux modèles non basiques devient `basic` avec ses champs fusionnés dans Extra ; il devient désormais un type personnalisé (doc mise à jour, ADR-010). Le texte à trous Anki à plus de 2 champs garde la fusion.
@@ -346,6 +372,11 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 - Chromium ne passe pas la requête du favicon SVG par le service worker : hors ligne, la console signale l'échec de `logo.svg` (sans effet sur l'application, les icônes du manifeste sont précachées).
 
 ## À vérifier manuellement par Nicolas
+
+- M10 — Anki : réimporter dans Anki (desktop) un export Recto d'un paquet venu d'Anki, avec les réglages par défaut : le type garde son style (vérifié avec le moteur sans interface, pas à l'écran). Dans Recto : réimporter un paquet Anki après y avoir ajouté un trou, voir la nouvelle carte ; fusionner une sauvegarde du téléphone sur le PC après des modifications des deux côtés.
+- M10 — Firefox sur le PC : ajouter plusieurs notes à la suite, y compris la toute première (une demande d'autorisation de stockage peut apparaître : l'éditeur doit rester utilisable sans y répondre) ; importer un CSV dans le type « Departements ».
+- M10 — Éditeur de types : monter et descendre champs et cartes au clavier, avec un lecteur d'écran (annonce de la position).
+- M10 — Revoir les écrans découpés (Accueil, Statistiques, Paramètres, Paquet, navigation) : aucun changement attendu.
 
 - M9 — paquet des départements : sur deux ou trois jours, une même note ne doit jamais proposer « numéro → nom » et « nom → numéro » (ni « préfecture → … ») le même jour, mais peut proposer l'une d'elles et « Quel est ce département ? ». Changer le planificateur d'un paquet : confirmation seule, aucun fichier téléchargé. Paramètres d'un paquet Memory Box : plus de choix « Calendrier du coffret », intervalles modifiables.
 

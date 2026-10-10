@@ -107,11 +107,11 @@ Critères d'acceptation :
 Hors roadmap initiale. Nicolas demande de poursuivre sans lui les étapes qui ne demandent pas son intervention : la dette de `STATUS.md` (« Reste à faire »), sans la V2, qui attend sa confirmation.
 
 Critères d'acceptation :
-- [ ] Réimport `.apkg` : une note plus récente dans Anki dont les cartes changent (trou, masque ou modèle ajouté ou retiré) est mise à jour avec ses cartes (nouvelles cartes converties comme à l'import, cartes en trop supprimées, journal conservé), sans changer de type ; une note qui changerait de type reste ignorée et comptée.
-- [ ] Fusion de sauvegarde : chaque note fusionnée a exactement les cartes de son contenu (invariant 2) ; deux cartes d'une même note pour le même `ord` n'en font plus qu'une.
-- [ ] Éditeur de types : monter et descendre un champ ou un modèle de carte, au clavier comme à la souris ; les notes et les cartes suivent (planification et journal conservés).
-- [ ] Formules `[$]…[/$]` et `[$$]…[/$$]` d'Anki rendues par KaTeX ; aide de syntaxe des formules dans l'éditeur.
-- [ ] Import CSV vers un type personnalisé (colonnes → champs du type, doublons et mise à jour parmi les notes du même type) ; une ligne d'un type intégré ne met jamais à jour une note d'un type personnalisé.
-- [ ] Aucun composant de plus de 200 lignes ; comportement inchangé (E2E existants verts).
-- [ ] Favicon sans requête réseau ; export d'un type personnalisé vérifié avec le moteur d'Anki ; suite E2E lancée dans Firefox et WebKit, écarts corrigés ou consignés.
-- [ ] `npm run verify` vert.
+- [x] Réimport `.apkg` : une note plus récente dans Anki dont les cartes changent (trou, masque ou modèle ajouté ou retiré) est mise à jour avec ses cartes (nouvelles cartes converties comme à l'import, cartes en trop supprimées, journal conservé), sans changer de type ; une note qui changerait de type reste ignorée et comptée.
+- [x] Fusion de sauvegarde : chaque note fusionnée a exactement les cartes de son contenu (invariant 2) ; deux cartes d'une même note pour le même `ord` n'en font plus qu'une.
+- [x] Éditeur de types : monter et descendre un champ ou un modèle de carte, au clavier comme à la souris ; les notes et les cartes suivent (planification et journal conservés).
+- [x] Formules `[$]…[/$]` et `[$$]…[/$$]` d'Anki rendues par KaTeX ; aide de syntaxe des formules dans l'éditeur.
+- [x] Import CSV vers un type personnalisé (colonnes → champs du type, doublons et mise à jour parmi les notes du même type) ; une ligne d'un type intégré ne met jamais à jour une note d'un type personnalisé.
+- [ ] Aucun composant de plus de 200 lignes ; comportement inchangé (E2E existants verts). — partiel : 6 composants restent au-delà (STATUS « Reste à faire »).
+- [x] Favicon sans requête réseau ; export d'un type personnalisé vérifié avec le moteur d'Anki ; suite E2E lancée dans Firefox et WebKit, écarts corrigés ou consignés. — favicon : défaut non reproductible avec Playwright, `index.html` non modifié (STATUS « Écarts »).
+- [x] `npm run verify` vert.

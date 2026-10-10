@@ -4,6 +4,28 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 ## [Unreleased]
 
+### M10 — Dette technique
+
+#### Added
+
+- **Import CSV vers un type de note personnalisé** : les colonnes se mappent sur les champs du type (reconnus par l'en-tête), une carte par modèle dont la question n'est pas vide ; doublons cherchés parmi les notes du même type, « Mettre à jour » remplace les champs des colonnes choisies et les cartes suivent.
+- Éditeur de types de notes : **« Monter » et « Descendre »** pour les champs et les modèles de cartes, au clavier comme à la souris ; les notes et les cartes suivent, planification et historique conservés.
+- Formules d'Anki **`[$]…[/$]`** (en ligne) et **`[$$]…[/$$]`** (bloc) rendues comme `\( … \)` et `\[ … \]` ; aide « Écrire une formule » dans l'éditeur.
+- Compatibilité : la suite E2E passe dans Firefox (`npm run e2e:firefox`) ; vérification de l'export Anki des types personnalisés avec le moteur d'Anki (`tests/interop/`).
+
+#### Changed
+
+- **Réimport Anki** : une note modifiée dans Anki dont les cartes changent (trou, masque ou modèle ajouté ou retiré) est mise à jour au lieu d'être ignorée ; une carte est créée pour ce qui s'ajoute, supprimée (historique conservé) pour ce qui disparaît.
+- **Fusion de sauvegarde** : les cartes de chaque note fusionnée suivent le contenu retenu (plus de carte en trop ni de carte manquante, plus de doublon pour un même trou).
+- Paramètres, Accueil, Statistiques, page Paquet, navigation et import CSV découpés en composants plus petits (aucun changement visible).
+
+#### Fixed
+
+- Firefox : après l'ajout de la première note, l'éditeur restait bloqué (formulaire non vidé) tant qu'on ne répondait pas à la demande de stockage persistant.
+- Import CSV : « Mettre à jour » pouvait remplacer les champs d'une note d'un type personnalisé par Recto, Verso et Extra.
+- Export Anki : réimporter dans Anki un paquet venu d'Anki remplaçait le style de son type de notes (CSS, champ de tri, préambule LaTeX).
+- Annuler une réponse après avoir déplacé le modèle de la carte dans l'éditeur de types rendait à la carte son ancien numéro de modèle.
+
 ### M9 — Jumelles, Memory Box sans calendrier, conversion sans sauvegarde
 
 #### Changed
