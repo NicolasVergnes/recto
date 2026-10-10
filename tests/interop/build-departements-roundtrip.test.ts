@@ -34,7 +34,7 @@ it.skipIf(!real)('round-trips the real « Les départements français » package
       scheduler: 'fsrs',
       dayStartHour: 4,
     },
-    { decks: [], notes: [], noteTypes: [], media: new Map() },
+    { decks: [], notes: [], noteTypes: [], cards: [], media: new Map() },
     now,
     newId,
   )
