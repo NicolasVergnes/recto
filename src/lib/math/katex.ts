@@ -5,8 +5,7 @@
  */
 import { renderToString } from 'katex'
 import 'katex/dist/katex.min.css'
-
-const FORMULA_RE = /^\\\(([\s\S]*)\\\)$|^\\\[([\s\S]*)\\\]$/
+import { parseFormula } from '$lib/domain/math'
 
 /**
  * Replaces the source of each `span.math` under `root` by KaTeX output: visual HTML plus
@@ -20,11 +19,11 @@ const FORMULA_RE = /^\\\(([\s\S]*)\\\)$|^\\\[([\s\S]*)\\\]$/
 export function renderMath(root: ParentNode, invalidMessage: string): void {
   for (const el of root.querySelectorAll<HTMLElement>('span.math')) {
     // Only spans produced by markMath(): text alone, delimiters on both ends.
-    const m = el.childElementCount === 0 ? FORMULA_RE.exec(el.textContent) : null
-    if (!m) continue
+    const formula = el.childElementCount === 0 ? parseFormula(el.textContent) : null
+    if (!formula) continue
     try {
-      el.innerHTML = renderToString(m[1] ?? m[2] ?? '', {
-        displayMode: m[2] !== undefined,
+      el.innerHTML = renderToString(formula.tex, {
+        displayMode: formula.display,
         output: 'htmlAndMathml',
         throwOnError: true,
         strict: 'ignore',

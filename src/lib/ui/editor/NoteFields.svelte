@@ -8,6 +8,7 @@
   import { toast } from '$lib/state/toast.svelte'
   import { errorMessage } from '$lib/ui/errors'
   import FieldInput from './FieldInput.svelte'
+  import MathHelp from './MathHelp.svelte'
   import { targetField, type FieldSlot } from './slots'
 
   interface Props {
@@ -88,3 +89,4 @@
     {/if}
   {/if}
 {/each}
+{#if slots.length > 0}<MathHelp />{/if}

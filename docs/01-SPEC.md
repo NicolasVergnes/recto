@@ -80,7 +80,7 @@ Une **note** porte le contenu ; une note génère une ou plusieurs **cartes** (c
 | `image_occlusion` (V1) | Image, masques, En-tête, Extra | 1 par groupe de masques rectangulaires (02 §2.1) ; importé/exporté vers le type « Image Occlusion » d'Anki ≥ 23.10 |
 | `custom` (M8) | Champs nommés de son type de note | 1 par modèle de carte dont le recto n'est pas vide, comme Anki (02 §2.2) ; types créés dans « Types de notes » ou importés d'Anki tels quels |
 
-- Les champs sont du HTML restreint (gras, italique, listes, `<img src="nom">`, `[sound:nom]`, LaTeX inline `\( … \)` rendu par KaTeX en V1 seulement — en V0 affiché tel quel).
+- Les champs sont du HTML restreint (gras, italique, listes, `<img src="nom">`, `[sound:nom]`, formules `\( … \)` (en ligne) et `\[ … \]` (bloc), ainsi que les écritures d'Anki `[$]…[/$]` et `[$$]…[/$$]` (M10), rendues par KaTeX en V1 seulement — en V0 affichées telles quelles ; `[latex]…[/latex]` reste en source, 04-UI §4).
 - Tags libres (chaîne, séparés par des espaces), autocomplétion.
 - Champ « Source » optionnel (URL ou référence) sur la note.
 - Médias : images (JPEG/PNG/WebP/GIF/SVG), audio (MP3/OGG/WebM/M4A). À l'ajout, les images sont redimensionnées côté client (côté max 1 280 px, WebP qualité 0,82 si supporté, sinon JPEG 0,85) ; taille max après traitement 600 Ko pour une image, 3 Mo pour un audio. Les médias sont stockés dans IndexedDB, référencés par nom de fichier unique (voir 02-DATA-MODEL).

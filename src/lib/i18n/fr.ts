@@ -235,6 +235,11 @@ export const fr = {
     clozeOnly: 'Sélectionnez du texte dans le champ Texte d’une note « Texte à trous ».',
     clozeHelp:
       'Entourez la réponse avec {{c1::…}} (Ctrl+Maj+C sur une sélection) ; un numéro par carte.',
+    mathHelp: 'Écrire une formule (LaTeX)',
+    mathInline: 'Dans le texte : \\(x^2\\)',
+    mathDisplay: 'En bloc, centrée : \\[\\frac{1}{2}\\]',
+    mathAnki: 'Syntaxes d’Anki acceptées : [$]x^2[/$] et [$$]\\frac{1}{2}[/$$]',
+    mathPreview: 'L’aperçu affiche le résultat.',
     preview: 'Aperçu ({n})',
     cardN: 'Carte {n}',
     willCreate: 'Cette note produira {n} carte.|Cette note produira {n} cartes.',

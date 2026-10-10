@@ -429,6 +429,29 @@ describe('round trip through the Recto importer', () => {
     expect(plan.report.missingMedia).toEqual(['absent.png'])
   })
 
+  it('never rewrites the formula syntaxes, Anki’s [$] and [$$] included (M10)', async () => {
+    const deck = makeDeck({ name: 'Maths' }, 'deck-maths', now)
+    const fields = [
+      'Aire : [$]\\pi r^2[/$] ou \\(\\pi r^2\\)',
+      '[$$]\\frac{1}{2}[/$$] et \\[x\\]',
+      '[latex]\\LaTeX[/latex]',
+    ]
+    const { note, cards } = noteWithCards('maths', deck.id, 'basic', fields, now)
+    const { bytes, db } = await open({
+      decks: [deck],
+      notes: [note],
+      cards,
+      reviews: [],
+      media: [],
+    })
+    // Anki reads the syntaxes it knows as typed…
+    expect(String(rows(db, 'SELECT flds FROM notes')[0]?.flds).split('\u001f')).toEqual(fields)
+    db.close()
+    // … and so does Recto when the package comes back.
+    const plan = await planApkgImport(readApkg(bytes, SQL), importOptions, empty, now, newId)
+    expect(plan.notes.map((n) => n.fields)).toEqual([fields])
+  })
+
   it('replays the exported history (FSRS and Leitner)', async () => {
     const input = representativeCollection(now)
     const { bytes } = await open(input)

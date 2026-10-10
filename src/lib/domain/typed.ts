@@ -19,9 +19,9 @@ export function canTypeAnswer(expectedHtml: string): boolean {
 /**
  * Character-by-character comparison of a typed answer (SPEC §5.3), by longest common
  * subsequence: `same` characters, `wrong` typed characters, `missing` expected characters.
- * Formulas are expected without their delimiters: `x^2` for `\(x^2\)`. Their source as
- * written, delimiters included, is accepted too when it matches better: an invalid formula
- * (a regex such as `\(\d+\)`) is displayed that way.
+ * Formulas are expected without their delimiters, whichever syntax: `x^2` for `\(x^2\)` and for
+ * `[$]x^2[/$]`. Their source as written, delimiters included, is accepted too when it matches
+ * better: an invalid formula (a regex such as `\(\d+\)`) is displayed that way.
  */
 export function compareTyped(expectedHtml: string, typed: string): DiffPart[] {
   const tex = stripHtml(stripMathDelimiters(expectedHtml))
