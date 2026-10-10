@@ -1,7 +1,14 @@
 import type { Card, Deck, Note, NoteType, Review } from '../domain/types'
 
 export type ImportErrorCode =
-  'emptyFront' | 'noCloze' | 'noMask' | 'tooManyRows' | 'emptyFile' | 'unknownModel' | 'orphanCard'
+  | 'emptyFront'
+  | 'noCloze'
+  | 'noMask'
+  | 'noCard'
+  | 'tooManyRows'
+  | 'emptyFile'
+  | 'unknownModel'
+  | 'orphanCard'
 
 export interface ImportError {
   /** 1-based line (CSV) or Anki note id; 0 for the whole file. */

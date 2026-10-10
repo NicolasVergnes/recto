@@ -11,6 +11,7 @@
     emptyFront: 'importReport.emptyFront',
     noCloze: 'importReport.noCloze',
     noMask: 'importReport.noMask',
+    noCard: 'importReport.noCard',
     tooManyRows: 'importReport.tooManyRows',
     emptyFile: 'importReport.emptyFile',
     unknownModel: 'importReport.unknownModel',

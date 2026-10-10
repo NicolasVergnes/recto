@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { makeDeck } from '$lib/domain/defaults'
-import type { Note } from '$lib/domain/types'
+import type { Note, NoteType } from '$lib/domain/types'
 import {
   defaultMapping,
   detectModelType,
+  headerNamesFields,
   MAX_CSV_ROWS,
   parseCsv,
   planCsvImport,
@@ -304,5 +305,133 @@ describe('fallback deck', () => {
     const p3 = planCsvImport(without, { ...options(without), deckId: '' }, empty, now, newId)
     expect(p3.decks).toEqual([])
     expect(p3.notes[0]?.deckId).toBe('target')
+  })
+})
+
+describe('custom note types (M10)', () => {
+  const type: NoteType = {
+    id: 'dept',
+    name: 'Departements',
+    fields: ['Numero', 'Dept', 'Carte'],
+    templates: [
+      {
+        name: 'QNumero',
+        front: 'Numéro {{Numero}} ?',
+        back: '{{FrontSide}}<hr id=answer>{{Dept}}',
+      },
+      { name: 'QDept', front: 'Numéro de {{Dept}} ?', back: '{{Numero}}' },
+      { name: 'Qcarte', front: '{{#Carte}}{{Carte}}{{/Carte}}', back: '{{Dept}}' },
+    ],
+    createdAt: now,
+    updatedAt: now,
+  }
+  const csv = (text: string) => parseCsv(text)
+  const custom = (data: ReturnType<typeof parseCsv>, patch: Partial<CsvImportOptions> = {}) => {
+    const hasHeader = headerNamesFields(data, type)
+    return {
+      mapping: defaultMapping(data, hasHeader, type),
+      hasHeader,
+      modelType: 'custom' as const,
+      noteType: type,
+      deckId: 'target',
+      duplicates: 'skip' as const,
+      ...patch,
+    }
+  }
+  const existingNote = (fields: string[], patch: Partial<Note> = {}): Note => ({
+    id: 'old',
+    deckId: 'target',
+    modelType: 'custom',
+    noteTypeId: type.id,
+    fields,
+    tags: ['vieux'],
+    createdAt: 1,
+    updatedAt: 1,
+    ...patch,
+  })
+
+  it('maps a header naming the fields, in any order, and makes one card per template', () => {
+    const data = csv('Dept;Numero;tags\nAin;01;geo\nAisne;02;\n')
+    expect(headerNamesFields(data, type)).toBe(true)
+    expect(defaultMapping(data, true, type)).toEqual(['field:1', 'field:0', 'tags'])
+    const plan = planCsvImport(data, custom(data), empty, now, newId)
+    expect(plan.report.errors).toEqual([])
+    expect(plan.notes.map((n) => [n.modelType, n.noteTypeId, n.fields, n.tags])).toEqual([
+      ['custom', 'dept', ['01', 'Ain', ''], ['geo']],
+      ['custom', 'dept', ['02', 'Aisne', ''], []],
+    ])
+    // No « Carte »: no card for the section template.
+    expect(plan.cards.map((c) => [c.noteId, c.ord])).toEqual([
+      [plan.notes[0]?.id, 0],
+      [plan.notes[0]?.id, 1],
+      [plan.notes[1]?.id, 0],
+      [plan.notes[1]?.id, 1],
+    ])
+  })
+
+  it('maps positionally without header and reports empty first fields and cardless rows', () => {
+    const data = csv('01,Ain,<img src="ain.png">\n,Aisne,\n')
+    expect(defaultMapping(data, false, type)).toEqual(['field:0', 'field:1', 'field:2'])
+    const plan = planCsvImport(data, custom(data), empty, now, newId)
+    expect(plan.notes).toHaveLength(1)
+    expect(plan.cards).toHaveLength(3)
+    expect(plan.report.errors).toEqual([{ line: 2, code: 'emptyFront' }])
+    const cardless: NoteType = {
+      ...type,
+      templates: [{ name: 'Q', front: '{{Carte}}', back: '{{Dept}}' }],
+    }
+    const none = planCsvImport(
+      csv('01;Ain\n'),
+      { ...custom(csv('01;Ain\n')), noteType: cardless },
+      empty,
+      now,
+      newId,
+    )
+    expect(none.report.errors).toEqual([{ line: 1, code: 'noCard' }])
+  })
+
+  it('updates the notes of the same type only: mapped fields replaced, cards reconciled', () => {
+    const old = existingNote(['01', 'Ain', 'vieille carte'])
+    const cards = [0, 1, 2].map((ord) => ({
+      id: `c${ord}`,
+      noteId: 'old',
+      ord,
+      lastReview: 5,
+      reps: 2,
+    }))
+    const builtIn: Note = { ...old, id: 'basic', modelType: 'basic', fields: ['01', 'x', ''] }
+    delete builtIn.noteTypeId
+    const existing: ExistingCollection = { ...empty, notes: [old, builtIn], cards }
+    // « Carte » emptied: its card goes, the others stay with their schedule.
+    const data = csv('Numero;Carte\n01;\n')
+    const plan = planCsvImport(data, custom(data, { duplicates: 'update' }), existing, now, newId)
+    expect(plan.notes).toEqual([])
+    expect(plan.updates.map((n) => [n.id, n.fields, n.tags])).toEqual([
+      ['old', ['01', 'Ain', ''], []],
+    ])
+    expect(plan.removedCards).toEqual([{ id: 'c2', noteId: 'old' }])
+    expect(plan.cards).toEqual([])
+    // And back: a card is created for the template that asks again.
+    const again = csv('Numero;Carte\n01;nouvelle\n')
+    const back = planCsvImport(
+      again,
+      custom(again, { duplicates: 'update' }),
+      { ...existing, notes: [{ ...old, fields: ['01', 'Ain', ''] }], cards: cards.slice(0, 2) },
+      now,
+      newId,
+    )
+    expect(back.cards.map((c) => [c.noteId, c.ord, c.deckId])).toEqual([['old', 2, 'target']])
+    expect(back.removedCards).toEqual([])
+  })
+
+  it('never lets a built-in row update a custom note (regression, M10)', () => {
+    const old = existingNote(['Capitale de la France', 'Paris', '', ''])
+    const existing: ExistingCollection = { ...empty, notes: [old] }
+    const data = csv('Capitale de la France;Lyon;\n')
+    for (const duplicates of ['skip', 'update', 'duplicate'] as const) {
+      const plan = planCsvImport(data, options(data, { duplicates }), existing, now, newId)
+      expect(plan.updates).toEqual([])
+      expect(plan.notes.map((n) => n.modelType)).toEqual(['basic'])
+    }
   })
 })

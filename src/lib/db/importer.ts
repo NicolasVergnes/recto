@@ -123,12 +123,13 @@ export async function applyImportPlan(
 
 /** Everything an import planner needs to know about the current collection. */
 export async function existingCollection() {
-  const [decks, notes, mediaNames] = await Promise.all([
+  const [decks, notes, cards, mediaNames] = await Promise.all([
     db.decks.toArray(),
     db.notes.toArray(),
+    db.cards.toArray(),
     db.media.toCollection().primaryKeys(),
   ])
-  return { decks, notes, mediaNames: new Set(mediaNames) }
+  return { decks, notes, cards, mediaNames: new Set(mediaNames) }
 }
 
 /**
