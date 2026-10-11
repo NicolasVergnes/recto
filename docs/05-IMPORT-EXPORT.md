@@ -87,7 +87,7 @@ SELECT id, cid, ease, ivl, lastIvl, factor, time, type FROM revlog ORDER BY id;
 
 Format en 02-DATA-MODEL §5. Zip construit en flux avec `fflate` (`Zip` + `ZipDeflate` pour `data.json`, `ZipPassThrough` pour les médias déjà compressés). Téléchargement via `<a download>` (fonctionne dans la PWA installée). Sur mobile, proposer aussi le partage natif (`navigator.share({ files })`) si disponible.
 
-Restauration : valider `manifest.format === 'recto-backup'` et `schemaVersion ≤ courant` (migrer si inférieur avec les mêmes fonctions `upgrade`) ; prévisualiser les comptes ; « Remplacer » ou « Fusionner » (02-DATA-MODEL §5). Le rapport de la restauration compte les paquets, notes, cartes, révisions et médias ajoutés, les notes mises à jour et (M10) les cartes supprimées parce que le contenu gagnant de leur note ne les produit plus.
+Restauration : valider `manifest.format === 'recto-backup'` et `schemaVersion ≤ courant` (migrer si inférieur avec les mêmes fonctions `upgrade`) ; prévisualiser les comptes ; « Remplacer » ou « Fusionner » (02-DATA-MODEL §5). Le rapport de la restauration compte les paquets, notes, cartes, révisions et médias ajoutés, les notes mises à jour, (M10) les cartes supprimées parce que le contenu gagnant de leur note ne les produit plus, et (M12) ce qui a été supprimé ici parce que l'autre appareil l'avait supprimé, ainsi que les médias ignorés parce qu'un fichier du même nom, au contenu différent, existe déjà. Depuis M12 (`schemaVersion` 4), la sauvegarde porte aussi l'identifiant de l'appareil et ses suppressions : fusionner la sauvegarde d'un autre appareil est le moyen de synchroniser deux appareils, en attendant une synchronisation automatique (V2).
 
 ## 4. Export `.apkg` (V1)
 

@@ -1,12 +1,27 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-10-11 · Branche : m11-two-way-cards (créée depuis `m10-tech-debt`, non fusionnée ni poussée) · **V1 (M6) fusionnée sur `main` (PR #1)** · **M7 (vue mosaïque), M8 (types de notes multi-cartes) et M9 (jumelles, Memory Box sans calendrier) livrés**, en attente de relecture et de fusion par Nicolas · **M10 (dette technique) et M11 (une carte, deux sens) livrés**, en attente de relecture et de fusion (dans l'ordre M7 → M11)
+Dernière mise à jour : 2026-10-12 · Branche : m12-sync-ready-data (créée depuis `m11-two-way-cards`, non fusionnée ni poussée) · **V1 (M6) fusionnée sur `main` (PR #1)** · **M7 (vue mosaïque), M8 (types de notes multi-cartes) et M9 (jumelles, Memory Box sans calendrier) livrés**, en attente de relecture et de fusion par Nicolas · **M10, M11 et M12 (V2 : données prêtes pour plusieurs appareils) livrés**, en attente de relecture et de fusion (dans l'ordre M7 → M12)
 
 ## Jalon en cours
 
-Aucun : M11 est terminé, en attente de relecture et de fusion (après M7 à M10, dont il dépend). Suivant : V2 (synchronisation par fichier, empaquetage Android), à confirmer par Nicolas, et la dette ci-dessous.
+Aucun : M12 est terminé. V2 décidée par Nicolas le 2026-10-11 (application Android avec Capacitor, publication possible sur le Play Store après un test avec quelques personnes). Plan validé :
+
+- M12 (fait) : données prêtes pour plusieurs appareils et pour des testeurs.
+- **M13** : application Android avec Capacitor, la PWA inchangée ; couche plateforme (`saveFile` natif, flux destructifs qui attendent la réussite de la sauvegarde, `lastBackupAt` écrit après l'enregistrement), projet `android/`, bouton retour, micro, lecture automatique des sons, flux Maestro, APK de débogage en CI. **Bloqué par une décision de Nicolas : l'identifiant d'application (`appId`), définitif sur le Play Store** (proposition : `fr.nicolasvergnes.recto`).
+- M14 : préparation de la publication avec le compte Google Play de Nicolas (politique de confidentialité, signature, fiche, test fermé : 12 testeurs pendant 14 jours pour un compte personnel récent).
+- M15 : transport de la synchronisation (dossier, Drive ou Syncthing), à choisir.
 
 ## Terminé
+
+### M12 — Données prêtes pour plusieurs appareils et pour des testeurs (2026-10-12)
+
+Critères (07-ROADMAP M12) :
+
+- ✔ Règle de migration écrite dans `CLAUDE.md` et `quality-gate` §4 ; Dexie version 3 (`card.updatedAt` indexé, table `deletions`) avec `upgrade()`, sauvegarde `schemaVersion` 4 (`readCard` date les cartes des sauvegardes plus anciennes comme l'`upgrade`) — `tests/unit/db/migration.test.ts` (« opens a version 2 database »), `tests/unit/import/backup.test.ts` (« reads a version 3 backup », « reads deletions and setting dates »).
+- ✔ Traces de suppression (`db/deletions.ts`, `recordDeletions` dans la transaction de chaque suppression : `deleteDeck`, `mergeDecks`, `deleteNotes`, `updateNote`, `updateNoteType`, `deleteNoteType`, import, `undoReview`, `deleteMedia`) ; `card.updatedAt` mis à jour par chaque modification (réponse dans les deux planificateurs, annulation, suspension, drapeau, retrait, réinitialisation, déplacement, `ord`, changement de planificateur) — `tests/unit/db/repo.test.ts` › « deletions and change dates », `tests/unit/db/study.test.ts`.
+- ✔ Fusion qui suit les suppressions (`db/restore.ts`) — `tests/unit/db/sync-merge.test.ts` (deux bases jouent A et B : note supprimée ici ou là, modifiée après sa suppression, paquet gardé pour une note ajoutée, annulation, copie la plus récente d'une carte, journal d'une note supprimée sans le savoir, médias, réglages ; propriété : huit graines de modifications aléatoires sur chaque appareil, fusion dans les deux sens → même contenu, idempotence, invariants) ; E2E `tests/e2e/backup-merge.spec.ts` (« a note deleted on one device stays deleted after merging both ways », deux profils de navigateur).
+- ✔ `deviceId` (réglage propre à l'appareil, dans le manifeste) ; réglages partagés `dayStartHour` et `globalReviewsPerDay` datés et fusionnés, les autres jamais importés (fusion et « remplacer ») — `sync-merge.test.ts` › « shares the collection settings », `backup.test.ts` (aller-retour).
+- ✔ `npm run verify` vert : check 0 erreur 0 avertissement, lint, format, 533 tests unitaires (couverture 92,2 % des lignes), build, E2E 105 réussis et 1 ignoré (bureau et mobile). Vérifié dans l'application réelle : une base créée en version 2 s'ouvre migrée (version 3, carte datée, table `deletions`), révision et sauvegarde fonctionnent, le thème de l'appareil est gardé.
 
 ### M11 — Une carte, deux sens ; champs protégés ; plus d'emoji (2026-10-11)
 
@@ -257,6 +272,12 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## Décisions prises en session
 
+- 2026-10-12 (M12) : V2 = application Android avec **Capacitor** (choix de Nicolas, pour permettre plus tard une synchronisation automatique par dossier sur le téléphone, impossible depuis la PWA : pas de File System Access API dans Chrome Android) ; découpage M12 (données), M13 (application), M14 (publication), M15 (transport de la synchronisation).
+- 2026-10-12 (M12) : traces de suppression par ligne, jamais purgées pour l'instant (quelques dizaines d'octets par ligne ; une purge demandera une date au-delà de laquelle une sauvegarde plus ancienne n'est plus fusionnable). Règle : une suppression l'emporte sur une ligne dont la dernière modification est antérieure ou égale ; « Tout effacer » efface aussi les traces (l'appareil repart de zéro).
+- 2026-10-12 (M12) : cartes fusionnées en entier par `updatedAt` (alternative écartée : planification de la copie la plus récemment révisée et drapeaux de la plus récemment modifiée ; elle annulait une réinitialisation faite sur un seul appareil). Limite assumée : une suspension faite sur A après une réponse donnée sur B remet la planification d'avant la réponse ; la réponse reste au journal.
+- 2026-10-12 (M12) : journal (P10) : une révision n'est supprimée par une fusion que si un appareil l'a supprimée en la connaissant (annulation, note supprimée) ; une réponse donnée à une note que l'autre appareil supprimait sans la connaître reste dans le journal des deux. Alternative écartée : supprimer les révisions des cartes d'une note supprimée ; les deux appareils ne connaissent pas forcément les mêmes cartes d'une note (une carte retirée d'un côté), et les journaux divergeaient selon l'ordre des fusions (trouvé par le test de propriété).
+- 2026-10-12 (M12) : un paquet ou un type de note supprimé d'un côté mais encore utilisé par une note de l'autre est gardé, daté de la fusion, et sa trace oubliée (sinon la fusion suivante le supprimerait ailleurs, notes orphelines) ; un média supprimé mais encore affiché par une note est gardé de même.
+- 2026-10-12 (M12) : `lastBackupAt` reste écrit par `createBackup` : son écriture après un enregistrement réussi demande de savoir si le fichier a été enregistré, ce que M13 apporte (`saveFile`).
 - 2026-10-11 (M11) : sens des cartes réglé par paquet (`alternateSides`, sorti de `leitner`, défaut `true` pour FSRS comme Memory Box) avec une exception par note (`oneWay`, notes basiques seulement) ; les textes à trous, masques et types personnalisés gardent le sens de leurs modèles (un type personnalisé définit ses sens par ses modèles). Avec FSRS, les deux sens partagent un état mémoire : prix accepté d'une seule carte. Aucune migration (phase de test, choix de Nicolas) : une note `basic_reverse` d'une ancienne base ou sauvegarde n'est plus lue ; l'ancienne clé `leitner.alternateSides` est ignorée (défaut).
 - 2026-10-11 (M11) : export Anki d'une note posée dans les deux sens en « Recto · Basique » (une carte), **et non** en « Basique et inversée » comme prévu au plan : le réglage étant activé par défaut, toutes les notes basiques auraient changé de type dans Anki d'un export à l'autre, ce que l'import d'Anki gère mal (copie « + » ou type remplacé, vu en M10). Anki ne sait pas retourner une carte : dans Anki, la note n'est posée que Recto → Verso.
 - 2026-10-11 (M11) : retirer un champ cité par un modèle est refusé (message nommant les cartes) plutôt que de réécrire les modèles ; tout modèle citant un champ absent invalide le type (garde-fou aussi pour les renommages), sauf les champs spéciaux d'Anki. Retirer un champ rempli mais non cité est permis, après confirmation chiffrée.
@@ -392,6 +413,8 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## À vérifier manuellement par Nicolas
 
+- M12 — Sur le PC et le téléphone (PWA) : faire une sauvegarde de chaque côté, supprimer une note sur l'un, puis fusionner la sauvegarde de l'autre : la note ne revient pas ; fusionner dans l'autre sens : elle disparaît aussi (le rapport l'indique). La première ouverture après la mise à jour migre la base (aucune action, rien ne doit changer à l'écran).
+- M13 — décider l'identifiant d'application Android (`appId`), définitif sur le Play Store.
 - M11 — Effacer les données de test (« Tout effacer ») avant d'essayer : les anciennes notes « Basique + inverse » ne sont plus lues. Réviser une note basique dans un paquet FSRS : après une réussite, elle revient retournée (« ↔ Sens inversé ») ; cocher « Ne jamais retourner cette note » sur une autre.
 - M11 — Réponse tapée sur une note nom ↔ photo : pas de saisie quand la réponse attendue est la photo, saisie du nom quand la photo est la question.
 - M11 — Types de notes : dans « Departements », tenter de retirer « Numero » (refus nommant les 4 cartes) ; retirer un champ rempli que les modèles n'utilisent plus (confirmation avec le nombre de notes).

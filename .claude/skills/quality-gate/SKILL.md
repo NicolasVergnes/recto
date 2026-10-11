@@ -36,6 +36,7 @@ Passer le diff (`git diff main...HEAD`) avec cette grille et corriger avant de c
 - **Principes P1–P11** : un écran ou une fonction les contourne-t-il ? (verso visible trop tôt, carte supprimable trop tôt, échéance globale, texte en dur non traduit…)
 - **Domaine pur** : `scheduler`, `queue`, parsers sans import de Svelte/Dexie/DOM ; `now` en paramètre.
 - **Transactions** : chaque écriture multi-tables est atomique ; `reviews` jamais modifié.
+- **Données des utilisateurs (depuis M12)** : tout changement du modèle stocké (champ, table, index, valeur permise) a sa nouvelle `version()` Dexie avec `upgrade()`, `SCHEMA_VERSION` + 1 avec son étape dans `migrate()` (ou la lecture tolérante de `import/validate.ts`), et un test qui ouvre une base et une sauvegarde de la version précédente (`tests/unit/db/migration.test.ts`, `tests/unit/import/backup.test.ts`). Toute suppression écrit sa trace (`recordDeletions`) dans la même transaction ; toute modification d'une carte met à jour `updatedAt`. Jamais de « on peut tout perdre ».
 - **Cas limites** : paquet vide, 0 nouvelles/jour, carte suspendue, changement de jour à 04:00, heure d'été, fichier vide/corrompu, quota plein.
 - **Accessibilité** : clavier seul sur le nouvel écran ; libellés ; focus après action ; contraste.
 - **Performance** : pas de requête Dexie dans une boucle ; listes longues virtualisées ; gros modules en `import()`.

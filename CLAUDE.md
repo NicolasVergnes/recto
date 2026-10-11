@@ -20,6 +20,7 @@ Ne jamais inventer une exigence : si une question n'a pas de réponse dans les d
 - Ne jamais ajouter une dépendance non listée dans `docs/08-DECISIONS.md` sans l'inscrire comme nouvelle ADR avec sa justification.
 - Ne jamais désactiver une règle de lint, un test ou une vérification de type pour « faire passer » : corriger la cause.
 - Ne jamais toucher aux fixtures de `data/samples/` sans mettre à jour les tests qui les lisent.
+- Des testeurs ont leurs données dans Recto (depuis M12) : tout changement du modèle stocké s'accompagne de sa migration (version Dexie avec `upgrade()`, `SCHEMA_VERSION` et `migrate()` des sauvegardes) et d'un test qui ouvre la version précédente ; toute suppression laisse sa trace (`db/deletions.ts`) et toute modification d'une carte met à jour `updatedAt`. Détail : skill `quality-gate` §4.
 
 ## Commandes
 

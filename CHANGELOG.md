@@ -4,6 +4,20 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 ## [Unreleased]
 
+### M12 — Données prêtes pour plusieurs appareils
+
+#### Added
+
+- **Les suppressions sont enregistrées** (paquets, notes, cartes, révisions, types de notes, médias) et la fusion d'une sauvegarde les suit : une note supprimée sur un appareil ne revient plus en fusionnant la sauvegarde de l'autre, et l'autre la supprime à son tour. Ce qui a été modifié après sa suppression reste ; un paquet ou un type encore utilisé par une note reste.
+- Chaque appareil a un identifiant, écrit dans ses sauvegardes ; le rapport de restauration dit ce qui a été supprimé comme sur l'autre appareil et les médias ignorés faute d'un contenu identique.
+
+#### Changed
+
+- Sauvegarde au format 4 (les sauvegardes plus anciennes restent lisibles) ; base de données en version 3, migrée à l'ouverture (chaque carte reçoit une date de modification).
+- Fusion : la copie d'une carte la plus récemment **modifiée** gagne (suspension, drapeau, retrait, réinitialisation comprises), plus seulement la plus récemment révisée ; le journal des révisions est réuni en entier.
+- Réglages : début de journée et limite globale de révisions passent d'un appareil à l'autre (le plus récent gagne) ; thème, taille du texte, dernier paquet utilisé et les autres réglages de l'appareil ne sont plus jamais écrasés par une sauvegarde, même en restauration « remplacer ».
+- La sauvegarde est lue en une seule transaction : un instantané cohérent même si l'application écrit pendant l'export.
+
 ### M11 — Une carte, deux sens
 
 #### Added

@@ -127,3 +127,14 @@ Critères d'acceptation :
 - [x] Éditeur de types : retirer un champ qu'une carte utilise est refusé avec les cartes concernées ; un modèle citant un champ inexistant empêche l'enregistrement ; le contenu perdu des champs retirés est annoncé avant l'enregistrement.
 - [x] Emoji retiré (création, détails, affichage) ; les sauvegardes qui en ont restent lisibles.
 - [x] Tests unitaires et E2E mis à jour ; `npm run verify` vert.
+
+## M12 — Données prêtes pour plusieurs appareils et pour des testeurs (V2, 2026-10-12)
+
+Hors roadmap initiale, premier jalon de la V2 (synchronisation et application Android, Capacitor, décidé par Nicolas). Avant que des testeurs aient leurs données dans Recto : plus de changement du modèle sans migration, et une fusion de sauvegarde qui suit les suppressions des deux appareils (aujourd'hui, elle ramène tout ce qui a été supprimé).
+
+Critères d'acceptation :
+- [x] Règle écrite (CLAUDE.md, `quality-gate`) : tout changement du modèle stocké a sa migration (Dexie et sauvegardes) et son test ; première application : Dexie version 3, sauvegarde `schemaVersion` 4.
+- [x] Chaque suppression laisse sa trace dans la même transaction (paquets, notes, cartes, révisions, types de notes, médias) ; chaque modification d'une carte la date (`updatedAt`).
+- [x] Fusion : une ligne supprimée d'un côté ne revient pas, sauf modifiée après sa suppression ; un paquet ou un type encore utilisé reste ; les deux appareils convergent quel que soit l'ordre des fusions (test de propriété).
+- [x] Identifiant d'appareil dans les sauvegardes ; réglages partagés (début de journée, limite globale) fusionnés, réglages de l'appareil jamais importés.
+- [x] Une base version 2 et une sauvegarde au schéma 3 s'ouvrent et se lisent ; `npm run verify` vert.

@@ -16,6 +16,7 @@ export class RectoDB extends Dexie {
   media!: EntityTable<Media, 'name'>
   settings!: EntityTable<Setting, 'key'>
   noteTypes!: EntityTable<NoteType, 'id'>     // M8
+  deletions!: EntityTable<Deletion, 'id'>     // M12
 
   constructor(name = 'recto') {   // nom paramétrable pour les tests
     super(name)
@@ -32,11 +33,16 @@ export class RectoDB extends Dexie {
       notes:     'id, deckId, modelType, noteTypeId, *tags, sourceGuid, updatedAt',
       noteTypes: 'id, name, sourceId',
     })
+    // M12 : cartes datées, suppressions enregistrées ; upgrade : card.updatedAt = lastReview ?? createdAt
+    this.version(3).stores({
+      cards:     'id, noteId, deckId, due, state, box, updatedAt, [deckId+due], [deckId+state], [noteId+ord]',
+      deletions: 'id, table, deletedAt',
+    }).upgrade(…)
   }
 }
 ```
 
-Règles de migration : chaque changement de schéma = nouvelle `version(n)` avec `upgrade()` ; jamais modifier une version publiée ; un test unitaire ouvre une base V(n-1) et vérifie la migration.
+Règles de migration : chaque changement de schéma = nouvelle `version(n)` avec `upgrade()` ; jamais modifier une version publiée ; un test unitaire ouvre une base V(n-1) et vérifie la migration (`tests/unit/db/migration.test.ts`). **Depuis M12, des testeurs ont leurs données dans Recto : plus aucun changement du modèle stocké sans migration** (base et sauvegardes, `SCHEMA_VERSION` et `migrate()`, §5).
 
 ## 2. Types
 
@@ -120,6 +126,8 @@ export interface Card {
   box: number                  // 0 = non applicable / nouvelle, 1..7
   sideFlipped: boolean         // alternateSides du paquet : true = on teste verso→recto (notes basic)
   createdAt: number
+  updatedAt: number            // M12 : dernière modification de toute sorte (réponse, annulation, suspension,
+                               // drapeau, retrait, réinitialisation, déplacement, ord, planificateur)
 }
 
 export type Rating = 1 | 2 | 3 | 4     // Again, Hard, Good, Easy (= ts-fsrs Rating)
@@ -158,10 +166,22 @@ export interface Media {
   createdAt: number
 }
 
-export interface Setting { key: string; value: unknown }
+export interface Setting { key: string; value: unknown; updatedAt?: number }   // updatedAt : réglages partagés (M12)
+
+// M12 : une ligne supprimée (« pierre tombale »), écrite dans la transaction de la suppression
+export interface Deletion {
+  id: string                   // `<table>:<recordId>`
+  table: 'decks' | 'notes' | 'cards' | 'reviews' | 'noteTypes' | 'media'
+  recordId: string
+  deletedAt: number
+}
 ```
 
-Clés `settings` réservées : `dayStartHour` (4), `theme`, `fontScale`, `lastBackupAt`, `persistGranted`, `onboardingDone`, `globalReviewsPerDay` (500), `lastDeckId` (null), `sleepTipDay` (null), `swipeGestures` (false), `browserView` (`list`), `flipStyle` (`horizontal`), `tileSize` (`medium`).
+Suppressions enregistrées (M12, `db/deletions.ts`) : paquets (suppression, fusion), notes et leurs cartes et révisions, cartes retirées d'une note (édition, type de note modifié, réimport, fusion de sauvegarde), types de notes, la révision effacée par une annulation, médias orphelins supprimés. Jamais purgées pour l'instant. « Tout effacer » supprime la base entière, traces comprises : l'appareil repart de zéro (nouvel identifiant), et une fusion suivante lui rend la collection.
+
+Clés `settings` réservées : `dayStartHour` (4), `theme`, `fontScale`, `lastBackupAt`, `persistGranted`, `onboardingDone`, `globalReviewsPerDay` (500), `lastDeckId` (null), `sleepTipDay` (null), `swipeGestures` (false), `browserView` (`list`), `flipStyle` (`horizontal`), `tileSize` (`medium`), `deviceId` (M12 : identifiant de l'appareil, créé au premier besoin, écrit dans les sauvegardes).
+
+Portée (M12) : `dayStartHour` et `globalReviewsPerDay` sont des réglages **partagés** de la collection, écrits avec `updatedAt` et fusionnés entre appareils (le plus récent gagne) ; tous les autres sont **propres à l'appareil** et ne viennent jamais d'un autre, ni par fusion ni par restauration « remplacer ».
 
 ### 2.1 Occlusion d'image (V1)
 
@@ -206,7 +226,8 @@ export interface NoteType {
 
 1. `card.deckId === note.deckId` pour toute carte (mise à jour en transaction lors d'un déplacement de note).
 2. Une note `basic` a exactement une carte `ord=0`, posée dans les deux sens par `sideFlipped` (M11 : plus de `basic_reverse` ni de carte jumelle) ; `cloze` une carte par index distinct présent dans le texte ; `image_occlusion` une carte par groupe de masques distinct ; `custom` une carte par modèle de carte dont la question n'est pas vide (§2.2) (les cartes des index, groupes ou modèles supprimés sont supprimées avec leur journal conservé). Vaut aussi pour une note mise à jour hors de l'éditeur (M10) : réimport `.apkg` (05 §2.3) et fusion de sauvegarde (§5) réconcilient ses cartes avec son nouveau contenu, avec la même fonction `reconcileCards` que l'éditeur (deux cartes de même `ord` n'en font plus qu'une).
-3. `reviews` est *append-only* : aucune fonction ne modifie ni ne supprime une ligne, sauf `rollback` de la dernière révision d'une carte (suppression de cette seule ligne) et la suppression explicite d'une carte/note par l'utilisateur.
+3. `reviews` est *append-only* : aucune fonction ne modifie ni ne supprime une ligne, sauf `rollback` de la dernière révision d'une carte (suppression de cette seule ligne) et la suppression explicite d'une carte/note par l'utilisateur, et la fusion qui applique ces deux suppressions faites sur un autre appareil (M12).
+8. (M12) Toute suppression laisse sa trace dans `deletions`, dans la même transaction ; toute modification d'une carte met à jour `card.updatedAt`.
 4. Une carte `retired` ou `suspended` n'apparaît jamais dans la file.
 5. Tout `Media.name` référencé dans un champ existe dans `media` (vérifié à l'import ; un utilitaire « médias orphelins » liste les entrées non référencées).
 6. `Card` FSRS : `stability ≥ 0`, `difficulty ∈ [1, 10]` ou 0 pour `New`.
@@ -222,19 +243,32 @@ export interface NoteType {
 ## 5. Sauvegarde `.recto.zip`
 
 ```
-manifest.json   { "format": "recto-backup", "schemaVersion": 3, "appVersion": "0.x", "exportedAt": ms, "device": "<navigator.userAgent tronqué à 120 car.>", "counts": {...} }
+manifest.json   { "format": "recto-backup", "schemaVersion": 4, "appVersion": "0.x", "exportedAt": ms, "device": "<navigator.userAgent tronqué à 120 car.>", "deviceId": "<uuid>", "counts": {...} }
 data.json       { "decks": [...], "noteTypes": [...], "notes": [...], "cards": [...], "reviews": [...], "settings": [...],
-                  "media": [{ "name", "mime", "size", "sha256", "createdAt" }] }   // sans blobs
+                  "media": [{ "name", "mime", "size", "sha256", "createdAt" }],   // sans blobs
+                  "deletions": [...] }
 media/<name>    fichiers binaires
 ```
 
-`schemaVersion` : 2 depuis la V1 (ajout du type `image_occlusion`), 3 depuis M8 (table `noteTypes`, notes `custom` ; une note `custom` sans son type est rejetée à la lecture). Une sauvegarde de version 1 ou 2 se restaure telle quelle (pas de type personnalisé), une version plus récente que l'application est refusée. Fusion : un type de note est identifié par `id`, le plus récemment modifié gagne.
+`schemaVersion` : 2 depuis la V1 (ajout du type `image_occlusion`), 3 depuis M8 (table `noteTypes`, notes `custom` ; une note `custom` sans son type est rejetée à la lecture). 4 depuis M12 (`card.updatedAt`, `deletions`, `setting.updatedAt`, `deviceId`) ; une carte d'une sauvegarde plus ancienne est datée comme à la migration Dexie (`lastReview ?? createdAt`), elle n'a pas de suppressions. Une sauvegarde de version 1 ou 2 se restaure telle quelle (pas de type personnalisé), une version plus récente que l'application est refusée. Les lignes sont lues dans une seule transaction en lecture : un instantané cohérent même si l'application écrit pendant l'export. Fusion : un type de note est identifié par `id`, le plus récemment modifié gagne.
 
-Restauration « remplacer » : vide la base puis importe ; « fusionner » : les entités sont identifiées par `id` (et `sourceGuid` pour les notes) ; en cas de conflit, la version la plus récente (`updatedAt`) gagne, les journaux sont unionnés par `id`.
+Restauration « remplacer » : vide la base puis importe (suppressions comprises), sauf les réglages propres à l'appareil, gardés (M12) ; « fusionner » : les entités sont identifiées par `id` (et `sourceGuid` pour les notes) ; en cas de conflit, la version la plus récente (`updatedAt`) gagne, les journaux sont unionnés par `id`.
 
-**Fusion et cartes (M10).** Dans la même transaction, après celle des notes, chaque note que la fusion touche (note de la sauvegarde gardée : nouvelle, de même `id`, ou reconnue par `sourceGuid` sous un autre `id` et plus récente que la locale, dont elle remplace alors champs et tags) reçoit exactement les cartes de son contenu gagnant (invariant 2), calculées avec les types de notes d'après fusion (les locaux et ceux de la sauvegarde retenus). Les cartes candidates sont les locales de la note et celles de la sauvegarde, rattachées à la note locale et à son paquet (invariant 1) quand la note a été reconnue par `sourceGuid` ; deux copies d'une même carte (même `id`) se départagent par la règle déjà en vigueur, la plus récemment révisée gagne (à égalité, le plus de répétitions, puis la locale). Puis, pour chaque `ord` :
+**Fusion et suppressions (M12).** Les suppressions des deux appareils sont réunies (la plus récente par ligne) et suivies :
+- une ligne (de la sauvegarde ou locale) supprimée d'un côté **à une date égale ou postérieure** à sa dernière modification (`updatedAt` ; `reviewedAt` pour une révision, `createdAt` pour un média) n'est ni gardée ni ramenée ; modifiée après sa suppression, elle reste (la modification gagne) ;
+- les cartes d'une note supprimée partent avec elle ;
+- un paquet ou un type de note supprimé d'un côté reste si une note l'utilise encore (ajoutée de l'autre côté après la suppression) : il est alors daté de la fusion et sa suppression est oubliée, pour que tous les appareils le gardent ;
+- un média supprimé reste si une note l'affiche ;
+- journal (P10) : une révision n'est supprimée que si un appareil l'a supprimée en la connaissant (annulation, note supprimée) ; une réponse donnée sur un appareil à une note que l'autre supprimait sans la connaître reste dans le journal des deux, comme celle d'une carte retirée. Quel que soit l'ordre des fusions, les deux appareils finissent avec le même contenu (test de propriété `tests/unit/db/sync-merge.test.ts`) ;
+- copies d'une même carte : la plus récemment **modifiée** gagne (`updatedAt`), toute entière (une suspension faite sur un appareil après une réponse donnée sur l'autre l'emporte, la réponse reste au journal) ;
+- médias de même nom et de contenu différent : le fichier local est gardé, le rapport le compte (`mediaConflicts`) ;
+- réglages : seulement les partagés, le plus récent gagne.
+
+Le rapport compte aussi les paquets, notes et types supprimés ici à la suite de l'autre appareil (`deleted`).
+
+**Fusion et cartes (M10).** Dans la même transaction, après celle des notes, chaque note que la fusion touche (note de la sauvegarde gardée : nouvelle, de même `id`, ou reconnue par `sourceGuid` sous un autre `id` et plus récente que la locale, dont elle remplace alors champs et tags) reçoit exactement les cartes de son contenu gagnant (invariant 2), calculées avec les types de notes d'après fusion (les locaux et ceux de la sauvegarde retenus). Les cartes candidates sont les locales de la note et celles de la sauvegarde, rattachées à la note locale et à son paquet (invariant 1) quand la note a été reconnue par `sourceGuid` ; deux copies d'une même carte (même `id`) se départagent par leur `updatedAt` depuis M12 (la plus récemment modifiée gagne ; à égalité, la plus récemment révisée, puis le plus de répétitions, puis la locale). Puis, pour chaque `ord` :
 - plus produit par le contenu gagnant : la carte est supprimée (locale) ou n'est pas ajoutée (sauvegarde), son journal est conservé (invariant 3) ;
 - plusieurs cartes pour le même `ord` (deux appareils ont chacun créé la carte du même nouveau trou, ou une note reconnue par `sourceGuid` a ses cartes des deux côtés) : la plus récemment révisée reste, les autres sont supprimées, journal conservé ;
 - produit mais sans carte : la carte de la sauvegarde pour cet `ord` est adoptée quand elle existe (`noteId` et `deckId` suivent la note locale, ses révisions sont importées avec elle, P10), sinon une carte neuve est créée.
 
-Le journal de la sauvegarde est unionné pour toutes les cartes lues, gardées ou non (une révision déjà faite ne se perd pas). Ne sont pas touchées : les notes que la sauvegarde n'apporte pas, et une note reconnue par `sourceGuid` mais moins récente que la locale (elle reste avec ses cartes). Un contenu qui ne produit aucune carte n'est pas un état que l'application écrit : les cartes de sa note ne sont pas supprimées. Le rapport (`RestoreReport`) compte les cartes ajoutées (`cards`, adoptées ou neuves) et supprimées (`cardsRemoved`). Aucune version Dexie nouvelle.
+Le journal de la sauvegarde est unionné (une révision déjà faite ne se perd pas), sauf les révisions supprimées en connaissance de cause (ci-dessus) et celles des cartes d'une note de la sauvegarde laissée de côté (reconnue par `sourceGuid` mais moins récente). Ne sont pas touchées : les notes que la sauvegarde n'apporte pas, et une note reconnue par `sourceGuid` mais moins récente que la locale (elle reste avec ses cartes). Un contenu qui ne produit aucune carte n'est pas un état que l'application écrit : les cartes de sa note ne sont pas supprimées. Le rapport (`RestoreReport`) compte les cartes ajoutées (`cards`, adoptées ou neuves) et supprimées (`cardsRemoved`).
