@@ -3,12 +3,13 @@
  * Writing it back is `db/restore.ts`.
  */
 import { strFromU8, unzipSync } from 'fflate'
-import type { Card, Deck, Note, NoteType, Review, Setting } from '../domain/types'
+import type { Card, Deck, Deletion, Note, NoteType, Review, Setting } from '../domain/types'
 import type { BackupManifest } from '../export/backup'
 import {
   readAll,
   readCard,
   readDeck,
+  readDeletion,
   readMediaMeta,
   readNote,
   readNoteType,
@@ -36,6 +37,8 @@ export interface BackupData {
   reviews: Review[]
   settings: Setting[]
   media: MediaMeta[]
+  /** Rows deleted on the exporting device (M12; none in older backups). */
+  deletions: Deletion[]
 }
 
 export interface ParsedBackup {
@@ -59,8 +62,9 @@ function json(entries: Record<string, Uint8Array>, name: string): unknown {
 
 /**
  * Older schema versions are migrated here with the same steps as the Dexie `upgrade()` functions
- * (05 §3). 1 → 2 only adds a note type and 2 → 3 the `noteTypes` table (absent: none): older
- * data is valid as is.
+ * (05 §3). 1 → 2 only adds a note type and 2 → 3 the `noteTypes` table (absent: none); 3 → 4
+ * (M12) dates the cards like the Dexie version 3 upgrade (`readCard`) and has no deletions
+ * (absent: none). Older data is valid as is.
  */
 function migrate(data: Record<string, unknown>, _fromVersion: number): Record<string, unknown> {
   return data
@@ -91,6 +95,7 @@ export function parseBackup(bytes: Uint8Array, currentSchema: number): ParsedBac
   const reviews = readAll(data.reviews, readReview)
   const settings = readAll(data.settings, readSetting)
   const media = readAll(data.media, readMediaMeta)
+  const deletions = readAll(data.deletions, readDeletion)
   const files = new Map<string, Uint8Array<ArrayBuffer>>()
   for (const [path, content] of Object.entries(entries)) {
     if (path.startsWith('media/') && path.length > 6)
@@ -108,6 +113,7 @@ export function parseBackup(bytes: Uint8Array, currentSchema: number): ParsedBac
         settings: settings.rows.length,
         media: media.rows.length,
         noteTypes: noteTypes.rows.length,
+        deletions: deletions.rows.length,
       },
     },
     data: {
@@ -118,6 +124,7 @@ export function parseBackup(bytes: Uint8Array, currentSchema: number): ParsedBac
       reviews: reviews.rows,
       settings: settings.rows,
       media: media.rows,
+      deletions: deletions.rows,
     },
     files,
     invalid:
@@ -127,6 +134,7 @@ export function parseBackup(bytes: Uint8Array, currentSchema: number): ParsedBac
       cards.invalid +
       reviews.invalid +
       settings.invalid +
-      media.invalid,
+      media.invalid +
+      deletions.invalid,
   }
 }

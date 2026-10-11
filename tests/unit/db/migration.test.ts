@@ -18,6 +18,17 @@ class RectoDBv1 extends Dexie {
   }
 }
 
+/** The published version 2 layout (M8–M11), frozen here to open « old » databases. */
+class RectoDBv2 extends RectoDBv1 {
+  constructor(name: string) {
+    super(name)
+    this.version(2).stores({
+      notes: 'id, deckId, modelType, noteTypeId, *tags, sourceGuid, updatedAt',
+      noteTypes: 'id, name, sourceId',
+    })
+  }
+}
+
 /**
  * Fake next migration, defined ONLY in this test (07-ROADMAP M1): it indexes `cards.flag` and
  * backfills a missing flag with 0. `schema.ts` must never contain it.
@@ -25,10 +36,10 @@ class RectoDBv1 extends Dexie {
 class RectoDBNext extends RectoDB {
   constructor(name: string) {
     super(name)
-    this.version(3)
+    this.version(99)
       .stores({
         cards:
-          'id, noteId, deckId, due, state, box, flag, [deckId+due], [deckId+state], [noteId+ord]',
+          'id, noteId, deckId, due, state, box, flag, updatedAt, [deckId+due], [deckId+state], [noteId+ord]',
       })
       .upgrade((tx) =>
         tx
@@ -70,7 +81,7 @@ describe('schema migrations', () => {
 
     const db = new RectoDB(name)
     await db.open()
-    expect(db.verno).toBe(2)
+    expect(db.verno).toBe(3)
     expect((await db.notes.get('n1'))?.fields).toEqual(['a', 'b', ''])
     expect(await db.noteTypes.count()).toBe(0)
     await db.noteTypes.add({
@@ -97,12 +108,12 @@ describe('schema migrations', () => {
     await current
       .table('cards')
       .add({ ...makeCard({ id: 'n1', deckId: 'd1' }, 1, 'c2', 1), flag: 3 })
-    expect(current.verno).toBe(2)
+    expect(current.verno).toBe(3)
     current.close()
 
     const next = new RectoDBNext(name)
     await next.open()
-    expect(next.verno).toBe(3)
+    expect(next.verno).toBe(99)
     expect(await next.decks.get('d1')).toEqual(deck)
     expect((await next.cards.get('c1'))?.flag).toBe(0)
     expect(await next.cards.where('flag').equals(3).primaryKeys()).toEqual(['c2'])
@@ -114,13 +125,42 @@ describe('schema migrations', () => {
     again.close()
   })
 
-  it('the published schema is version 2', async () => {
+  it('opens a version 2 database: cards dated, deletions table (M12)', async () => {
+    const name = uniqueName('v2')
+    const v2 = new RectoDBv2(name)
+    const { updatedAt: _new, ...reviewed } = {
+      ...makeCard({ id: 'n1', deckId: 'd1' }, 0, 'c1', 10),
+      lastReview: 50,
+    }
+    const { updatedAt: _none, ...fresh } = makeCard({ id: 'n1', deckId: 'd1' }, 1, 'c2', 20)
+    await v2.table('cards').bulkAdd([reviewed, fresh])
+    await v2.table('settings').add({ key: 'dayStartHour', value: 5 })
+    v2.close()
+
+    const db = new RectoDB(name)
+    await db.open()
+    expect(db.verno).toBe(3)
+    // Dated by their last review, else by their creation.
+    expect((await db.cards.get('c1'))?.updatedAt).toBe(50)
+    expect((await db.cards.get('c2'))?.updatedAt).toBe(20)
+    expect(await db.cards.where('updatedAt').above(30).primaryKeys()).toEqual(['c1'])
+    expect(await db.deletions.count()).toBe(0)
+    expect(await db.settings.get('dayStartHour')).toEqual({ key: 'dayStartHour', value: 5 })
+    db.close()
+    // Re-opening does not run the upgrade again.
+    const again = new RectoDB(name)
+    expect((await again.cards.get('c2'))?.updatedAt).toBe(20)
+    again.close()
+  })
+
+  it('the published schema is version 3', async () => {
     const db = new RectoDB(uniqueName('schema'))
     await db.open()
-    expect(db.verno).toBe(2)
+    expect(db.verno).toBe(3)
     expect(db.tables.map((t) => t.name).sort()).toEqual([
       'cards',
       'decks',
+      'deletions',
       'media',
       'noteTypes',
       'notes',

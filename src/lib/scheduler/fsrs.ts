@@ -124,7 +124,11 @@ export function createFsrsScheduler(options: SchedulerOptions): Scheduler {
 
   function answer(card: Card, rating: Rating, now: number, deck: Deck): SchedulerOutcome {
     const { card: f } = get(deck).next(toFsrsCard(card), new Date(now), grade(rating))
-    const next = { ...fromFsrsCard(card, f), sideFlipped: flipAfter(card, rating, deck) }
+    const next = {
+      ...fromFsrsCard(card, f),
+      sideFlipped: flipAfter(card, rating, deck),
+      updatedAt: now,
+    }
     return {
       card: next,
       review: {

@@ -85,7 +85,7 @@ describe('backup validators', () => {
         exportedAt: 5,
         device: 'd',
       }),
-    ).toEqual({ schemaVersion: 1, appVersion: '0.1.0', exportedAt: 5, device: 'd' })
+    ).toEqual({ schemaVersion: 1, appVersion: '0.1.0', exportedAt: 5, device: 'd', deviceId: '' })
   })
 
   it('keeps the Anki styling of a note type, dropping wrong values (M10)', () => {

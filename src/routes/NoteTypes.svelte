@@ -42,7 +42,7 @@
     })
     if (!ok) return
     try {
-      await repo.deleteNoteType(type.id)
+      await repo.deleteNoteType(type.id, Date.now())
       toast(t('noteTypes.deleted'))
     } catch (e) {
       toast(errorMessage(e), 'error')

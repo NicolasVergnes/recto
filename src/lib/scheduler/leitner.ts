@@ -58,6 +58,7 @@ export function createLeitnerScheduler(options: Pick<SchedulerOptions, 'dayStart
       lastReview: now,
       scheduledDays,
       sideFlipped: flipAfter(card, rating, deck),
+      updatedAt: now,
     }
     return {
       card: next,

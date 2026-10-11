@@ -1,3 +1,4 @@
+import { recordDeletions } from '../db/deletions'
 import { RepoError } from '../db/errors'
 import { db } from '../db/schema'
 import { mediaRefs } from '../domain/text'
@@ -142,6 +143,9 @@ export async function findMissingMedia(): Promise<string[]> {
   return [...missing].sort()
 }
 
-export async function deleteMedia(names: readonly string[]): Promise<void> {
-  await db.media.bulkDelete([...names])
+export async function deleteMedia(names: readonly string[], now: number): Promise<void> {
+  await db.transaction('rw', db.media, db.deletions, async () => {
+    await db.media.bulkDelete([...names])
+    await recordDeletions('media', names, now)
+  })
 }

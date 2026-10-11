@@ -4,10 +4,12 @@
  */
 import { defaultDeckSettings } from '../domain/defaults'
 import {
+  DELETION_TABLES,
   MODEL_TYPES,
   type Card,
   type CardTemplate,
   type Deck,
+  type Deletion,
   type DeckSettings,
   type Note,
   type NoteType,
@@ -159,6 +161,8 @@ export function readCard(x: unknown): Card | null {
     box: n('box'),
     sideFlipped: x.sideFlipped,
     createdAt: n('createdAt'),
+    // Backups before schema 4 (M12) have no updatedAt: same rule as the Dexie version 3 upgrade.
+    updatedAt: isNum(x.updatedAt) ? x.updatedAt : (x.lastReview ?? n('createdAt')),
   }
 }
 
@@ -211,7 +215,21 @@ export function readReview(x: unknown): Review | null {
 }
 
 export function readSetting(x: unknown): Setting | null {
-  return isObj(x) && isStr(x.key) && 'value' in x ? { key: x.key, value: x.value } : null
+  if (!isObj(x) || !isStr(x.key) || !('value' in x)) return null
+  return isNum(x.updatedAt)
+    ? { key: x.key, value: x.value, updatedAt: x.updatedAt }
+    : { key: x.key, value: x.value }
+}
+
+export function readDeletion(x: unknown): Deletion | null {
+  if (!isObj(x) || !isStr(x.recordId) || !isNum(x.deletedAt)) return null
+  if (!oneOf(DELETION_TABLES, x.table)) return null
+  return {
+    id: `${x.table}:${x.recordId}`,
+    table: x.table,
+    recordId: x.recordId,
+    deletedAt: x.deletedAt,
+  }
 }
 
 export interface MediaMeta {
@@ -249,6 +267,7 @@ export interface ManifestFields {
   appVersion: string
   exportedAt: number
   device: string
+  deviceId: string
 }
 
 export function readManifest(x: unknown): ManifestFields | null {
@@ -258,6 +277,7 @@ export function readManifest(x: unknown): ManifestFields | null {
     appVersion: isStr(x.appVersion) ? x.appVersion : '',
     exportedAt: isNum(x.exportedAt) ? x.exportedAt : 0,
     device: isStr(x.device) ? x.device : '',
+    deviceId: isStr(x.deviceId) ? x.deviceId : '',
   }
 }
 

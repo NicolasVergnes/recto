@@ -142,6 +142,11 @@ export interface Card {
   /** Deck `alternateSides`: true = asks back→front (basic notes only). */
   sideFlipped: boolean
   createdAt: number
+  /**
+   * Last change of any kind (answer, undo, suspend, flag, retire, reset, move, ord…), M12: the
+   * most recent copy of a card wins a merge between devices.
+   */
+  updatedAt: number
 }
 
 /** Again, Hard, Good, Easy (same integers as ts-fsrs Rating). Leitner: 1 forgot, 3 ok, 4 sure. */
@@ -185,4 +190,18 @@ export interface Media {
 export interface Setting {
   key: string
   value: unknown
+  /** Shared settings only (M12): the most recent value wins a merge between devices. */
+  updatedAt?: number
+}
+
+/** Tables whose deletions are recorded (M12): a merge never brings a deleted row back. */
+export const DELETION_TABLES = ['decks', 'notes', 'cards', 'reviews', 'noteTypes', 'media'] as const
+export type DeletionTable = (typeof DELETION_TABLES)[number]
+
+/** A deleted row (« pierre tombale », 02-DATA-MODEL §5): `id` is `<table>:<recordId>`. */
+export interface Deletion {
+  id: string
+  table: DeletionTable
+  recordId: string
+  deletedAt: number
 }

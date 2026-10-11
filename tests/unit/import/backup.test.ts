@@ -37,9 +37,20 @@ describe('backup round trip (property: restore(export(db)) ≡ db)', () => {
 
       const target = await freshDatabase()
       try {
+        await target.settings.put({ key: 'theme', value: 'light' })
         const report = await restoreBackup(parsed, 'replace')
         expect(report.missingFiles).toBe(0)
-        expect(await dumpDatabase(target)).toEqual(before)
+        // Everything but this device's own settings (M12): they stay, the collection's come.
+        const after = await dumpDatabase(target)
+        const shared = (rows: typeof after.settings) => rows.filter((s) => s.key === 'dayStartHour')
+        expect({ ...after, settings: shared(after.settings) }).toEqual({
+          ...before,
+          settings: shared(before.settings),
+        })
+        expect(after.settings.map((s) => [s.key, s.value])).toEqual([
+          ['dayStartHour', 4],
+          ['theme', 'light'],
+        ])
       } finally {
         await target.delete()
       }
@@ -157,6 +168,7 @@ function backupOf(data: Partial<BackupData>): ParsedBackup {
     reviews: [],
     settings: [],
     media: [],
+    deletions: [],
     ...data,
   }
   const counts = {
@@ -167,6 +179,7 @@ function backupOf(data: Partial<BackupData>): ParsedBackup {
     reviews: full.reviews.length,
     settings: full.settings.length,
     media: full.media.length,
+    deletions: full.deletions.length,
   }
   const manifest = {
     format: 'recto-backup' as const,
@@ -174,6 +187,7 @@ function backupOf(data: Partial<BackupData>): ParsedBackup {
     appVersion: 'test',
     exportedAt: now,
     device: '',
+    deviceId: '',
     counts,
   }
   return { manifest, data: full, files: new Map(), invalid: 0 }
@@ -536,6 +550,47 @@ describe('parseBackup errors', () => {
     expect(parsed.invalid).toBe(4)
     expect(parsed.files.get('m.png')).toEqual(strToU8('abc'))
     expect(parsed.manifest).toMatchObject({ appVersion: '', exportedAt: 0, device: '' })
+  })
+
+  it('reads a version 3 backup: cards dated by their last review, no deletions (M12)', () => {
+    const v3 = JSON.stringify({ format: 'recto-backup', schemaVersion: 3, device: 'pc' })
+    const { updatedAt: _u1, ...reviewed } = {
+      ...makeCard({ id: 'n', deckId: 'd' }, 0, 'c1', 10),
+      lastReview: 50,
+    }
+    const { updatedAt: _u2, ...fresh } = makeCard({ id: 'n', deckId: 'd' }, 1, 'c2', 20)
+    const data = JSON.stringify({
+      cards: [reviewed, fresh],
+      settings: [{ key: 'dayStartHour', value: 5 }],
+    })
+    const parsed = parseBackup(zip({ 'manifest.json': v3, 'data.json': data }), SCHEMA_VERSION)
+    expect(parsed.invalid).toBe(0)
+    expect(parsed.data.cards.map((c) => [c.id, c.updatedAt])).toEqual([
+      ['c1', 50],
+      ['c2', 20],
+    ])
+    expect(parsed.data.deletions).toEqual([])
+    expect(parsed.data.settings).toEqual([{ key: 'dayStartHour', value: 5 }])
+    expect(parsed.manifest).toMatchObject({ device: 'pc', deviceId: '' })
+  })
+
+  it('reads deletions and setting dates (version 4), dropping malformed ones', () => {
+    const v4 = JSON.stringify({ format: 'recto-backup', schemaVersion: 4, deviceId: 'tel' })
+    const data = JSON.stringify({
+      settings: [{ key: 'dayStartHour', value: 6, updatedAt: 9 }],
+      deletions: [
+        { id: 'ignored', table: 'notes', recordId: 'n1', deletedAt: 7 },
+        { table: 'cartes', recordId: 'c1', deletedAt: 7 },
+        { table: 'cards', recordId: 'c2' },
+      ],
+    })
+    const parsed = parseBackup(zip({ 'manifest.json': v4, 'data.json': data }), SCHEMA_VERSION)
+    expect(parsed.data.deletions).toEqual([
+      { id: 'notes:n1', table: 'notes', recordId: 'n1', deletedAt: 7 },
+    ])
+    expect(parsed.invalid).toBe(2)
+    expect(parsed.data.settings).toEqual([{ key: 'dayStartHour', value: 6, updatedAt: 9 }])
+    expect(parsed.manifest.deviceId).toBe('tel')
   })
 
   it('reads note types (version 3), and older backups without them', () => {

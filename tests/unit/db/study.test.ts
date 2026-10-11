@@ -60,12 +60,13 @@ describe('recordReview / undoReview', () => {
     const afterFirst = await repo.getCard(cards[0].id)
     if (!afterFirst) throw new Error('missing')
     const second = await recordReview(fsrs.answer(afterFirst, 1, now + 600_000, deck), 1000)
-    await undoReview(afterFirst, second.id)
-    expect(await repo.getCard(cards[0].id)).toEqual(afterFirst)
+    await undoReview(afterFirst, second.id, now)
+    // The schedule of before the answer, dated by the undo (M12).
+    expect(await repo.getCard(cards[0].id)).toEqual({ ...afterFirst, updatedAt: now })
     expect((await cardReviews(cards[0].id)).map((r) => r.id)).toEqual([first.id])
-    await undoReview(cards[0], first.id)
-    expect(await repo.getCard(cards[0].id)).toEqual(cards[0])
-    await expect(undoReview(cards[0], first.id)).rejects.toBeInstanceOf(RepoError)
+    await undoReview(cards[0], first.id, now)
+    expect(await repo.getCard(cards[0].id)).toEqual({ ...cards[0], updatedAt: now })
+    await expect(undoReview(cards[0], first.id, now)).rejects.toBeInstanceOf(RepoError)
   })
 
   it('never brings back a card deleted since, and keeps the deck of a moved note', async () => {
@@ -77,7 +78,7 @@ describe('recordReview / undoReview', () => {
       { deckId: deck.id, modelType: 'basic', fields: ['a', 'b'], tags: [] },
       now + 1,
     )
-    await expect(undoReview(cards[1], answer.id)).rejects.toSatisfy(
+    await expect(undoReview(cards[1], answer.id, now)).rejects.toSatisfy(
       (e: unknown) => e instanceof RepoError && e.code === 'undoGone',
     )
     expect(await repo.getCard(cards[1].id)).toBeUndefined()
@@ -86,8 +87,8 @@ describe('recordReview / undoReview', () => {
     const other = await repo.createDeck({ name: 'Autre' }, now)
     const kept = await recordReview(fsrs.answer(cards[0], 3, now, deck), 1000)
     await repo.moveNotes([note.id], other.id, now + 2)
-    const restored = await undoReview(cards[0], kept.id)
-    expect(restored).toEqual({ ...cards[0], deckId: other.id })
+    const restored = await undoReview(cards[0], kept.id, now)
+    expect(restored).toEqual({ ...cards[0], deckId: other.id, updatedAt: now })
     expect(await repo.getCard(cards[0].id)).toEqual(restored)
   })
 
@@ -123,8 +124,8 @@ describe('recordReview / undoReview', () => {
     await repo.updateNoteType(type.id, edit, now + 1)
     expect((await repo.getCard(first.id))?.ord).toBe(1)
 
-    const restored = await undoReview(first, answer.id)
-    expect(restored).toEqual({ ...first, ord: 1 })
+    const restored = await undoReview(first, answer.id, now)
+    expect(restored).toEqual({ ...first, ord: 1, updatedAt: now })
     // Two templates, two cards: the ords stay distinct.
     const ords = (await repo.getCardsOfNote(first.noteId)).map((c) => [c.id, c.ord])
     expect(ords).toEqual([
@@ -205,7 +206,7 @@ describe('daily queue from the database', () => {
 describe('retire (P7) and scheduler switch', () => {
   it('refuses to retire before three spaced successes', async () => {
     const { deck, cards } = await setup()
-    await expect(setRetired(cards[0].id, true)).rejects.toSatisfy(
+    await expect(setRetired(cards[0].id, true, now)).rejects.toSatisfy(
       (e) => e instanceof RepoError && e.code === 'retireLocked',
     )
     let c = cards[0]
@@ -216,11 +217,11 @@ describe('retire (P7) and scheduler switch', () => {
       await recordReview(o, 1000)
       c = o.card
     }
-    await setRetired(c.id, true)
+    await setRetired(c.id, true, now)
     expect((await repo.getCard(c.id))?.retired).toBe(true)
-    await setRetired(c.id, false)
+    await setRetired(c.id, false, now)
     expect((await repo.getCard(c.id))?.retired).toBe(false)
-    await expect(setRetired('missing', false)).rejects.toBeInstanceOf(RepoError)
+    await expect(setRetired('missing', false, now)).rejects.toBeInstanceOf(RepoError)
   })
 
   it('converts Leitner → FSRS by replaying history, and back to boxes', async () => {

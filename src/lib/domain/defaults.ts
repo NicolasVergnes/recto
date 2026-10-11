@@ -76,6 +76,7 @@ export function makeCard(
     box: 0,
     sideFlipped: false,
     createdAt: now,
+    updatedAt: now,
   }
 }
 
@@ -95,5 +96,6 @@ export function resetScheduling(card: Card, now: number): Card {
     learningSteps: 0,
     box: 0,
     sideFlipped: false,
+    updatedAt: now,
   }
 }

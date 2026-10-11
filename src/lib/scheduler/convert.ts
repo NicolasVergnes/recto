@@ -16,8 +16,14 @@ export function convertCard(
 ): Card {
   if (to === 'fsrs') {
     const out = rescheduleFromHistory(card, history, deck.settings.fsrs, now, fuzz)
-    return { ...out, suspended: card.suspended, retired: card.retired, flag: card.flag }
+    return {
+      ...out,
+      suspended: card.suspended,
+      retired: card.retired,
+      flag: card.flag,
+      updatedAt: now,
+    }
   }
   // FSRS → Leitner: box from stability (approximation), due kept.
-  return { ...card, box: card.state === 0 ? 0 : boxFromStability(card.stability) }
+  return { ...card, box: card.state === 0 ? 0 : boxFromStability(card.stability), updatedAt: now }
 }

@@ -164,10 +164,10 @@ describe('custom note types', () => {
 
   it('deletes a type only when no note uses it', async () => {
     const { type } = await setup()
-    await expectCode(repo.deleteNoteType(type.id), 'noteTypeInUse')
+    await expectCode(repo.deleteNoteType(type.id, T0), 'noteTypeInUse')
     expect((await repo.noteTypeUsage()).get(type.id)).toBe(1)
     const unused = await repo.createNoteType({ ...PAYS, name: 'Vide' }, T0)
-    await repo.deleteNoteType(unused.id)
+    await repo.deleteNoteType(unused.id, T0)
     expect((await repo.listNoteTypes()).map((t) => t.name)).toEqual(['Pays'])
   })
 

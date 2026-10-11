@@ -189,8 +189,8 @@ describe('reordering fields and templates (M10)', () => {
       ['i0', 1],
       ['i1', 2],
     ])
-    // Same cards: only the ord differs.
-    expect(plan.moved).toEqual(studied.map((c) => ({ ...c, ord: [1, 2, 0][c.ord] })))
+    // Same cards: only the ord differs, and the date of the change (M12).
+    expect(plan.moved).toEqual(studied.map((c) => ({ ...c, ord: [1, 2, 0][c.ord], updatedAt: 2 })))
     expect(plan).toMatchObject({ notes: [], removed: [], added: [] })
   })
 
@@ -264,7 +264,8 @@ describe('reordering fields and templates (M10)', () => {
           if (!note) throw new Error(card.noteId)
           const rewritten = plan.notes.find((n) => n.id === note.id) ?? note
           const moved = plan.moved.find((c) => c.id === card.id) ?? card
-          expect(moved).toEqual({ ...card, ord: templateOrder.indexOf(card.ord) })
+          const ord = templateOrder.indexOf(card.ord)
+          expect(moved).toEqual({ ...card, ord, updatedAt: ord === card.ord ? card.updatedAt : 2 })
           const before = renderCard(note, card, false, TYPE)
           const after = renderCard(rewritten, moved, false, plan.type)
           expect([after.question, after.answer]).toEqual([before.question, before.answer])

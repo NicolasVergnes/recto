@@ -1,5 +1,5 @@
 import { DEFAULT_DAY_START_HOUR, DEFAULT_GLOBAL_REVIEWS_PER_DAY } from '../config/app'
-import { db } from './schema'
+import { db, newId } from './schema'
 
 export type Theme = 'system' | 'light' | 'dark'
 /** Card browser layout (SPEC §5.2): table, tiles showing one face, tiles showing both faces. */
@@ -30,6 +30,8 @@ export interface SettingsMap {
   flipStyle: FlipStyle
   /** Mosaic tile size, remembered silently like `browserView`. */
   tileSize: TileSize
+  /** This device, in backups (M12): created on first use, renewed by « Tout effacer ». */
+  deviceId: string | null
 }
 
 export const DEFAULT_SETTINGS: SettingsMap = {
@@ -46,9 +48,19 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   browserView: 'list',
   flipStyle: 'horizontal',
   tileSize: 'medium',
+  deviceId: null,
 }
 
 export type SettingKey = keyof SettingsMap
+
+/**
+ * Settings of the collection, not of the device (M12): merged between devices (the most recent
+ * value wins). All the others belong to this device and never come from another one.
+ */
+export const SHARED_SETTINGS: ReadonlySet<string> = new Set<SettingKey>([
+  'dayStartHour',
+  'globalReviewsPerDay',
+])
 
 const THEMES: readonly string[] = ['system', 'light', 'dark']
 const BROWSER_VIEWS: readonly string[] = ['list', 'flip', 'both']
@@ -75,6 +87,7 @@ function isValid<K extends SettingKey>(key: K, value: unknown): value is Setting
       return typeof value === 'boolean'
     case 'lastDeckId':
     case 'sleepTipDay':
+    case 'deviceId':
       return value === null || typeof value === 'string'
     case 'browserView':
       return typeof value === 'string' && BROWSER_VIEWS.includes(value)
@@ -110,6 +123,16 @@ function assign<K extends SettingKey>(out: SettingsMap, key: K, value: unknown) 
 export async function setSetting<K extends SettingKey>(
   key: K,
   value: SettingsMap[K],
+  now = Date.now(),
 ): Promise<void> {
-  await db.settings.put({ key, value })
+  await db.settings.put(SHARED_SETTINGS.has(key) ? { key, value, updatedAt: now } : { key, value })
+}
+
+/** This device's id, created and stored on first use. */
+export async function getDeviceId(): Promise<string> {
+  const known = await getSetting('deviceId')
+  if (known) return known
+  const id = newId()
+  await setSetting('deviceId', id)
+  return id
 }

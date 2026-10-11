@@ -190,7 +190,7 @@ export class ReviewController {
     const last = $state.snapshot(entry)
     this.busy = true
     try {
-      const restored = await undoReview(last.previous, last.reviewId)
+      const restored = await undoReview(last.previous, last.reviewId, Date.now())
       active.undo = active.undo.slice(0, -1)
       active.cards.set(restored.id, restored)
       active.queue = putBack(last.queue, restored.id)
@@ -213,7 +213,7 @@ export class ReviewController {
     const { card } = this
     const active = session.active
     if (!active || !card) return
-    await repo.setSuspended([card.id], true)
+    await repo.setSuspended([card.id], true, Date.now())
     active.queue = removeCard(active.queue, card.id)
     toast(t('review.suspended'))
     this.advance()
@@ -224,7 +224,7 @@ export class ReviewController {
     const active = session.active
     if (!active || !card || !this.retireAllowed) return
     try {
-      await setRetired(card.id, true)
+      await setRetired(card.id, true, Date.now())
       active.queue = removeCard(active.queue, card.id)
       toast(t('review.retired'))
       this.advance()
@@ -238,7 +238,7 @@ export class ReviewController {
     const active = session.active
     if (!active || !card) return
     const flag = card.flag === 0 ? 1 : 0
-    await repo.setFlag([card.id], flag)
+    await repo.setFlag([card.id], flag, Date.now())
     active.cards.set(card.id, { ...card, flag })
     this.menuOpen = false
     toast(t(flag ? 'review.flagged' : 'review.unflagged'))

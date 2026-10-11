@@ -1,7 +1,7 @@
 import { strToU8, Zip, ZipDeflate, ZipPassThrough } from 'fflate'
 import { APP_VERSION } from '../config/app'
 import { db, SCHEMA_VERSION } from '../db/schema'
-import { setSetting } from '../db/settings'
+import { getDeviceId, setSetting } from '../db/settings'
 import Dexie, { type IndexableType, type Table } from 'dexie'
 
 /** `manifest.json` of a `.recto.zip` (02-DATA-MODEL §5). */
@@ -11,8 +11,10 @@ export interface BackupManifest {
   appVersion: string
   exportedAt: number
   device: string
+  /** The exporting device (M12), empty in older backups. */
+  deviceId: string
   counts: Record<
-    'decks' | 'notes' | 'cards' | 'reviews' | 'settings' | 'media' | 'noteTypes',
+    'decks' | 'notes' | 'cards' | 'reviews' | 'settings' | 'media' | 'noteTypes' | 'deletions',
     number
   >
 }
@@ -48,8 +50,9 @@ async function pushTable<T extends object>(
 }
 
 /**
- * Builds a complete backup: manifest.json, data.json (all tables, media without blobs) and
- * media/<name> (stored as is: media are already compressed). Updates `lastBackupAt`.
+ * Builds a complete backup: manifest.json, data.json (all tables, media without blobs, deletions)
+ * and media/<name> (stored as is: media are already compressed). The rows are read in ONE read
+ * transaction: a consistent snapshot even if the app writes meanwhile. Updates `lastBackupAt`.
  */
 export async function createBackup(now: number): Promise<Blob> {
   const chunks: Uint8Array<ArrayBuffer>[] = []
@@ -65,45 +68,62 @@ export async function createBackup(now: number): Promise<Blob> {
     if (final) done(new Blob(chunks, { type: 'application/zip' }))
   })
 
-  const manifest: BackupManifest = {
-    format: 'recto-backup',
-    schemaVersion: SCHEMA_VERSION,
-    appVersion: APP_VERSION,
-    exportedAt: now,
-    device: typeof navigator === 'undefined' ? '' : navigator.userAgent.slice(0, 120),
-    counts: {
-      decks: await db.decks.count(),
-      notes: await db.notes.count(),
-      cards: await db.cards.count(),
-      reviews: await db.reviews.count(),
-      settings: await db.settings.count(),
-      media: await db.media.count(),
-      noteTypes: await db.noteTypes.count(),
-    },
-  }
-  const man = new ZipDeflate('manifest.json', { level: 6 })
-  zip.add(man)
-  man.push(strToU8(JSON.stringify(manifest, null, 2)), true)
+  const deviceId = await getDeviceId()
+  const tables = [
+    db.decks,
+    db.noteTypes,
+    db.notes,
+    db.cards,
+    db.reviews,
+    db.settings,
+    db.media,
+    db.deletions,
+  ]
+  // Only Dexie calls and synchronous zip pushes inside: any other await would end it.
+  const names = await db.transaction('r', tables, async () => {
+    const manifest: BackupManifest = {
+      format: 'recto-backup',
+      schemaVersion: SCHEMA_VERSION,
+      appVersion: APP_VERSION,
+      exportedAt: now,
+      device: typeof navigator === 'undefined' ? '' : navigator.userAgent.slice(0, 120),
+      deviceId,
+      counts: {
+        decks: await db.decks.count(),
+        notes: await db.notes.count(),
+        cards: await db.cards.count(),
+        reviews: await db.reviews.count(),
+        settings: await db.settings.count(),
+        media: await db.media.count(),
+        noteTypes: await db.noteTypes.count(),
+        deletions: await db.deletions.count(),
+      },
+    }
+    const man = new ZipDeflate('manifest.json', { level: 6 })
+    zip.add(man)
+    man.push(strToU8(JSON.stringify(manifest, null, 2)), true)
 
-  const data = new ZipDeflate('data.json', { level: 6 })
-  zip.add(data)
-  data.push(strToU8('{'))
-  await pushTable(data, 'decks', db.decks, undefined, true)
-  await pushTable(data, 'noteTypes', db.noteTypes)
-  await pushTable(data, 'notes', db.notes)
-  await pushTable(data, 'cards', db.cards)
-  await pushTable(data, 'reviews', db.reviews)
-  await pushTable(data, 'settings', db.settings)
-  await pushTable(data, 'media', db.media, ({ name, mime, size, sha256, createdAt }) => ({
-    name,
-    mime,
-    size,
-    sha256,
-    createdAt,
-  }))
-  data.push(strToU8('}'), true)
+    const data = new ZipDeflate('data.json', { level: 6 })
+    zip.add(data)
+    data.push(strToU8('{'))
+    await pushTable(data, 'decks', db.decks, undefined, true)
+    await pushTable(data, 'noteTypes', db.noteTypes)
+    await pushTable(data, 'notes', db.notes)
+    await pushTable(data, 'cards', db.cards)
+    await pushTable(data, 'reviews', db.reviews)
+    await pushTable(data, 'settings', db.settings)
+    await pushTable(data, 'media', db.media, ({ name, mime, size, sha256, createdAt }) => ({
+      name,
+      mime,
+      size,
+      sha256,
+      createdAt,
+    }))
+    await pushTable(data, 'deletions', db.deletions)
+    data.push(strToU8('}'), true)
+    return db.media.toCollection().primaryKeys()
+  })
 
-  const names = await db.media.toCollection().primaryKeys()
   for (const name of names) {
     const media = await db.media.get(name)
     if (!media) continue

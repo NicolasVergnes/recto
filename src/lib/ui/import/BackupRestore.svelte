@@ -143,8 +143,12 @@
           media: report.media,
         })}
       </p>
+      {#if report.deleted > 0}<p>{t('backup.deletedThere', { n: report.deleted })}</p>{/if}
       {#if report.missingFiles > 0}<p class="warning-text">
           {t('backup.missingFiles', { n: report.missingFiles })}
+        </p>{/if}
+      {#if report.mediaConflicts > 0}<p class="warning-text">
+          {t('backup.mediaConflicts', { n: report.mediaConflicts })}
         </p>{/if}
     </div>
   {/if}

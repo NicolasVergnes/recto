@@ -1,13 +1,15 @@
 import { makeCard, makeDeck } from '$lib/domain/defaults'
-import type {
-  Card,
-  Deck,
-  Media,
-  ModelType,
-  Note,
-  NoteType,
-  Review,
-  Setting,
+import {
+  DELETION_TABLES,
+  type Card,
+  type Deck,
+  type Deletion,
+  type Media,
+  type ModelType,
+  type Note,
+  type NoteType,
+  type Review,
+  type Setting,
 } from '$lib/domain/types'
 import { sha256Hex } from '$lib/media/hash'
 import { seededRandom } from '$lib/queue/random'
@@ -138,13 +140,19 @@ export async function generateCollection(db: RectoDB, seed: string) {
     }
   }
   const settings: Setting[] = [
-    { key: 'dayStartHour', value: 4 },
+    { key: 'dayStartHour', value: 4, updatedAt: t0 },
     { key: 'theme', value: 'dark' },
     { key: 'lastDeckId', value: decks[0]?.id ?? null },
   ]
+  // Rows deleted earlier (M12), recorded like the app does.
+  const deletions: Deletion[] = Array.from({ length: int(5) }, () => {
+    const table = pick(DELETION_TABLES)
+    const recordId = id()
+    return { id: `${table}:${recordId}`, table, recordId, deletedAt: t0 + int(1e9) }
+  })
   await db.transaction(
     'rw',
-    [db.decks, db.noteTypes, db.notes, db.cards, db.reviews, db.media, db.settings],
+    [db.decks, db.noteTypes, db.notes, db.cards, db.reviews, db.media, db.settings, db.deletions],
     async () => {
       await db.decks.bulkAdd(decks)
       await db.noteTypes.add(noteType)
@@ -153,6 +161,7 @@ export async function generateCollection(db: RectoDB, seed: string) {
       await db.reviews.bulkAdd(reviews)
       await db.media.bulkAdd(media)
       await db.settings.bulkAdd(settings)
+      await db.deletions.bulkAdd(deletions)
     },
   )
 }
@@ -179,5 +188,6 @@ export async function dumpDatabase(db: RectoDB) {
     reviews: byId(await db.reviews.toArray()),
     settings: (await db.settings.toArray()).sort((a, b) => a.key.localeCompare(b.key)),
     media: media.sort((a, b) => a.name.localeCompare(b.name)),
+    deletions: byId(await db.deletions.toArray()),
   }
 }

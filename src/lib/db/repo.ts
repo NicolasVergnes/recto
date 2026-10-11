@@ -24,6 +24,7 @@ import type {
   Note,
   NoteType,
 } from '../domain/types'
+import { recordDeletions } from './deletions'
 import { RepoError } from './errors'
 import { db, newId } from './schema'
 
@@ -111,15 +112,16 @@ export async function moveDeck(id: string, parentId: string | null, now: number)
  */
 export async function mergeDecks(sourceId: string, targetId: string, now: number): Promise<void> {
   if (sourceId === targetId) throw new RepoError('deckMergeSelf')
-  await db.transaction('rw', db.decks, db.notes, db.cards, async () => {
+  await db.transaction('rw', [db.decks, db.notes, db.cards, db.deletions], async () => {
     await requireDeck(sourceId)
     const target = await requireDeck(targetId)
     if (target.parentId === sourceId) throw new RepoError('deckMergeSelf')
     const topLevel = target.parentId ?? target.id
     await db.decks.where('parentId').equals(sourceId).modify({ parentId: topLevel, updatedAt: now })
     await db.notes.where('deckId').equals(sourceId).modify({ deckId: targetId, updatedAt: now })
-    await db.cards.where('deckId').equals(sourceId).modify({ deckId: targetId })
+    await db.cards.where('deckId').equals(sourceId).modify({ deckId: targetId, updatedAt: now })
     await db.decks.delete(sourceId)
+    await recordDeletions('decks', [sourceId], now)
   })
 }
 
@@ -145,15 +147,22 @@ export async function countDeckContents(id: string): Promise<DeletionCounts> {
 }
 
 /** Explicit user deletion: the deck, its sub-decks, their notes, cards and review log. */
-export async function deleteDeck(id: string): Promise<DeletionCounts> {
-  return db.transaction('rw', [db.decks, db.notes, db.cards, db.reviews], async () => {
+export async function deleteDeck(id: string, now: number): Promise<DeletionCounts> {
+  const tables = [db.decks, db.notes, db.cards, db.reviews, db.deletions]
+  return db.transaction('rw', tables, async () => {
     const ids = await deckFamily(id)
+    const noteIds = await db.notes.where('deckId').anyOf(ids).primaryKeys()
     const cardIds = await db.cards.where('deckId').anyOf(ids).primaryKeys()
-    const notes = await db.notes.where('deckId').anyOf(ids).delete()
-    await db.reviews.where('cardId').anyOf(cardIds).delete()
+    const reviewIds = await db.reviews.where('cardId').anyOf(cardIds).primaryKeys()
+    await db.reviews.bulkDelete(reviewIds)
     await db.cards.bulkDelete(cardIds)
+    await db.notes.bulkDelete(noteIds)
     await db.decks.bulkDelete(ids)
-    return { decks: ids.length, notes, cards: cardIds.length }
+    await recordDeletions('reviews', reviewIds, now)
+    await recordDeletions('cards', cardIds, now)
+    await recordDeletions('notes', noteIds, now)
+    await recordDeletions('decks', ids, now)
+    return { decks: ids.length, notes: noteIds.length, cards: cardIds.length }
   })
 }
 
@@ -274,7 +283,8 @@ export async function updateNote(
   input: NoteInput,
   now: number,
 ): Promise<{ note: Note; added: Card[]; removed: string[] }> {
-  return db.transaction('rw', db.decks, db.notes, db.cards, db.noteTypes, async () => {
+  const tables = [db.decks, db.notes, db.cards, db.noteTypes, db.deletions]
+  return db.transaction('rw', tables, async () => {
     const existing = await db.notes.get(id)
     if (!existing) throw new RepoError('noteNotFound')
     await requireDeck(input.deckId)
@@ -300,21 +310,27 @@ export async function updateNote(
     const added = create.map((o) => makeCard(note, o, newId(), now))
     await db.notes.put(note)
     await db.cards.bulkDelete(removed)
+    await recordDeletions('cards', removed, now)
     await db.cards.bulkAdd(added)
     if (existing.deckId !== note.deckId) {
-      await db.cards.where('noteId').equals(id).modify({ deckId: note.deckId })
+      await db.cards.where('noteId').equals(id).modify({ deckId: note.deckId, updatedAt: now })
     }
     return { note, added, removed }
   })
 }
 
 /** Explicit user deletion: notes, their cards and their review log (invariant 3). */
-export async function deleteNotes(noteIds: readonly string[]): Promise<number> {
-  return db.transaction('rw', db.notes, db.cards, db.reviews, async () => {
+export async function deleteNotes(noteIds: readonly string[], now: number): Promise<number> {
+  return db.transaction('rw', [db.notes, db.cards, db.reviews, db.deletions], async () => {
     const cardIds = await db.cards.where('noteId').anyOf(noteIds).primaryKeys()
-    await db.reviews.where('cardId').anyOf(cardIds).delete()
+    const reviewIds = await db.reviews.where('cardId').anyOf(cardIds).primaryKeys()
+    const existing = await db.notes.where('id').anyOf(noteIds).primaryKeys()
+    await db.reviews.bulkDelete(reviewIds)
     await db.cards.bulkDelete(cardIds)
-    await db.notes.bulkDelete([...noteIds])
+    await db.notes.bulkDelete(existing)
+    await recordDeletions('reviews', reviewIds, now)
+    await recordDeletions('cards', cardIds, now)
+    await recordDeletions('notes', existing, now)
     return cardIds.length
   })
 }
@@ -323,7 +339,7 @@ export async function moveNotes(noteIds: readonly string[], deckId: string, now:
   await db.transaction('rw', db.decks, db.notes, db.cards, async () => {
     await requireDeck(deckId)
     await db.notes.where('id').anyOf(noteIds).modify({ deckId, updatedAt: now })
-    await db.cards.where('noteId').anyOf(noteIds).modify({ deckId })
+    await db.cards.where('noteId').anyOf(noteIds).modify({ deckId, updatedAt: now })
   })
 }
 
@@ -375,12 +391,12 @@ export function getCard(id: string): Promise<Card | undefined> {
   return db.cards.get(id)
 }
 
-export async function setSuspended(cardIds: readonly string[], suspended: boolean) {
-  await db.cards.where('id').anyOf(cardIds).modify({ suspended })
+export async function setSuspended(cardIds: readonly string[], suspended: boolean, now: number) {
+  await db.cards.where('id').anyOf(cardIds).modify({ suspended, updatedAt: now })
 }
 
-export async function setFlag(cardIds: readonly string[], flag: Flag) {
-  await db.cards.where('id').anyOf(cardIds).modify({ flag })
+export async function setFlag(cardIds: readonly string[], flag: Flag, now: number) {
+  await db.cards.where('id').anyOf(cardIds).modify({ flag, updatedAt: now })
 }
 
 /** Puts cards back to "new" without touching the review log (SPEC §5.2). */
@@ -499,23 +515,25 @@ export async function updateNoteType(
   edit: NoteTypeEdit,
   now: number,
 ): Promise<NoteTypeEditPlan> {
-  return db.transaction('rw', db.noteTypes, db.notes, db.cards, async () => {
+  return db.transaction('rw', [db.noteTypes, db.notes, db.cards, db.deletions], async () => {
     const plan = await planEdit(id, edit, now)
     await db.noteTypes.put(plan.type)
     await db.notes.bulkPut(plan.notes)
     await db.cards.bulkPut(plan.moved)
     await db.cards.bulkDelete(plan.removed)
+    await recordDeletions('cards', plan.removed, now)
     await db.cards.bulkAdd(plan.added)
     return plan
   })
 }
 
 /** A note type is deleted only when no note uses it. */
-export async function deleteNoteType(id: string): Promise<void> {
-  await db.transaction('rw', db.noteTypes, db.notes, async () => {
+export async function deleteNoteType(id: string, now: number): Promise<void> {
+  await db.transaction('rw', db.noteTypes, db.notes, db.deletions, async () => {
     if ((await db.notes.where('noteTypeId').equals(id).count()) > 0)
       throw new RepoError('noteTypeInUse')
     await db.noteTypes.delete(id)
+    await recordDeletions('noteTypes', [id], now)
   })
 }
 

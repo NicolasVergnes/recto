@@ -172,7 +172,7 @@ export function planNoteTypeEdit(
         continue
       }
       keptOrds.add(ord)
-      if (ord !== card.ord) plan.moved.push({ ...card, ord })
+      if (ord !== card.ord) plan.moved.push({ ...card, ord, updatedAt: now })
     }
     for (const ord of wanted)
       if (!keptOrds.has(ord)) plan.added.push(makeCard(note, ord, newId(), now))

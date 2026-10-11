@@ -40,7 +40,7 @@
 
   async function suspend(on: boolean) {
     await run(
-      () => repo.setSuspended([...selected], on),
+      () => repo.setSuspended([...selected], on, Date.now()),
       t(on ? 'browser.suspended' : 'browser.unsuspended'),
     )
   }
@@ -76,7 +76,7 @@
     await run(
       async () => {
         const ids = [...selectedNoteIds]
-        await repo.deleteNotes(ids)
+        await repo.deleteNotes(ids, Date.now())
         selected.clear()
       },
       t('browser.deleted', { n: notes }),

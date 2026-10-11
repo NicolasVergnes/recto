@@ -35,7 +35,7 @@
       danger: true,
     })
     if (!ok) return
-    await deleteMedia(orphans)
+    await deleteMedia(orphans, Date.now())
     clearMediaUrls()
     toast(t('settings.orphansDeleted', { n: orphans.length }))
     await onrefresh()

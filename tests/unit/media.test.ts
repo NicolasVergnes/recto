@@ -157,7 +157,7 @@ describe('media storage', () => {
     )
     expect(await findOrphanMedia()).toEqual([orphan.name])
     expect(await findMissingMedia()).toEqual(['absent.png'])
-    await deleteMedia([orphan.name])
+    await deleteMedia([orphan.name], 0)
     expect(await findOrphanMedia()).toEqual([])
   })
 })

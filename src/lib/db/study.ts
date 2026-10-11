@@ -16,6 +16,7 @@ import {
 import type { Card, Deck, Review, SchedulerKind } from '../domain/types'
 import { deckTree } from '../domain/decks'
 import { areTwins } from '../domain/notes'
+import { recordDeletions } from './deletions'
 import { RepoError } from './errors'
 import { db, newId } from './schema'
 import { getSetting } from './settings'
@@ -43,15 +44,17 @@ export async function recordReview(outcome: SchedulerOutcome, durationMs: number
  * (invariant 2); a card whose note moved keeps its new deck (invariant 1) and one whose template
  * moved in the note type editor keeps its new `ord` (M10). Returns the card.
  */
-export async function undoReview(previous: Card, reviewId: string): Promise<Card> {
-  return db.transaction('rw', db.cards, db.reviews, async () => {
+export async function undoReview(previous: Card, reviewId: string, now: number): Promise<Card> {
+  return db.transaction('rw', db.cards, db.reviews, db.deletions, async () => {
     const row = await db.reviews.get(reviewId)
     if (!row || row.cardId !== previous.id) throw new RepoError('noteNotFound')
     const current = await db.cards.get(previous.id)
     if (!current) throw new RepoError('undoGone')
-    const restored: Card = { ...previous, deckId: current.deckId, ord: current.ord }
+    // The schedule of before the answer, dated now: undoing is a change (M12, merges).
+    const restored: Card = { ...previous, deckId: current.deckId, ord: current.ord, updatedAt: now }
     await db.cards.put(restored)
     await db.reviews.delete(reviewId)
+    await recordDeletions('reviews', [reviewId], now)
     return restored
   })
 }
@@ -64,12 +67,12 @@ export function cardReviews(cardId: string): Promise<Review[]> {
 }
 
 /** P7: retiring requires three spaced successes; un-retiring is always possible. */
-export async function setRetired(cardId: string, retired: boolean): Promise<void> {
+export async function setRetired(cardId: string, retired: boolean, now: number): Promise<void> {
   await db.transaction('rw', db.cards, db.reviews, async () => {
     const card = await db.cards.get(cardId)
     if (!card) throw new RepoError('noteNotFound')
     if (retired && !canRetire(card, await cardReviews(cardId))) throw new RepoError('retireLocked')
-    await db.cards.update(cardId, { retired })
+    await db.cards.update(cardId, { retired, updatedAt: now })
   })
 }
 

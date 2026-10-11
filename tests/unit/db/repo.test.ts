@@ -99,7 +99,7 @@ describe('decks', () => {
     if (!card) throw new Error('no card')
     await env.db.reviews.add(fakeReview(card.id, a.id, T0))
     expect(await repo.countDeckContents(a.id)).toEqual({ decks: 2, notes: 2, cards: 3 })
-    expect(await repo.deleteDeck(a.id)).toEqual({ decks: 2, notes: 2, cards: 3 })
+    expect(await repo.deleteDeck(a.id, T0)).toEqual({ decks: 2, notes: 2, cards: 3 })
     expect(await repo.collectionCounts()).toEqual({
       decks: 1,
       notes: 1,
@@ -292,7 +292,7 @@ describe('notes and cards', () => {
     const card = b.cards[0]
     if (!card) throw new Error('no card')
     await env.db.reviews.add(fakeReview(card.id, d2.id, T0))
-    expect(await repo.deleteNotes([b.note.id])).toBe(2)
+    expect(await repo.deleteNotes([b.note.id], T0)).toBe(2)
     expect(await repo.getNote(b.note.id)).toBeUndefined()
     expect(await env.db.reviews.count()).toBe(0)
   })
@@ -304,8 +304,8 @@ describe('notes and cards', () => {
       T0,
     )
     const ids = cards.map((c) => c.id)
-    await repo.setSuspended(ids, true)
-    await repo.setFlag(ids, 2)
+    await repo.setSuspended(ids, true, T0)
+    await repo.setFlag(ids, 2, T0)
     const first = ids[0] ?? ''
     await env.db.cards.update(first, { state: 2, stability: 10, difficulty: 5, reps: 3, box: 4 })
     await env.db.reviews.add(fakeReview(first, d.id, T0))
@@ -322,5 +322,85 @@ describe('notes and cards', () => {
       flag: 2,
     })
     expect(await env.db.reviews.count()).toBe(1)
+  })
+})
+
+// M12: every deletion is recorded in its transaction; every change of a card dates it.
+describe('deletions and change dates (M12)', () => {
+  const deletions = async () =>
+    (await env.db.deletions.toArray()).map((d) => [d.table, d.recordId, d.deletedAt]).sort()
+
+  it('records what a deck deletion removes: decks, notes, cards and their log', async () => {
+    const a = await repo.createDeck({ name: 'A' }, T0)
+    const sub = await repo.createDeck({ name: 'Sub', parentId: a.id }, T0)
+    const { note, cards } = await repo.createNote(
+      { deckId: sub.id, modelType: 'basic', fields: ['q', 'r'], tags: [] },
+      T0,
+    )
+    const card = cards[0]?.id ?? ''
+    const review = fakeReview(card, sub.id, T0)
+    await env.db.reviews.add(review)
+    await repo.deleteDeck(a.id, T0 + 5)
+    expect(await deletions()).toEqual(
+      [
+        ['cards', card, T0 + 5],
+        ['decks', a.id, T0 + 5],
+        ['decks', sub.id, T0 + 5],
+        ['notes', note.id, T0 + 5],
+        ['reviews', review.id, T0 + 5],
+      ].sort(),
+    )
+  })
+
+  it('records deleted notes, cards removed by an edit, note types and merged decks', async () => {
+    const d = await repo.createDeck({ name: 'D' }, T0)
+    const other = await repo.createDeck({ name: 'E' }, T0)
+    const cloze = await repo.createNote(
+      { deckId: d.id, modelType: 'cloze', fields: ['{{c1::a}} {{c2::b}}', ''], tags: [] },
+      T0,
+    )
+    const [, second] = cloze.cards
+    await repo.updateNote(
+      cloze.note.id,
+      { deckId: d.id, modelType: 'cloze', fields: ['{{c1::a}} b', ''], tags: [] },
+      T0 + 1,
+    )
+    expect(await deletions()).toEqual([['cards', second?.id, T0 + 1]])
+    await repo.deleteNotes([cloze.note.id, 'absent'], T0 + 2)
+    const type = await repo.createNoteType(
+      { name: 'T', fields: ['A'], templates: [{ name: 'C', front: '{{A}}', back: '{{A}}' }] },
+      T0,
+    )
+    await repo.deleteNoteType(type.id, T0 + 3)
+    await repo.mergeDecks(other.id, d.id, T0 + 4)
+    expect(await deletions()).toEqual(
+      [
+        ['cards', second?.id, T0 + 1],
+        ['cards', cloze.cards[0]?.id, T0 + 2],
+        ['notes', cloze.note.id, T0 + 2],
+        ['noteTypes', type.id, T0 + 3],
+        ['decks', other.id, T0 + 4],
+      ].sort(),
+    )
+  })
+
+  it('dates every change of a card: suspend, flag, move, reset', async () => {
+    const d1 = await repo.createDeck({ name: 'D1' }, T0)
+    const d2 = await repo.createDeck({ name: 'D2' }, T0)
+    const { note, cards } = await repo.createNote(
+      { deckId: d1.id, modelType: 'basic', fields: ['q', 'r'], tags: [] },
+      T0,
+    )
+    const id = cards[0]?.id ?? ''
+    const dated = async () => (await repo.getCard(id))?.updatedAt
+    expect(await dated()).toBe(T0)
+    await repo.setSuspended([id], true, T0 + 1)
+    expect(await dated()).toBe(T0 + 1)
+    await repo.setFlag([id], 3, T0 + 2)
+    expect(await dated()).toBe(T0 + 2)
+    await repo.moveNotes([note.id], d2.id, T0 + 3)
+    expect(await dated()).toBe(T0 + 3)
+    await repo.resetCards([id], T0 + 4)
+    expect(await dated()).toBe(T0 + 4)
   })
 })

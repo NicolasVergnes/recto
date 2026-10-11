@@ -9,6 +9,7 @@
 import type { ImportPlan, ImportReport } from '../import/plan'
 import type { Media, Note } from '../domain/types'
 import { sha256Hex } from '../media/hash'
+import { recordDeletions } from './deletions'
 import { db } from './schema'
 
 export const IMPORT_BATCH = 500
@@ -100,9 +101,10 @@ export async function applyImportPlan(
     }
     const batch = plan.updates.slice(i, i + size)
     const rows = rowsOf(batch)
-    await db.transaction('rw', db.notes, db.cards, db.reviews, async () => {
+    await db.transaction('rw', [db.notes, db.cards, db.reviews, db.deletions], async () => {
       await db.notes.bulkPut(batch)
       await db.cards.bulkDelete(rows.removed)
+      await recordDeletions('cards', rows.removed, now)
       await db.cards.bulkAdd(rows.cards)
       await db.reviews.bulkAdd(rows.reviews)
     })

@@ -692,7 +692,7 @@ export const fr = {
     mode: 'Restauration',
     merge: 'Fusionner avec les données actuelles',
     mergeHelp:
-      'Ajoute ce qui manque ; en cas de conflit, la version la plus récente gagne ; les historiques sont réunis.',
+      'Ajoute ce qui manque ; en cas de conflit, la version la plus récente gagne ; les historiques sont réunis ; ce qui a été supprimé d’un côté l’est aussi de l’autre.',
     replace: 'Remplacer toutes les données',
     replaceHelp: 'Les données actuelles sont d’abord téléchargées en sauvegarde, puis remplacées.',
     replaceTitle: 'Remplacer toutes les données',
@@ -703,6 +703,10 @@ export const fr = {
     report:
       'Ajoutés : paquets {decks}, notes {notes}, cartes {cards}, révisions {reviews}, médias {media} ; notes mises à jour : {updated} ; cartes supprimées : {removed}.',
     missingFiles: '{n} média absent de l’archive.|{n} médias absents de l’archive.',
+    deletedThere:
+      'Supprimés ici comme sur l’autre appareil : {n} paquet, note ou type de note.|Supprimés ici comme sur l’autre appareil : {n} paquets, notes ou types de notes.',
+    mediaConflicts:
+      '{n} média de la sauvegarde ignoré : un fichier du même nom, au contenu différent, existe déjà ici.|{n} médias de la sauvegarde ignorés : des fichiers du même nom, au contenu différent, existent déjà ici.',
   },
   // `button`, `title` and `export` belong to the export dialog of both formats (CSV and Anki).
   exportCsv: {

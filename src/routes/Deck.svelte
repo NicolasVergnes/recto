@@ -102,7 +102,7 @@
         await createBackup(now),
         timestampedName('recto-avant-suppression', BACKUP_EXTENSION, now),
       )
-      await repo.deleteDeck(deckId)
+      await repo.deleteDeck(deckId, Date.now())
       toast(t('deck.deleted'))
       navigate('/')
     } catch (err) {
