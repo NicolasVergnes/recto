@@ -272,6 +272,7 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## Décisions prises en session
 
+- 2026-10-12 : Nicolas garde **la PWA installable** pour l'instant ; la publication sur le Play Store viendra plus tard. M13 (Capacitor) et M14 (publication) sont suspendus, l'`appId` n'a pas à être décidé maintenant. M15 (synchronisation automatique PC ↔ Android) est également en attente : Nicolas teste la PWA telle quelle, fait des évolutions, et en reparlera plus tard. Entre appareils, la sauvegarde `.recto.zip` + « Fusionner » (M12) fait office de synchronisation manuelle.
 - 2026-10-12 (M12) : V2 = application Android avec **Capacitor** (choix de Nicolas, pour permettre plus tard une synchronisation automatique par dossier sur le téléphone, impossible depuis la PWA : pas de File System Access API dans Chrome Android) ; découpage M12 (données), M13 (application), M14 (publication), M15 (transport de la synchronisation).
 - 2026-10-12 (M12) : traces de suppression par ligne, jamais purgées pour l'instant (quelques dizaines d'octets par ligne ; une purge demandera une date au-delà de laquelle une sauvegarde plus ancienne n'est plus fusionnable). Règle : une suppression l'emporte sur une ligne dont la dernière modification est antérieure ou égale ; « Tout effacer » efface aussi les traces (l'appareil repart de zéro).
 - 2026-10-12 (M12) : cartes fusionnées en entier par `updatedAt` (alternative écartée : planification de la copie la plus récemment révisée et drapeaux de la plus récemment modifiée ; elle annulait une réinitialisation faite sur un seul appareil). Limite assumée : une suspension faite sur A après une réponse donnée sur B remet la planification d'avant la réponse ; la réponse reste au journal.
@@ -414,7 +415,7 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 ## À vérifier manuellement par Nicolas
 
 - M12 — Sur le PC et le téléphone (PWA) : faire une sauvegarde de chaque côté, supprimer une note sur l'un, puis fusionner la sauvegarde de l'autre : la note ne revient pas ; fusionner dans l'autre sens : elle disparaît aussi (le rapport l'indique). La première ouverture après la mise à jour migre la base (aucune action, rien ne doit changer à l'écran).
-- M13 — décider l'identifiant d'application Android (`appId`), définitif sur le Play Store.
+- (Suspendu) M13 — décider l'identifiant d'application Android (`appId`) quand la publication sur le Play Store sera reprise.
 - M11 — Effacer les données de test (« Tout effacer ») avant d'essayer : les anciennes notes « Basique + inverse » ne sont plus lues. Réviser une note basique dans un paquet FSRS : après une réussite, elle revient retournée (« ↔ Sens inversé ») ; cocher « Ne jamais retourner cette note » sur une autre.
 - M11 — Réponse tapée sur une note nom ↔ photo : pas de saisie quand la réponse attendue est la photo, saisie du nom quand la photo est la question.
 - M11 — Types de notes : dans « Departements », tenter de retirer « Numero » (refus nommant les 4 cartes) ; retirer un champ rempli que les modèles n'utilisent plus (confirmation avec le nombre de notes).
