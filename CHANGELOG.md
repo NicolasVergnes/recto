@@ -4,6 +4,13 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 ## [Unreleased]
 
+### Outils — plugin Claude « recto-deck-builder »
+
+#### Added
+
+- `tools/deck-builder/` : plugin Claude autonome (skill, validateur Python `check_deck.py`, exemples CSV basique, texte à trous et mixte) qui crée des paquets importables dans Recto ; `npm run plugin:zip` produit `recto-deck-builder.zip` à téléverser dans l'application Claude. Aucun changement dans l'application.
+- Test `deck-builder-plugin.test.ts` : les exemples du plugin passent par le parseur et le plan d'import de Recto.
+
 ### M12 — Données prêtes pour plusieurs appareils
 
 #### Added

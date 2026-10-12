@@ -1,0 +1,6 @@
+{
+  "name": "recto-deck-builder",
+  "version": "1.0.0",
+  "description": "Crée des paquets de flashcards (CSV) importables dans l'application Recto : cartes atomiques, texte à trous, vérification avant livraison.",
+  "author": { "name": "Nicolas" }
+}
