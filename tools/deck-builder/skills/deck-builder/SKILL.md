@@ -1,55 +1,71 @@
 ---
 name: deck-builder
-description: Crée un paquet de flashcards en CSV importable dans l'application Recto (répétition espacée). À utiliser quand l'utilisateur demande des cartes, des flashcards, un paquet, des fiches de révision ou du texte à trous à partir d'un sujet, d'un cours, d'un PDF ou de notes, ou veut importer des cartes dans Recto.
+description: Crée un paquet de flashcards clé en main (.apkg) pour l'application Recto — types de notes à plusieurs champs et plusieurs cartes, images, sons, texte à trous, occlusion d'image, formules. À utiliser dès que l'utilisateur demande des cartes, des flashcards, un paquet, un deck ou des fiches de révision, à partir d'un sujet, d'un cours, d'un PDF, d'images ou de notes, ou veut importer des cartes dans Recto.
 ---
 
-# Création de paquets pour Recto
+# Paquets clé en main pour Recto
 
-Tu produis un fichier **CSV** que l'utilisateur importe dans Recto (Importer → CSV). Recto est une application de flashcards à répétition espacée, en français, locale, sans serveur. Ce que tu écris est relu par l'utilisateur avant import : vise des cartes prêtes à apprendre, pas un résumé du cours.
+Tu livres un fichier **`.apkg`** que l'utilisateur importe dans Recto (Importer → Paquet Anki), sur ordinateur ou téléphone. Recto est une application de flashcards à répétition espacée, en français, sans serveur. **Clé en main** veut dire : tout ce que l'utilisateur ferait à la main dans Recto (type de note, champs, cartes dans chaque sens, images, sons, masques d'occlusion, sous-paquets, tags), le paquet le contient déjà. Ne lui demande jamais de finir à la main ce que la bibliothèque sait faire.
+
+Outils de ce skill (même dossier que ce fichier ; si tu ne le trouves pas : `find / -name recto_apkg.py -path "*deck-builder*" 2>/dev/null`) :
+
+- `scripts/recto_apkg.py` : bibliothèque Python (bibliothèque standard seulement) qui écrit le `.apkg` sous la forme exacte que Recto relit, et le vérifie. **Seule façon d'écrire le paquet** : pas de `.apkg` écrit à la main, pas de genanki, pas de CSV (le CSV ne porte ni types de notes, ni médias).
+- `reference/api.md` : l'API, avec un exemple complet de type à plusieurs cartes.
+- `reference/medias.md` : images, sons, formules, masques d'occlusion. À lire dès qu'un média est en jeu.
+- `examples/exemple.py` : un paquet qui utilise chaque type de note ; le lire avant d'écrire le tien.
 
 ## Démarche
 
-1. **Cadrer** (une seule question groupée, sauf si c'est déjà clair) : sujet et source, niveau, nombre de cartes souhaité, nom du paquet. À défaut de réponse : 20 à 40 cartes, nom déduit du sujet.
-2. **Extraire** les faits à retenir de la source fournie. Ne rien inventer : si la source ne dit pas, ne pas compléter de mémoire sans le signaler ; si tu ajoutes un fait extérieur, le dire dans la réponse.
-3. **Rédiger** les cartes selon les règles ci-dessous.
-4. **Vérifier** : écrire le fichier, lancer `python scripts/check_deck.py fichier.csv`, corriger jusqu'à « OK ».
-5. **Livrer** le fichier et, en 3 à 5 lignes, dire : nombre de cartes, paquet(s), points à relire (faits incertains, cartes limites).
+1. **Cadrer.** Si la demande décrit déjà la note et ses cartes (« note avec Carte, Nom, Numéro ; cartes Carte → Nom, Nom ↔ Numéro »), c'est la spécification : la suivre exactement, sans la simplifier. Sinon, une seule question groupée : sujet et source, ce qu'il faut savoir faire (dans quel sens), médias souhaités, nombre de cartes, nom du paquet. À défaut de réponse : 20 à 40 notes, choix raisonnables, annoncés.
+2. **Choisir les types de notes** (tableau ci-dessous). Un paquet peut en mélanger plusieurs.
+3. **Réunir les faits.** Partir de la source fournie. Ne rien inventer : un fait tiré de ta mémoire est signalé comme tel à la livraison ; si le réseau est disponible, vérifier les faits incertains sur une source de référence et la citer (champ `Source` ou `Extra`).
+4. **Produire les médias** (`reference/medias.md`) : générés (schémas, cartes, drapeaux, graphiques), téléchargés si le réseau et la licence le permettent, ou fournis par l'utilisateur. Regarder soi-même 2 ou 3 images produites avant de continuer.
+5. **Écrire le script de construction** (`construire_paquet.py`) avec la bibliothèque, l'exécuter. `Package.write()` vérifie le paquet comme Recto l'importera et **refuse d'écrire** ce qui ne s'importerait pas comme voulu : corriger jusqu'à « OK : importable dans Recto ».
+6. **Relire le rapport** : l'aperçu montre la première note de chaque type, carte par carte (question | réponse). Chaque carte doit avoir du sens seule, dans son sens. Traiter les avertissements (ou dire pourquoi on les garde).
+7. **Livrer** le `.apkg` et le script de construction (il permet de corriger puis de régénérer), avec le message de livraison ci-dessous.
 
-## Règles de qualité d'une carte (issues de la recherche sur la mémoire)
+## Choisir le type de note
 
-- **Une information par carte** (carte atomique). Une question dont la réponse est une liste de plus de 4 éléments, ou un recto/verso de plus de 200 caractères, se découpe en plusieurs cartes ou passe en texte à trous.
-- **Rappel actif** : le recto est une vraie question ou un indice qui force à produire la réponse, jamais une phrase qu'on reconnaît. Pas de « Parle-moi de… ».
-- **Pas d'ambiguïté** : une seule bonne réponse possible, sans connaître la carte voisine. Rendre le contexte explicite (« En physique, … »).
-- **Verso court** : la réponse seule. Le « pourquoi », l'exemple, la nuance vont dans **Extra**, affiché après la réponse.
-- **Pas de carte en double** dans l'autre sens : une note basique est posée dans les deux sens par Recto selon le réglage du paquet. N'écris pas aussi la carte inverse.
-- **Texte à trous** pour les définitions, dates, formules à compléter, énumérations courtes. Un trou = une idée ; 1 à 3 trous par phrase.
-- Phrases dans la langue de la source. Vocabulaire de langue : recto = mot, verso = traduction, extra = exemple.
+| Besoin | Méthode | Ce que Recto en fait |
+|---|---|---|
+| Paire réversible : mot ↔ traduction, terme ↔ définition courte, symbole ↔ élément | `add_basic` | Une carte, posée dans un sens puis dans l'autre (le paquet alterne après chaque réussite, réglage par défaut) |
+| Question à sens unique : pourquoi, comment, question dont la réponse est une explication | `add_question` | Une carte, jamais retournée ; explication et source sous la réponse |
+| Phrase, définition, date, formule, courte énumération à compléter | `add_cloze` | Une carte par numéro de trou (`{{c1::…}}`, `{{c2::…}}`) |
+| Image légendée : anatomie, carte, schéma, plan, tableau | `add_occlusion` | Une carte par groupe de masques, la zone cachée à retrouver |
+| Un objet à plusieurs facettes demandé dans des directions précises : département (carte, nom, numéro, préfecture), mot (son, image, traduction, genre), œuvre (image, titre, auteur, date) | `note_type` + `add_note` | Type de note personnalisé : un champ par facette, **une carte par modèle** ; chaque direction voulue est un modèle (A ↔ B = deux modèles, A → B et B → A) |
 
-## Format du fichier (strict)
+Types personnalisés, l'essentiel (détail dans `reference/api.md`) :
 
-- **UTF-8**, séparateur **point-virgule `;`**, une ligne par note. Entourer toute cellule de guillemets `"…"` et doubler un guillemet interne (`""`). Les retours à la ligne dans une cellule sont permis entre guillemets mais préférer `<br>`.
-- **Première ligne = en-tête obligatoire.** Une colonne doit s'appeler `recto` (ou `texte` pour le cloze).
-- Colonnes reconnues (par leur nom, dans n'importe quel ordre) : `recto`, `verso`, `extra`, `tags`, `deck`, `type`. Sans noms, l'ordre serait recto, verso, extra : toujours mettre l'en-tête.
-- `tags` : mots séparés par des espaces, sans accents ni espaces dans un tag (`histoire dates`).
-- `deck` : nom du paquet ; `::` pour un sous-paquet (`Histoire::Renaissance`). Le paquet est créé s'il n'existe pas. Un même fichier peut viser plusieurs paquets.
-- **Basique** : colonnes `recto;verso;extra;tags;deck`. Exemple : `examples/basique.csv`.
-- **Texte à trous (cloze)** : colonnes `texte;extra;tags;deck`. Syntaxe `{{c1::réponse}}` ou avec indice `{{c1::réponse::indice}}`. Numéros distincts = une carte par numéro ; même numéro = masqués ensemble. Exemple : `examples/cloze.csv`.
-- **Basique et cloze dans un même fichier** : il faut une colonne `type` avec `basic` ou `cloze` à chaque ligne (`type;recto;verso;extra;tags;deck`). Sans colonne `type`, un fichier est entièrement basique ou entièrement cloze (dès qu'une ligne contient `{{c1::`, les lignes basiques échouent). Exemple : `examples/mixte.csv`. Par défaut, préférer deux fichiers.
-- Aucune ligne dont le recto est vide. Pas de doublon de recto dans un même paquet (le doublon est ignoré à l'import).
+- **Champs** : noms uniques, sans `{ } : "`, ne commençant pas par `# ^ /`. Le premier champ identifie la note (doublons, réimportation) : le choisir stable (nom, numéro, image), ou passer `guid=`.
+- **Modèles** : `(nom de la carte, question, réponse)`. Syntaxe : `{{Champ}}`, `{{FrontSide}}` (rappel de la question dans la réponse), `{{#Champ}}…{{/Champ}}` (seulement si le champ est rempli), `{{^Champ}}…{{/Champ}}` (s'il est vide), `{{text:Champ}}`, `{{type:Champ}}` (l'utilisateur tape la réponse, Recto compare). Une note n'a pas la carte d'un modèle dont la question serait vide pour elle.
+- **Mise en forme** : `<br>`, `<b>`, `<i>`, `<u>`, `<sub>`, `<sup>`, `<ul>/<ol>/<li>`, `<p>`, `<hr id=answer>`. Recto retire tout le reste à l'affichage (`<div>` : le texte reste mais sans retour à la ligne ; `style` et CSS : ignorés).
+- Au plus 3 champs avec un seul modèle qui demande le 1er champ (ou deux modèles : le 1er puis le 2e) : Recto en ferait une note basique. La bibliothèque le refuse : `add_basic`, ou un champ de plus (`Source`, `Exemple`).
+- Un texte à trous ne vit pas dans un type personnalisé : `add_cloze` (champs Texte et Extra).
 
-### HTML et formules dans les champs
+## Règles de qualité d'une carte (recherche sur la mémoire)
 
-- Balises autorisées : `<b> <i> <u> <br> <hr> <p> <ul> <ol> <li> <sub> <sup> <span>`. Toute autre balise est retirée ; pas de style, pas de lien.
-- **Formules LaTeX** : `\( … \)` en ligne, `\[ … \]` en bloc (rendu KaTeX). Dans un CSV, l'antislash s'écrit tel quel. Pour un cloze, mettre le trou **autour de toute la formule**, jamais dedans.
-- **Pas de médias** : ni `<img>`, ni `[sound:…]` (les fichiers ne voyagent pas avec un CSV). Décrire en mots, ou signaler à l'utilisateur qu'il faudra ajouter l'image dans Recto.
+- **Une information par carte.** Une réponse qui est une liste de plus de 4 éléments, ou un champ de plus de 200 caractères, se découpe ou passe en texte à trous.
+- **Rappel actif** : la question force à produire la réponse ; jamais une phrase qu'on se contente de reconnaître, jamais de QCM, de vrai/faux, ni de « Parle-moi de… ».
+- **Pas d'ambiguïté** : une seule bonne réponse, sans connaître les cartes voisines ; contexte explicite (« En chimie, … »).
+- **La question ne contient pas la réponse**, y compris par une autre facette de la note : dans un type personnalisé, une question ne montre que ce qui est demandé (pas « Ain (01) » sur une carte Nom → Numéro).
+- **Réponse courte** ; le pourquoi, l'exemple, la nuance vont dans Extra, Explication, ou sous `<hr id=answer>`.
+- **Images = indice, pas béquille** : une image qui aide à retrouver, avec un `alt` qui la décrit sans donner la réponse.
+- Les cartes d'une même note sont espacées automatiquement par Recto (pas deux le même jour) : ne pas s'en soucier.
 
-## À ne pas faire
+## Ce qui se règle dans Recto (pas dans le paquet)
 
-- Pas de QCM, de vrai/faux, de « note de difficulté » ni de numérotation dans le recto.
-- Pas de recto qui contient la réponse.
-- Pas de paquet géant sans demande : au-delà de 60 cartes, proposer de livrer en plusieurs fichiers par thème.
-- Ne jamais annoncer « importé » : tu livres le fichier, l'utilisateur l'importe dans Recto.
+- À l'import, l'utilisateur choisit le planificateur des paquets créés : FSRS (défaut) ou Memory Box (boîte à 7 compartiments).
+- Les réglages d'un paquet (nouvelles cartes par jour, rétention, alternance des faces, réponse tapée pour les notes basiques, lecture automatique des sons) ne voyagent pas dans un `.apkg` : n'en parler que si le paquet en a besoin, en une ligne précise (« Paquet Vocabulaire › Paramètres : activer la lecture automatique des sons »). Pour une réponse tapée, préférer `{{type:Champ}}` dans un type personnalisé : c'est alors dans le paquet.
+- Sous-paquets : un niveau (`Matière::Chapitre`) ; au-delà, Recto aplatit le nom.
+- **Régénérer un paquet corrigé** : même nom de type, mêmes champs, même premier champ (ou même `guid=`) → Recto met à jour les notes au lieu de les dupliquer et garde la progression. Changer les champs ou les modèles d'un type existant n'est pas repris par une réimportation : le dire si c'est le cas.
 
-## Import côté utilisateur
+## Message de livraison
 
-Recto → Importer → CSV → choisir le fichier (Google Drive accessible depuis le sélecteur sur téléphone) → vérifier l'aperçu et le rapport → valider. Une relecture rapide dans l'aperçu avant de valider évite d'apprendre une erreur.
+En 5 à 10 lignes :
+
+- le fichier, et ce qu'il contient : paquets, types de notes (cartes par note), nombre de notes, de cartes et de médias ;
+- **les points à vérifier** : faits tirés de ta mémoire ou incertains, choix discutables (ex. « Cergy » plutôt que « Cergy-Pontoise »), cartes à suspendre éventuellement ;
+- l'import : Recto → Importer → Paquet Anki (.apkg) → choisir le fichier (Google Drive est accessible depuis le sélecteur du téléphone) → planificateur → Importer ;
+- les réglages de paquet à faire dans Recto, seulement s'il y en a.
+
+Ne jamais écrire « importé » : tu livres le fichier, l'utilisateur l'importe.

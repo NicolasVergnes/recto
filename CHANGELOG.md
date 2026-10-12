@@ -8,8 +8,8 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 #### Added
 
-- `tools/deck-builder/` : plugin Claude autonome (skill, validateur Python `check_deck.py`, exemples CSV basique, texte à trous et mixte) qui crée des paquets importables dans Recto ; `npm run plugin:zip` produit `recto-deck-builder.zip` à téléverser dans l'application Claude. Aucun changement dans l'application.
-- Test `deck-builder-plugin.test.ts` : les exemples du plugin passent par le parseur et le plan d'import de Recto.
+- `tools/deck-builder/` : plugin Claude autonome qui crée des paquets **clé en main** au format `.apkg` (importés par « Paquet Anki ») : types de notes personnalisés à plusieurs champs et plusieurs cartes, notes basiques, questions à sens unique, texte à trous, occlusion d'image avec réponses, images, sons, formules, sous-paquets, tags. Bibliothèque Python `recto_apkg.py` (bibliothèque standard seulement) qui écrit les paquets sous la forme de l'export de Recto et les vérifie selon les règles de son importeur (`python recto_apkg.py check x.apkg`, utilisable aussi sur un paquet Anki) ; skill, références (API, médias) et exemple complet. `npm run plugin:zip` produit `recto-deck-builder.zip` à téléverser dans l'application Claude. Aucun changement dans l'application.
+- Test `deck-builder-plugin.test.ts` (Python 3 requis) : les paquets du plugin passent par l'importeur `.apkg` de Recto (types, cartes, masques, médias, réimportation d'un paquet régénéré sans doublon, refus de ce qui serait mal importé).
 
 ### M12 — Données prêtes pour plusieurs appareils
 
