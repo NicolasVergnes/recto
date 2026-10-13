@@ -32,14 +32,15 @@ Outils de ce skill (même dossier que ce fichier ; si tu ne le trouves pas : `fi
 | Question à sens unique : pourquoi, comment, question dont la réponse est une explication | `add_question` | Une carte, jamais retournée ; explication et source sous la réponse |
 | Phrase, définition, date, formule, courte énumération à compléter | `add_cloze` | Une carte par numéro de trou (`{{c1::…}}`, `{{c2::…}}`) |
 | Image légendée : anatomie, carte, schéma, plan, tableau | `add_occlusion` | Une carte par groupe de masques, la zone cachée à retrouver |
-| Un objet à plusieurs facettes demandé dans des directions précises : département (carte, nom, numéro, préfecture), mot (son, image, traduction, genre), œuvre (image, titre, auteur, date) | `note_type` + `add_note` | Type de note personnalisé : un champ par facette, **une carte par modèle** ; chaque direction voulue est un modèle (A ↔ B = deux modèles, A → B et B → A) |
+| Un objet à plusieurs facettes demandé dans des directions précises : département (carte, nom, numéro, préfecture), mot (son, image, traduction, genre), œuvre (image, titre, auteur, date) | `note_type` + `add_note` | Type de note personnalisé : un champ par facette, **une carte par modèle** : `one_way` pour « A → B » (toujours posée ainsi), `two_way` pour « A ↔ B » (**une seule carte**, posée dans un sens puis dans l'autre) |
 
 Types personnalisés, l'essentiel (détail dans `reference/api.md`) :
 
 - **Champs** : noms uniques, sans `{ } : "`, ne commençant pas par `# ^ /`. Le premier champ identifie la note (doublons, réimportation) : le choisir stable (nom, numéro, image), ou passer `guid=`.
-- **Modèles** : `(nom de la carte, question, réponse)`. Syntaxe : `{{Champ}}`, `{{FrontSide}}` (rappel de la question dans la réponse), `{{#Champ}}…{{/Champ}}` (seulement si le champ est rempli), `{{^Champ}}…{{/Champ}}` (s'il est vide), `{{text:Champ}}`, `{{type:Champ}}` (l'utilisateur tape la réponse, Recto compare). Une note n'a pas la carte d'un modèle dont la question serait vide pour elle.
+- **Sens des cartes, à respecter à la lettre** : « A → B » est une carte toujours posée dans ce sens : `one_way(nom, question, réponse)`. « A ↔ B » est **une seule carte** qui peut être posée dans un sens ou dans l'autre (la face 1 d'abord, la face 2 après une réussite, comme une note basique) : `two_way(nom, face1, face2)`, jamais deux modèles A → B et B → A. Exemple : « Carte → Nom, Nom ↔ Numéro, Nom ↔ Préfecture » = 3 modèles, donc 3 cartes par note.
+- **Modèles** : `one_way(nom, question, réponse)` (la réponse reprend la question par `{{FrontSide}}<hr id=answer>`), `two_way(nom, face1, face2)` (chaque face s'écrit seule, sans `{{FrontSide}}` ; la carte n'existe que si les deux faces ont un contenu). Syntaxe : `{{Champ}}`, `{{#Champ}}…{{/Champ}}` (seulement si le champ est rempli), `{{^Champ}}…{{/Champ}}` (s'il est vide), `{{text:Champ}}`, `{{type:Champ}}` (le champ attendu quand le paquet a la réponse tapée). Une note n'a pas la carte d'un modèle dont la question serait vide pour elle.
 - **Mise en forme** : `<br>`, `<b>`, `<i>`, `<u>`, `<sub>`, `<sup>`, `<ul>/<ol>/<li>`, `<p>`, `<hr id=answer>`. Recto retire tout le reste à l'affichage (`<div>` : le texte reste mais sans retour à la ligne ; `style` et CSS : ignorés).
-- Au plus 3 champs avec un seul modèle qui demande le 1er champ (ou deux modèles : le 1er puis le 2e) : Recto en ferait une note basique. La bibliothèque le refuse : `add_basic`, ou un champ de plus (`Source`, `Exemple`).
+- Au plus 3 champs avec un seul modèle qui demande le 1er champ (ou deux modèles : le 1er puis le 2e) : Recto en ferait une note basique. La bibliothèque le refuse : `add_basic` (une paire A ↔ B seule), ou un champ de plus (`Source`, `Continent`, `Région`).
 - Un texte à trous ne vit pas dans un type personnalisé : `add_cloze` (champs Texte et Extra).
 
 ## Règles de qualité d'une carte (recherche sur la mémoire)
@@ -51,11 +52,12 @@ Types personnalisés, l'essentiel (détail dans `reference/api.md`) :
 - **Réponse courte** ; le pourquoi, l'exemple, la nuance vont dans Extra, Explication, ou sous `<hr id=answer>`.
 - **Images = indice, pas béquille** : une image qui aide à retrouver, avec un `alt` qui la décrit sans donner la réponse.
 - Les cartes d'une même note sont espacées automatiquement par Recto (pas deux le même jour) : ne pas s'en soucier.
+- Dans un `two_way`, chaque face est une question : elle doit se suffire (« Ain » ↔ « 01 » ; pas « Numéro de l'Ain ? » ↔ « 01 », qui donnerait une question « 01 » et une réponse « Numéro de l'Ain ? »).
 
 ## Ce qui se règle dans Recto (pas dans le paquet)
 
 - À l'import, l'utilisateur choisit le planificateur des paquets créés : FSRS (défaut) ou Memory Box (boîte à 7 compartiments).
-- Les réglages d'un paquet (nouvelles cartes par jour, rétention, alternance des faces, réponse tapée pour les notes basiques, lecture automatique des sons) ne voyagent pas dans un `.apkg` : n'en parler que si le paquet en a besoin, en une ligne précise (« Paquet Vocabulaire › Paramètres : activer la lecture automatique des sons »). Pour une réponse tapée, préférer `{{type:Champ}}` dans un type personnalisé : c'est alors dans le paquet.
+- Les réglages d'un paquet (nouvelles cartes par jour, rétention, alternance des faces, réponse tapée pour les notes basiques, lecture automatique des sons) ne voyagent pas dans un `.apkg` : n'en parler que si le paquet en a besoin, en une ligne précise (« Paquet Vocabulaire › Paramètres : activer la lecture automatique des sons »). La réponse tapée s'active toujours dans les réglages du paquet (« Réponse tapée ») ; `{{type:Champ}}` désigne seulement le champ attendu par une carte `one_way`.
 - Sous-paquets : un niveau (`Matière::Chapitre`) ; au-delà, Recto aplatit le nom.
 - **Régénérer un paquet corrigé** : même nom de type, mêmes champs, même premier champ (ou même `guid=`) → Recto met à jour les notes au lieu de les dupliquer et garde la progression. Changer les champs ou les modèles d'un type existant n'est pas repris par une réimportation : le dire si c'est le cas.
 

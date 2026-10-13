@@ -2,7 +2,9 @@
 
     python exemple.py [sortie.apkg]
 
-- type personnalisé « Pays » : drapeau (image SVG générée), pays, capitale ; trois cartes ;
+- type personnalisé « Pays d'Europe » : drapeau (image SVG générée), pays, capitale, continent ;
+  deux cartes : Drapeau → Pays (toujours ce sens), Pays ↔ Capitale (une carte, posée dans les
+  deux sens) ;
 - basique (paire réversible), question à sens unique, texte à trous avec formule ;
 - occlusion d'image sur un schéma SVG généré, masques placés en pixels.
 """
@@ -10,18 +12,18 @@ import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
-from recto_apkg import Mask, Package, img  # noqa: E402
+from recto_apkg import Mask, Package, img, one_way, two_way  # noqa: E402
 
 pkg = Package()
 
-# ─── Type personnalisé : une note par pays, une carte par direction utile ──────────────────────
+# ─── Type personnalisé : une note par pays ; « A → B » sens unique, « A ↔ B » une carte, deux sens
 pays = pkg.note_type(
     "Pays d'Europe",
-    fields=["Drapeau", "Pays", "Capitale"],
+    fields=["Drapeau", "Pays", "Capitale", "Continent"],
     templates=[
-        ("Drapeau → Pays", "{{Drapeau}}<br>Quel pays ?", "{{FrontSide}}<hr id=answer>{{Pays}}"),
-        ("Pays → Capitale", "Capitale : {{Pays}} ?", "{{FrontSide}}<hr id=answer>{{Capitale}}"),
-        ("Capitale → Pays", "{{Capitale}} est la capitale de… ?", "{{FrontSide}}<hr id=answer>{{Pays}}"),
+        one_way("Drapeau → Pays", "{{Drapeau}}<br>Quel pays ?",
+                "{{FrontSide}}<hr id=answer>{{Pays}}<br>{{Continent}}"),
+        two_way("Pays ↔ Capitale", "{{Pays}}", "{{Capitale}}"),
     ],
 )
 
@@ -50,7 +52,7 @@ for name, capital, colors, vertical in [
         pays,
         "Exemple::Pays",
         {"Drapeau": img(file, f"Drapeau à bandes {'verticales' if vertical else 'horizontales'}"),
-         "Pays": name, "Capitale": capital},
+         "Pays": name, "Capitale": capital, "Continent": "Europe"},
         tags=["europe", "exemple"],
     )
 

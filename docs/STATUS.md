@@ -1,10 +1,10 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-10-12 · Branche : m12-sync-ready-data (créée depuis `m11-two-way-cards`, non fusionnée ni poussée) · **V1 (M6) fusionnée sur `main` (PR #1)** · **M7 (vue mosaïque), M8 (types de notes multi-cartes) et M9 (jumelles, Memory Box sans calendrier) livrés**, en attente de relecture et de fusion par Nicolas · **M10, M11 et M12 (V2 : données prêtes pour plusieurs appareils) livrés**, en attente de relecture et de fusion (dans l'ordre M7 → M12)
+Dernière mise à jour : 2026-10-14 · Branche : m16-two-way-templates (créée depuis `worktree-deck-builder-plugin`, poussée, non fusionnée) · **V1 (M6) fusionnée sur `main` (PR #1)** · M7 à M12 livrés · **plugin Claude `recto-deck-builder` (branche `worktree-deck-builder-plugin`) et M16 (cartes dans les deux sens dans les types de notes) livrés**, en attente de relecture et de fusion (fusionner `m16-two-way-templates`, qui contient le plugin)
 
 ## Jalon en cours
 
-Aucun : M12 est terminé. V2 décidée par Nicolas le 2026-10-11 (application Android avec Capacitor, publication possible sur le Play Store après un test avec quelques personnes). Plan validé :
+Aucun : M16 est terminé. V2 décidée par Nicolas le 2026-10-11 (application Android avec Capacitor, publication possible sur le Play Store après un test avec quelques personnes). Plan validé :
 
 - M12 (fait) : données prêtes pour plusieurs appareils et pour des testeurs.
 - **M13** : application Android avec Capacitor, la PWA inchangée ; couche plateforme (`saveFile` natif, flux destructifs qui attendent la réussite de la sauvegarde, `lastBackupAt` écrit après l'enregistrement), projet `android/`, bouton retour, micro, lecture automatique des sons, flux Maestro, APK de débogage en CI. **Bloqué par une décision de Nicolas : l'identifiant d'application (`appId`), définitif sur le Play Store** (proposition : `fr.nicolasvergnes.recto`).
@@ -12,6 +12,17 @@ Aucun : M12 est terminé. V2 décidée par Nicolas le 2026-10-11 (application An
 - M15 : transport de la synchronisation (dossier, Drive ou Syncthing), à choisir.
 
 ## Terminé
+
+### M16 — Cartes dans les deux sens dans les types de notes (2026-10-14)
+
+Branche `m16-two-way-templates` (créée depuis `worktree-deck-builder-plugin`). Critères (`docs/07-ROADMAP.md`) :
+
+- [x] Option « Poser dans les deux sens » (`CardTemplate.twoWay`) : rendu à deux faces et alternance comme une note basique (`domain/notes.ts`, `tests/unit/domain/templates.test.ts` › « ask a two-way template by either face »), E2E `tests/e2e/note-types.spec.ts` › « a card asked both ways: one card, turned over after a success » ; vérifié dans l'application avec le paquet Départements (Carte → Nom reste dans son sens, Nom ↔ Numéro revient « ↔ Sens inversé » après une réussite).
+- [x] Carte seulement si les deux faces ont un contenu (`templateOrds`) ; cocher ou décocher garde les cartes (`tests/unit/domain/note-types.test.ts` › « asks a template both ways or one way », « removes a two-way card when its second face is empty »).
+- [x] Sauvegarde schéma 5, lecture des versions précédentes (`tests/unit/import/backup.test.ts` › « reads two-way templates (version 5) », allers-retours avec un modèle à deux sens dans `tests/helpers/generate.ts`), base d'avant M16 (`tests/unit/db/migration.test.ts` › « reads note types stored before M16 »).
+- [x] `.apkg` : `tests/unit/export-apkg.test.ts` › « exports a two-way template as a one-way Anki card that comes back two-way ».
+- [x] Plugin 2.1.0 : `one_way()`, `two_way()`, vérificateur et skill (`tests/unit/deck-builder-plugin.test.ts`) ; paquet Départements : 3 cartes par note.
+- [x] `npm run verify` vert.
 
 ### M12 — Données prêtes pour plusieurs appareils et pour des testeurs (2026-10-12)
 
@@ -272,6 +283,9 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## Décisions prises en session
 
+- 2026-10-14 (M16) : une carte « A ↔ B » d'un type personnalisé est **une seule carte** à deux faces (demande de Nicolas : pas deux cartes A → B et B → A). Option par modèle de carte (`twoWay`), pas par note ni par paquet : c'est la définition de la carte. Ses deux faces s'écrivent seules (`back` = face 2, sans `{{FrontSide}}`), comme Recto/Verso d'une note basique ; alternative écartée : garder la réponse d'Anki et en déduire la face 2 au rendu (fragile). Le sens suit le réglage « Interroger dans les deux sens » du paquet et `sideFlipped`, déjà basculé par les deux planificateurs pour toutes les cartes : rien ne change dans `scheduler/`. La carte existe si ses deux faces passent la règle d'Anki (chacune sera une question). Jumelles : une carte à deux sens demande et révèle les champs de ses deux faces.
+- 2026-10-14 (M16) : **pas de version Dexie** pour `twoWay` (champ facultatif, aucun index, rien à transformer : absent = sens unique, comme avant) ; `SCHEMA_VERSION` 5 pour qu'une version plus ancienne refuse une sauvegarde qui en contient au lieu de poser ces cartes dans un seul sens. Tests : base et sauvegarde d'avant M16 lues telles quelles. Alternative écartée : une `version(4)` Dexie vide, sans rien à migrer.
+- 2026-10-14 (M16) : export `.apkg` d'un modèle à deux sens = carte à sens unique pour Anki (`afmt` = `{{FrontSide}}<hr id=answer>` + face 2) avec la marque `"rectoTwoWay": true` dans le JSON du modèle, relue par l'import de Recto (aller-retour sans perte) ; le plugin écrit la même marque. Anki ignore les clés inconnues des modèles (à vérifier à la main avec le moteur d'Anki, voir plus bas).
 - 2026-10-13 : création de paquets avec l'IA **hors de l'application**, par un plugin Claude autonome (`tools/deck-builder/`, zip `recto-deck-builder.zip`, `npm run plugin:zip`). La spec §2 (« génération de cartes par IA ») et §6 (aucune requête réseau) restent intactes : Recto n'appelle aucune API. Le plugin livre des **`.apkg`** (première version en CSV abandonnée le même jour : le CSV ne porte ni types de notes ni médias, Nicolas veut des paquets clé en main), écrits par une bibliothèque Python sans dépendance (`recto_apkg.py`) qui reprend la forme de l'export `.apkg` de Recto (types intégrés aux identifiants de 05 §4) et vérifie un paquet selon les règles de l'importeur (05 §2.3). Choix : une question à sens unique devient un type personnalisé « Recto · Question » à 4 champs (identifiant fixe 1758758400005), car `oneWay` ne voyage pas dans un `.apkg` et un type de 3 champs au plus serait converti en note basique, posée dans les deux sens ; un type personnalisé a un identifiant dérivé de son nom, pour qu'une réimportation d'un paquet régénéré le retrouve. `tests/unit/deck-builder-plugin.test.ts` lance Python 3 (préinstallé sur le runner de la CI ; `python3` ou `python`) et fait lire ses paquets par l'importeur de Recto : un changement de l'import `.apkg` qui casserait le plugin fait échouer le test. Vérifié dans l'application (Playwright) avec le paquet Départements de Nicolas : 101 notes, 505 cartes, 101 cartes de France.
 - 2026-10-12 : Nicolas garde **la PWA installable** pour l'instant ; la publication sur le Play Store viendra plus tard. M13 (Capacitor) et M14 (publication) sont suspendus, l'`appId` n'a pas à être décidé maintenant. M15 (synchronisation automatique PC ↔ Android) est également en attente : Nicolas teste la PWA telle quelle, fait des évolutions, et en reparlera plus tard. Entre appareils, la sauvegarde `.recto.zip` + « Fusionner » (M12) fait office de synchronisation manuelle.
 - 2026-10-12 (M12) : V2 = application Android avec **Capacitor** (choix de Nicolas, pour permettre plus tard une synchronisation automatique par dossier sur le téléphone, impossible depuis la PWA : pas de File System Access API dans Chrome Android) ; découpage M12 (données), M13 (application), M14 (publication), M15 (transport de la synchronisation).
@@ -415,7 +429,9 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## À vérifier manuellement par Nicolas
 
-- Plugin `recto-deck-builder` — Téléverser `tools/deck-builder/recto-deck-builder.zip` dans l'application Claude (exécution de code activée), redemander le paquet des départements (note Carte, Nom, Numéro, Préfecture ; cartes Carte → Nom, Nom ↔ Numéro, Nom ↔ Préfecture) : le résultat doit être un seul `.apkg` (type « Département », 5 cartes par note, images comprises) qui s'importe par Importer › Paquet Anki sans rien terminer à la main.
+- M16 — Dans un type de note, cocher « Poser dans les deux sens » sur une carte, réviser : après « Bien », la carte revient dans l'autre sens (« ↔ Sens inversé ») ; les autres cartes du type restent dans leur sens. Exporter un tel type en `.apkg` et l'importer dans Anki : une carte à sens unique (face 1 → face 2), sans erreur.
+- M16 — Paquet `paquets/departements.apkg` (101 notes, 3 cartes par note : Carte → Nom, Nom ↔ Numéro, Nom ↔ Préfecture) : si la version d'hier (5 cartes par note) a été importée, supprimer d'abord le paquet « Départements » et le type « Département » (une réimportation garde les modèles d'un type déjà présent).
+- Plugin `recto-deck-builder` — Téléverser `tools/deck-builder/recto-deck-builder.zip` dans l'application Claude (exécution de code activée), redemander le paquet des départements (note Carte, Nom, Numéro, Préfecture ; cartes Carte → Nom, Nom ↔ Numéro, Nom ↔ Préfecture) : le résultat doit être un seul `.apkg` (type « Département », 3 cartes par note dont deux posées dans les deux sens, images comprises) qui s'importe par Importer › Paquet Anki sans rien terminer à la main.
 - M12 — Sur le PC et le téléphone (PWA) : faire une sauvegarde de chaque côté, supprimer une note sur l'un, puis fusionner la sauvegarde de l'autre : la note ne revient pas ; fusionner dans l'autre sens : elle disparaît aussi (le rapport l'indique). La première ouverture après la mise à jour migre la base (aucune action, rien ne doit changer à l'écran).
 - (Suspendu) M13 — décider l'identifiant d'application Android (`appId`) quand la publication sur le Play Store sera reprise.
 - M11 — Effacer les données de test (« Tout effacer ») avant d'essayer : les anciennes notes « Basique + inverse » ne sont plus lues. Réviser une note basique dans un paquet FSRS : après une réussite, elle revient retournée (« ↔ Sens inversé ») ; cocher « Ne jamais retourner cette note » sur une autre.

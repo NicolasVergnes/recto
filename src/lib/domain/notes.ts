@@ -122,7 +122,8 @@ export function reconcileCards<C extends ReconcilableCard>(
  * front→back and back→front, so reviewing both the same day gives the second answer away.
  * Cloze and occlusion cards reveal each other's answers and stay twins. Custom: a template asks
  * the fields of its question and answers those its answer adds; numéro→nom and nom→numéro are
- * twins, carte→nom and numéro→nom are not.
+ * twins, carte→nom and numéro→nom are not. A two-way template (M16) asks and answers the fields
+ * of both faces: nom↔numéro and nom↔préfecture are twins, carte→nom and nom↔numéro are not.
  */
 export function areTwins(
   modelType: ModelType,
@@ -134,6 +135,11 @@ export function areTwins(
   if (modelType !== 'custom') return true
   const sides = (ord: number) => {
     const t = noteType?.templates[ord]
+    // A two-way card (M16) asks either face and answers with the other: its fields are both.
+    if (t?.twoWay) {
+      const both = new Set([...referencedFields(t.front), ...referencedFields(t.back)])
+      return { asked: both, answered: both }
+    }
     const asked = new Set(t ? referencedFields(t.front) : [])
     const answered = new Set(t ? referencedFields(t.back).filter((f) => !asked.has(f)) : [])
     return { asked, answered }
@@ -178,14 +184,17 @@ export interface RenderedCard {
 
 /**
  * Question/answer of a custom note's card: its template rendered like Anki, the answer side
- * replacing the question (it usually repeats it through `{{FrontSide}}`).
+ * replacing the question (it usually repeats it through `{{FrontSide}}`). A two-way template
+ * (M16) is rendered like a basic note: one face asked, the other below it once revealed, turned
+ * over with `flip` (the deck's `alternateSides`) and `sideFlipped`.
  */
 function renderCustom(
   fields: readonly string[],
-  ord: number,
+  card: Pick<Card, 'ord' | 'sideFlipped'>,
+  flip: boolean,
   noteType: TypeShape | undefined,
 ): RenderedCard {
-  const template = noteType?.templates[ord]
+  const template = noteType?.templates[card.ord]
   if (!noteType || !template) {
     return {
       question: '',
@@ -197,6 +206,19 @@ function renderCustom(
     }
   }
   const values = fieldValues(noteType.fields, fields)
+  if (template.twoWay) {
+    const faces = [renderTemplate(template.front, values), renderTemplate(template.back, values)]
+    const flipped = flip && card.sideFlipped
+    const [question = '', answer = ''] = flipped ? faces.reverse() : faces
+    return {
+      question,
+      answer,
+      extra: '',
+      answerReplacesQuestion: false,
+      flipped,
+      expected: answer,
+    }
+  }
   const question = renderTemplate(template.front, values)
   const typed = typedField(template)
   return {
@@ -211,8 +233,8 @@ function renderCustom(
 
 /**
  * Question/answer of a card. `flip` (the deck's `alternateSides`) applies `sideFlipped` to a basic
- * note that is not `oneWay`; cloze, occlusion and custom notes keep their templates' side (03 §1.1).
- * A custom note needs its note type.
+ * note that is not `oneWay` and to a two-way template of a custom note (M16); cloze, occlusion and
+ * one-way templates keep their side (03 §1.1). A custom note needs its note type.
  */
 export function renderCard(
   note: Pick<Note, 'modelType' | 'fields' | 'oneWay'>,
@@ -220,7 +242,7 @@ export function renderCard(
   flip = false,
   noteType?: TypeShape,
 ): RenderedCard {
-  if (note.modelType === 'custom') return renderCustom(note.fields, card.ord, noteType)
+  if (note.modelType === 'custom') return renderCustom(note.fields, card, flip, noteType)
   const [f0 = '', f1 = '', f2 = '', f3 = ''] = note.fields
   if (note.modelType === 'image_occlusion') {
     const occlusion = parseOcclusion(f1)

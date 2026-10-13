@@ -64,7 +64,8 @@ function json(entries: Record<string, Uint8Array>, name: string): unknown {
  * Older schema versions are migrated here with the same steps as the Dexie `upgrade()` functions
  * (05 §3). 1 → 2 only adds a note type and 2 → 3 the `noteTypes` table (absent: none); 3 → 4
  * (M12) dates the cards like the Dexie version 3 upgrade (`readCard`) and has no deletions
- * (absent: none). Older data is valid as is.
+ * (absent: none); 4 → 5 (M16) has no two-way template (absent: one way). Older data is valid as
+ * is.
  */
 function migrate(data: Record<string, unknown>, _fromVersion: number): Record<string, unknown> {
   return data

@@ -288,6 +288,11 @@ export const fr = {
     cardName: 'Nom de la carte',
     question: 'Recto (question)',
     answer: 'Verso (réponse)',
+    twoWay: 'Poser dans les deux sens',
+    twoWayHelp:
+      'Une seule carte, demandée par une face puis par l’autre après chaque réussite (réglage « Interroger dans les deux sens » du paquet). Chaque face s’écrit seule, sans {{FrontSide}}.',
+    face1: 'Face 1',
+    face2: 'Face 2',
     addCard: 'Ajouter une carte',
     removeCard: 'Retirer la carte « {name} »',
     moveCardUp: 'Monter la carte « {name} »',

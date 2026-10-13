@@ -61,4 +61,21 @@ describe('areTwins (03 §5.2)', () => {
     expect(areTwins('custom', 0, 5, type)).toBe(false)
     expect(areTwins('custom', 0, 1)).toBe(false)
   })
+
+  it('pairs two-way cards through the fields of both faces (M16)', () => {
+    const type = {
+      fields: ['Carte', 'Nom', 'Numéro', 'Préfecture'],
+      templates: [
+        { name: 'Carte → Nom', front: '{{Carte}}', back: '{{FrontSide}}<hr id=answer>{{Nom}}' },
+        { name: 'Nom ↔ Numéro', front: '{{Nom}}', back: '{{Numéro}}', twoWay: true },
+        { name: 'Nom ↔ Préfecture', front: '{{Nom}}', back: '{{Préfecture}}', twoWay: true },
+        { name: 'Numéro → Carte', front: '{{Numéro}}', back: '{{FrontSide}}<hr>{{Carte}}' },
+      ],
+    }
+    const twins = (a: number, b: number) => areTwins('custom', a, b, type)
+    expect(twins(1, 2)).toBe(true) // both show and ask the name
+    expect(twins(0, 1)).toBe(false) // the map is never shown by nom ↔ numéro
+    expect(twins(0, 2)).toBe(false)
+    expect(twins(1, 3)).toBe(false) // numéro → carte never answers nom nor numéro
+  })
 })

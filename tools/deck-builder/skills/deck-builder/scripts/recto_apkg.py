@@ -9,20 +9,20 @@ personnalisés (plusieurs champs, une carte par modèle), images, sons, formules
 Construire :
 
     import sys; sys.path.insert(0, "<dossier du skill>/scripts")
-    from recto_apkg import Package, Mask, img, sound
+    from recto_apkg import Package, Mask, img, sound, one_way, two_way
 
     pkg = Package()
     pays = pkg.note_type(
         "Pays",
-        fields=["Drapeau", "Pays", "Capitale"],
+        fields=["Drapeau", "Pays", "Capitale", "Continent"],
         templates=[
-            ("Drapeau → Pays", "{{Drapeau}}<br>Quel pays ?", "{{FrontSide}}<hr id=answer>{{Pays}}"),
-            ("Pays → Capitale", "Capitale : {{Pays}} ?", "{{FrontSide}}<hr id=answer>{{Capitale}}"),
+            one_way("Drapeau → Pays", "{{Drapeau}}<br>Quel pays ?", "{{FrontSide}}<hr id=answer>{{Pays}}"),
+            two_way("Pays ↔ Capitale", "{{Pays}}", "{{Capitale}}"),   # une carte, posée dans les deux sens
         ],
     )
     drapeau = pkg.add_media("drapeau_fr.png")          # chemin d'un fichier, ou (bytes, name=…)
     pkg.add_note(pays, "Géographie::Pays", {"Drapeau": img(drapeau, "Drapeau"), "Pays": "France",
-                                            "Capitale": "Paris"}, tags=["europe"])
+                                            "Capitale": "Paris", "Continent": "Europe"}, tags=["europe"])
     pkg.write("paquet.apkg")   # vérifie, affiche le rapport, lève DeckError en cas d'erreur
 
 Vérifier un .apkg (celui-ci ou un autre) : python recto_apkg.py check paquet.apkg
@@ -43,6 +43,7 @@ import time
 import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import NamedTuple
 
 __all__ = [
     "DeckError",
@@ -50,11 +51,14 @@ __all__ = [
     "NoteType",
     "Package",
     "Report",
+    "Template",
     "check_apkg",
     "check_bytes",
     "image_size",
     "img",
+    "one_way",
     "sound",
+    "two_way",
 ]
 
 
@@ -239,16 +243,52 @@ def referenced_fields(template: str) -> list[str]:
     return names
 
 
-def template_ords(fields: list[str], templates: list[tuple[str, str, str]], values: list[str]) -> list[int]:
-    """Cartes d'une note : un modèle dont la question n'est pas vide et dépend de la note."""
+class Template(NamedTuple):
+    """Modèle de carte : nom, question (ou face 1), réponse (ou face 2), posé dans les deux sens."""
+
+    name: str
+    front: str
+    back: str
+    two_way: bool = False
+
+
+def one_way(name: str, question: str, answer: str) -> Template:
+    """Carte toujours posée dans le même sens (« A → B ») ; la réponse reprend la question par
+    {{FrontSide}} : "{{FrontSide}}<hr id=answer>{{B}}"."""
+    return Template(name, question, answer)
+
+
+def two_way(name: str, face1: str, face2: str) -> Template:
+    """Une seule carte posée dans les deux sens (« A ↔ B ») : la face 1 est demandée, puis la face 2
+    après une réussite (réglage « Interroger dans les deux sens » du paquet, actif par défaut).
+    Chaque face s'écrit seule, sans {{FrontSide}}."""
+    return Template(name, face1, face2, True)
+
+
+ANSWER_OPENING = re.compile(r"^\s*\{\{\s*FrontSide\s*\}\}\s*(?:<hr\b[^>]*>\s*)?", re.I)
+
+
+def face_of_answer(back: str) -> str:
+    """Face 2 d'un modèle à deux sens à partir de la réponse d'Anki (son ouverture retirée)."""
+    return ANSWER_OPENING.sub("", back, count=1)
+
+
+def answer_of_face(face: str) -> str:
+    """Réponse d'Anki pour la face 2 d'un modèle à deux sens (Recto, src/lib/domain/templates.ts)."""
+    return "{{FrontSide}}\n\n<hr id=answer>\n\n" + face
+
+
+def template_ords(fields: list[str], templates: list[Template], values: list[str]) -> list[int]:
+    """Cartes d'une note : un modèle dont la question n'est pas vide et dépend de la note ; un modèle
+    à deux sens demande ses deux faces, il faut donc que chacune le permette."""
     filled = {n: (values[i] if i < len(values) else "") for i, n in enumerate(fields)}
     blank = {n: "" for n in fields}
-    ords = []
-    for i, (_, front, _back) in enumerate(templates):
-        q = render_template(front, filled)
-        if not is_empty_field(q) and q != render_template(front, blank):
-            ords.append(i)
-    return ords
+
+    def asks(side: str) -> bool:
+        q = render_template(side, filled)
+        return not is_empty_field(q) and q != render_template(side, blank)
+
+    return [i for i, t in enumerate(templates) if asks(t.front) and (not t.two_way or asks(t.back))]
 
 
 def cloze_indices(text: str) -> list[int]:
@@ -348,7 +388,7 @@ class NoteType:
     id: int
     name: str
     fields: list[str]
-    templates: list[tuple[str, str, str]]
+    templates: list[Template]
     kind: str  # basic, question, cloze, occlusion, custom
     css: str = CSS
     mod: int = BUILT_IN_MOD
@@ -389,7 +429,7 @@ class Mask:
         )
 
 
-def _classify(model_type: int, fields: list[str], templates: list[tuple[str, str, str]]) -> str:
+def _classify(model_type: int, fields: list[str], templates: list[Template]) -> str:
     """Ce que Recto fait d'un type Anki (src/lib/import/apkg.ts, convertModel)."""
     if model_type == 1 and any("image-occlusion" in t[1] for t in templates):
         return "occlusion"
@@ -410,7 +450,7 @@ BASIC = NoteType(
     BASIC_ID,
     "Recto · Basique",
     ["Recto", "Verso", "Extra"],
-    [("Recto → Verso", "{{Recto}}", "{{FrontSide}}\n\n<hr id=answer>\n\n{{Verso}}" + EXTRA)],
+    [Template("Recto → Verso", "{{Recto}}", "{{FrontSide}}\n\n<hr id=answer>\n\n{{Verso}}" + EXTRA)],
     "basic",
 )
 QUESTION = NoteType(
@@ -418,7 +458,7 @@ QUESTION = NoteType(
     "Recto · Question",
     ["Question", "Réponse", "Explication", "Source"],
     [
-        (
+        Template(
             "Question → Réponse",
             "{{Question}}",
             "{{FrontSide}}\n\n<hr id=answer>\n\n{{Réponse}}"
@@ -432,14 +472,14 @@ CLOZE = NoteType(
     CLOZE_ID,
     "Recto · Texte à trous",
     ["Texte", "Extra"],
-    [("Texte à trous", "{{cloze:Texte}}", "{{cloze:Texte}}" + EXTRA)],
+    [Template("Texte à trous", "{{cloze:Texte}}", "{{cloze:Texte}}" + EXTRA)],
     "cloze",
 )
 OCCLUSION = NoteType(
     OCCLUSION_ID,
     "Recto · Occlusion d’image",
     ["Occlusion", "Image", "Header", "Back Extra", "Comments"],
-    [("Image Occlusion", IO_FRONT, IO_BACK)],
+    [Template("Image Occlusion", IO_FRONT, IO_BACK)],
     "occlusion",
     css=IO_CSS,
 )
@@ -455,10 +495,12 @@ def _field_name_problem(name: str) -> str | None:
     return None
 
 
-def _template_problems(fields: list[str], templates: list[tuple[str, str, str]]) -> list[str]:
+def _template_problems(fields: list[str], templates: list[Template]) -> list[str]:
     problems = []
     known = set(fields) | SPECIAL_FIELDS
-    for name, front, back in templates:
+    for name, front, back, both in templates:
+        if both and any(re.search(r"\{\{\s*FrontSide\s*\}\}", side) for side in (front, back)):
+            problems.append(f"le modèle à deux sens « {name} » : chaque face s'écrit seule, sans {{{{FrontSide}}}}")
         for side in (front, back):
             for ref in referenced_fields(side):
                 if ref not in known:
@@ -580,14 +622,17 @@ class Package:
         self,
         name: str,
         fields: list[str],
-        templates: list[tuple[str, str, str]],
+        templates: list,
         css: str | None = None,
     ) -> NoteType:
-        """Type de note personnalisé : `templates` = [(nom de la carte, question, réponse), …].
+        """Type de note personnalisé : `templates` = [one_way(…) ou two_way(…), …] ; un tuple
+        (nom, question, réponse) vaut one_way.
 
-        Une carte par modèle dont la question rendue n'est pas vide. Syntaxe : {{Champ}},
-        {{FrontSide}} (la question, dans la réponse), {{#Champ}}…{{/Champ}} (si rempli),
-        {{^Champ}}…{{/Champ}} (si vide), {{text:Champ}}, {{type:Champ}} (réponse tapée).
+        one_way : une carte par modèle dont la question rendue n'est pas vide. two_way : une seule
+        carte, demandée par une face puis par l'autre ; elle existe si ses deux faces ont un contenu.
+        Syntaxe : {{Champ}}, {{FrontSide}} (la question, dans la réponse d'un one_way),
+        {{#Champ}}…{{/Champ}} (si rempli), {{^Champ}}…{{/Champ}} (si vide), {{text:Champ}},
+        {{type:Champ}} (champ attendu en réponse tapée).
         """
         name = name.strip()
         fields = [str(f).strip() for f in fields]
@@ -601,7 +646,10 @@ class Package:
             problems.append("deux champs portent le même nom (sans tenir compte de la casse)")
         if not templates:
             problems.append("au moins un modèle de carte est nécessaire")
-        templates = [(str(n).strip() or f"Carte {i + 1}", q, r) for i, (n, q, r) in enumerate(templates)]
+        templates = [
+            Template(str(t[0]).strip() or f"Carte {i + 1}", t[1], t[2], bool(t[3]) if len(t) > 3 else False)
+            for i, t in enumerate(templates)
+        ]
         problems += _template_problems(fields, templates)
         if problems:
             raise DeckError(f"type « {name} » : " + " ; ".join(problems))
@@ -894,14 +942,16 @@ def _model_json(t: NoteType) -> dict:
          **({"tag": i, "preventDeletion": i < 4} if occlusion else {})}
         for i, f in enumerate(t.fields)
     ]
+    # Deux sens (Recto M16) : Anki pose la face 1 et répond par la face 2 ; la marque rectoTwoWay
+    # rend l'option à Recto (src/lib/export/apkg.ts).
     tmpls = [
-        {"name": n, "ord": i, "qfmt": q, "afmt": a, "bqfmt": "", "bafmt": "", "did": None, "bfont": "",
-         "bsize": 0}
-        for i, (n, q, a) in enumerate(t.templates)
+        {"name": n, "ord": i, "qfmt": q, "afmt": answer_of_face(a) if both else a, "bqfmt": "", "bafmt": "",
+         "did": None, "bfont": "", "bsize": 0, **({"rectoTwoWay": True} if both else {})}
+        for i, (n, q, a, both) in enumerate(t.templates)
     ]
     req = [
-        [i, "any", [t.fields.index(f) for f in referenced_fields(q) if f in t.fields]]
-        for i, (_, q, _a) in enumerate(t.templates)
+        [i, "any", [t.fields.index(f) for f in referenced_fields(tpl.front) if f in t.fields]]
+        for i, tpl in enumerate(t.templates)
     ]
     if t.kind == "cloze":
         req = [[0, "any", [0]]]
@@ -1045,8 +1095,12 @@ def check_bytes(data: bytes) -> Report:
     models = {}
     for mid, m in json.loads(models_json).items():
         flds = [f["name"] for f in sorted(m.get("flds", []), key=lambda f: f.get("ord", 0))]
-        tmpls = [(t.get("name", ""), t.get("qfmt", ""), t.get("afmt", ""))
-                 for t in sorted(m.get("tmpls", []), key=lambda t: t.get("ord", 0))]
+        tmpls = [
+            Template(t.get("name", ""), t.get("qfmt", ""), face_of_answer(t.get("afmt", "")), True)
+            if t.get("rectoTwoWay") is True
+            else Template(t.get("name", ""), t.get("qfmt", ""), t.get("afmt", ""))
+            for t in sorted(m.get("tmpls", []), key=lambda t: t.get("ord", 0))
+        ]
         kind = _classify(int(m.get("type", 0)), flds, tmpls)
         models[str(mid)] = (m.get("name", "?"), flds, tmpls, kind)
     deck_names = {str(k): v.get("name", "?") for k, v in json.loads(decks_json).items()}
@@ -1060,8 +1114,8 @@ def check_bytes(data: bytes) -> Report:
             continue
         for p in [p for p in (_field_name_problem(f) for f in flds) if p] + _template_problems(flds, tmpls):
             r.error(f"type « {name} » : {p}")
-        for _, q, a in tmpls:
-            for key, ex in _html_problems(q + a):
+        for tpl in tmpls:
+            for key, ex in _html_problems(tpl.front + tpl.back):
                 r.warn(f"type « {name} » : {key}", ex)
 
     cards_per_deck: dict[str, int] = {}
@@ -1129,9 +1183,13 @@ def check_bytes(data: bytes) -> Report:
             for o in ords[:6]:
                 if kind == "custom":
                     vals = dict(zip(mfields, values))
-                    q = render_template(tmpls[o][1], vals)
-                    a = render_template(tmpls[o][2], vals, front_side="")
-                    shown.append(f"    [{tmpls[o][0]}] Q : {_preview(q)} | R : {_preview(a)}")
+                    q = render_template(tmpls[o].front, vals)
+                    a = render_template(tmpls[o].back, vals, front_side="")
+                    if tmpls[o].two_way:
+                        shown.append(f"    [{tmpls[o].name}] {_preview(q)} ↔ {_preview(a)} "
+                                     "(une carte : l'une ou l'autre face est demandée)")
+                    else:
+                        shown.append(f"    [{tmpls[o].name}] Q : {_preview(q)} | R : {_preview(a)}")
                 elif kind == "cloze":
                     answers = [m.group(2) for m in CLOZE_RE.finditer(values[0]) if int(m.group(1)) == o + 1]
                     shown.append(f"    [trou {o + 1}] Q : {_preview(_cloze_side(values[0], o + 1, False), 140)}"
@@ -1181,7 +1239,8 @@ def check_bytes(data: bytes) -> Report:
         desc = kinds.get(kind, "")
         if kind == "custom":
             desc = ("question à sens unique" if int(mid) == QUESTION_ID else
-                    f"type personnalisé, {len(tmpls)} modèle(s) : " + ", ".join(t[0] for t in tmpls))
+                    f"type personnalisé, {len(tmpls)} carte(s) par note : "
+                    + ", ".join(f"{t.name} (deux sens)" if t.two_way else t.name for t in tmpls))
         r.lines.append(f"  {name} ({notes_per_model[mid]} notes) : {desc}")
         r.lines += previews.get(mid, [])
     return r

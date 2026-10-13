@@ -292,7 +292,10 @@ export function readNoteType(x: unknown): NoteType | null {
   const templates: CardTemplate[] = []
   for (const t of x.templates) {
     if (!isObj(t) || !isStr(t.name) || !isStr(t.front) || !isStr(t.back)) return null
-    templates.push({ name: t.name, front: t.front, back: t.back })
+    const template: CardTemplate = { name: t.name, front: t.front, back: t.back }
+    // M16: a two-way template; any other value (absent before schema 5) asks it one way.
+    if (t.twoWay === true) template.twoWay = true
+    templates.push(template)
   }
   if (x.fields.length === 0 || templates.length === 0) return null
   const type: NoteType = {

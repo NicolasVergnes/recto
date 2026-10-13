@@ -77,17 +77,17 @@ export function validateNoteType(
   return null
 }
 
+/** A template as stored: `twoWay` only when set (M16), the name trimmed. */
+export function storedTemplate({ name, front, back, twoWay }: CardTemplate): CardTemplate {
+  return twoWay ? { name: name.trim(), front, back, twoWay } : { name: name.trim(), front, back }
+}
+
 /** The edit of a stored type that changes nothing (the editor's starting point). */
 export function editOf(type: Pick<NoteType, 'name' | 'fields' | 'templates'>): NoteTypeEdit {
   return {
     name: type.name,
     fields: type.fields.map((name, i) => ({ name, from: i })),
-    templates: type.templates.map((t, i) => ({
-      name: t.name,
-      front: t.front,
-      back: t.back,
-      from: i,
-    })),
+    templates: type.templates.map((t, i) => ({ ...storedTemplate(t), name: t.name, from: i })),
   }
 }
 
@@ -121,7 +121,7 @@ export function planNoteTypeEdit(
     ...type,
     name: edit.name.trim(),
     fields: edit.fields.map((f) => f.name.trim()),
-    templates: edit.templates.map(({ name, front, back }) => ({ name: name.trim(), front, back })),
+    templates: edit.templates.map(storedTemplate),
     updatedAt: now,
   }
   // Anki's sort field follows its field; a removed one falls back to the first (M10).

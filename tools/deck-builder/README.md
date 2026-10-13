@@ -10,7 +10,7 @@ Plugin Claude (application bureau, claude.ai ou Claude Code) qui crée des paque
 - `skills/deck-builder/scripts/recto_apkg.py` : bibliothèque Python (bibliothèque standard seulement) qui écrit le `.apkg` sous la forme exacte de l'export de Recto et le vérifie selon les règles de son importeur ; `python recto_apkg.py check x.apkg` vérifie un paquet existant.
 - `skills/deck-builder/examples/exemple.py` : un paquet qui utilise chaque type de note (personnalisé avec images, basique, question, texte à trous, occlusion).
 
-Ce que le paquet peut contenir : notes basiques (posées dans les deux sens), questions à sens unique, texte à trous, occlusion d'image (masques et réponses), types de notes personnalisés (plusieurs champs, une carte par modèle, réponse tapée), images, sons, formules, sous-paquets, tags, cartes suspendues. Ce qui reste un réglage de Recto : le planificateur (choisi à l'import) et les réglages de paquet.
+Ce que le paquet peut contenir : notes basiques (posées dans les deux sens), questions à sens unique, texte à trous, occlusion d'image (masques et réponses), types de notes personnalisés (plusieurs champs, une carte par modèle, chaque carte posée dans un seul sens, « A → B », ou dans les deux, « A ↔ B » : une seule carte qui alterne), images, sons, formules, sous-paquets, tags, cartes suspendues. Ce qui reste un réglage de Recto : le planificateur (choisi à l'import) et les réglages de paquet.
 
 ## Garanties
 

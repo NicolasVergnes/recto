@@ -57,11 +57,27 @@
         </div>
       </div>
       <div class="field">
-        <label for="{uid}-{i}-front">{t('noteTypes.question')}</label>
+        <label class="check">
+          <input
+            type="checkbox"
+            checked={!!template.twoWay}
+            aria-describedby="{uid}-{i}-two-way-help"
+            onchange={(e) => draft.setTwoWay(i, e.currentTarget.checked)}
+          />
+          {t('noteTypes.twoWay')}
+        </label>
+        <p id="{uid}-{i}-two-way-help" class="muted small">{t('noteTypes.twoWayHelp')}</p>
+      </div>
+      <div class="field">
+        <label for="{uid}-{i}-front"
+          >{t(template.twoWay ? 'noteTypes.face1' : 'noteTypes.question')}</label
+        >
         <textarea id="{uid}-{i}-front" class="code" rows="3" bind:value={template.front}></textarea>
       </div>
       <div class="field">
-        <label for="{uid}-{i}-back">{t('noteTypes.answer')}</label>
+        <label for="{uid}-{i}-back"
+          >{t(template.twoWay ? 'noteTypes.face2' : 'noteTypes.answer')}</label
+        >
         <textarea id="{uid}-{i}-back" class="code" rows="3" bind:value={template.back}></textarea>
       </div>
     </fieldset>

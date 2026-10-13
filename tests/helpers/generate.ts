@@ -60,7 +60,8 @@ export async function generateCollection(db: RectoDB, seed: string) {
         front: 'Capitale de {{Pays}} ?',
         back: '{{FrontSide}}<hr id=answer>{{Capitale}}',
       },
-      { name: 'Pays', front: '{{Capitale}} ?', back: '{{Pays}}' },
+      // M16: asked both ways, one card (the round trips keep the option).
+      { name: 'Pays ↔ Capitale', front: '{{Capitale}}', back: '{{Pays}}', twoWay: true },
     ],
     sourceId: 1342697561419,
     createdAt: t0,

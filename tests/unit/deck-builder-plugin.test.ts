@@ -88,16 +88,24 @@ describe('deck-builder plugin: the example package', () => {
     expect(kinds.filter((k) => k === 'basic')).toHaveLength(2)
     expect(kinds.filter((k) => k === 'cloze')).toHaveLength(1)
     expect(kinds.filter((k) => k === 'image_occlusion')).toHaveLength(1)
-    // 4 countries × 3 templates, 2 basic, 1 question, 2 holes, 4 masks.
-    expect(plan.cards).toHaveLength(21)
+    // 4 countries × 2 cards (Drapeau → Pays, Pays ↔ Capitale), 2 basic, 1 question, 2 holes,
+    // 4 masks.
+    expect(plan.cards).toHaveLength(17)
 
     const country = plan.noteTypes?.find((t) => t.name === "Pays d'Europe")
-    expect(country?.fields).toEqual(['Drapeau', 'Pays', 'Capitale'])
-    expect(country?.templates.map((t) => t.name)).toEqual([
-      'Drapeau → Pays',
-      'Pays → Capitale',
-      'Capitale → Pays',
-    ])
+    expect(country?.fields).toEqual(['Drapeau', 'Pays', 'Capitale', 'Continent'])
+    expect(country?.templates[0]).toEqual({
+      name: 'Drapeau → Pays',
+      front: '{{Drapeau}}<br>Quel pays ?',
+      back: '{{FrontSide}}<hr id=answer>{{Pays}}<br>{{Continent}}',
+    })
+    // « Pays ↔ Capitale »: one card, asked by either face (M16).
+    expect(country?.templates[1]).toEqual({
+      name: 'Pays ↔ Capitale',
+      front: '{{Pays}}',
+      back: '{{Capitale}}',
+      twoWay: true,
+    })
     const france = plan.notes.find((n) => n.fields[1] === 'France')
     expect(france?.fields[0]).toBe(
       '<img src="drapeau_france.svg" alt="Drapeau à bandes verticales">',
@@ -144,11 +152,9 @@ describe('deck-builder plugin: regenerating a package', () => {
   const deck = (now: number, prefecture: string) => `
 pkg = Package(now=${now})
 t = pkg.note_type("Département", ["Carte", "Nom", "Numéro", "Préfecture"], [
-    ("Carte → Nom", "{{Carte}}<br>Quel département ?", "{{FrontSide}}<hr id=answer>{{Nom}}"),
-    ("Nom → Numéro", "Numéro : {{Nom}} ?", "{{FrontSide}}<hr id=answer>{{Numéro}}"),
-    ("Numéro → Nom", "Département n° {{Numéro}} ?", "{{FrontSide}}<hr id=answer>{{Nom}}"),
-    ("Nom → Préfecture", "Préfecture : {{Nom}} ?", "{{FrontSide}}<hr id=answer>{{Préfecture}}"),
-    ("Préfecture → Nom", "{{Préfecture}} est la préfecture de… ?", "{{FrontSide}}<hr id=answer>{{Nom}}"),
+    one_way("Carte → Nom", "{{Carte}}<br>Quel département ?", "{{FrontSide}}<hr id=answer>{{Nom}}"),
+    two_way("Nom ↔ Numéro", "{{Nom}}", "{{Numéro}}"),
+    two_way("Nom ↔ Préfecture", "{{Nom}}", "{{Préfecture}}"),
 ])
 carte = pkg.add_media(b"\\x89PNG\\r\\n\\x1a\\n" + bytes(8) + bytes([0,0,0,10,0,0,0,10]), name="departement_95.png")
 pkg.add_note(t, "Géographie::Départements", {"Carte": img(carte, "Carte"), "Nom": "Val-d'Oise",
@@ -164,7 +170,13 @@ pkg.write(sys.argv[2])
 
     const first = await planApkgImport(read('v1.apkg'), options, empty, now, newId)
     expect(first.report.errors).toEqual([])
-    expect(first.cards).toHaveLength(6)
+    // Carte → Nom, Nom ↔ Numéro, Nom ↔ Préfecture: three cards, two of them asked both ways.
+    expect(first.noteTypes?.[0]?.templates.map((t) => [t.name, t.twoWay ?? false])).toEqual([
+      ['Carte → Nom', false],
+      ['Nom ↔ Numéro', true],
+      ['Nom ↔ Préfecture', true],
+    ])
+    expect(first.cards).toHaveLength(4)
     expect(first.report.missingMedia).toEqual([])
     expect(first.media.map((m) => [m.name, m.mime]).sort()).toEqual([
       ['bonjour.mp3', 'audio/mpeg'],
@@ -214,6 +226,7 @@ pkg = Package()
 refused(lambda: pkg.note_type("Paire", ["A", "B"], [("A → B", "{{A}}", "{{B}}")]))
 refused(lambda: pkg.note_type("Inconnu", ["A", "B", "C", "D"], [("A", "{{A}} {{Z}}", "{{B}}")]))
 refused(lambda: pkg.note_type("Trous", ["A", "B", "C", "D"], [("A", "{{cloze:A}}", "{{B}}")]))
+refused(lambda: pkg.note_type("Faces", ["A", "B", "C", "D"], [two_way("A ↔ B", "{{A}}", "{{FrontSide}}{{B}}")]))
 refused(lambda: pkg.add_media(b"RIFF", name="son.wav"))
 refused(lambda: pkg.add_cloze("P", "pas de trou"))
 refused(lambda: pkg.add_occlusion("P", "absente.png", [Mask(1, 0.1, 0.1, 0.2, 0.2)]))
@@ -226,7 +239,7 @@ refused(lambda: pkg.add_basic("P", "<img src='manque.png' alt='x'>", "v") or pkg
     )
     expect(r.status).toBe(0)
     expect(r.out).not.toContain('ACCEPTÉ')
-    expect(r.out.match(/refusé :/g)).toHaveLength(9)
+    expect(r.out.match(/refusé :/g)).toHaveLength(10)
   })
 
   it('check: refuses the zstd format and accepts a package exported by Anki', () => {

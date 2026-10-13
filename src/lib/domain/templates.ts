@@ -59,6 +59,7 @@ export function renderTemplate(template: string, values: FieldValues, frontSide 
 /**
  * Templates that make a card (Anki's rule): the question must show something that comes from
  * the note, i.e. not be empty and differ from the question rendered with every field empty.
+ * A two-way template (M16) asks both faces in turn: each of them must pass that rule.
  */
 export function templateOrds(
   type: Pick<NoteType, 'fields' | 'templates'>,
@@ -66,12 +67,28 @@ export function templateOrds(
 ): number[] {
   const values = fieldValues(type.fields, fields)
   const blank = fieldValues(type.fields, [])
+  const asks = (side: string) => {
+    const rendered = renderTemplate(side, values)
+    return !isEmptyField(rendered) && rendered !== renderTemplate(side, blank)
+  }
   const ords: number[] = []
   type.templates.forEach((t, ord) => {
-    const front = renderTemplate(t.front, values)
-    if (!isEmptyField(front) && front !== renderTemplate(t.front, blank)) ords.push(ord)
+    if (asks(t.front) && (!t.twoWay || asks(t.back))) ords.push(ord)
   })
   return ords
+}
+
+/** Anki's answer opening: the question repeated (`{{FrontSide}}`), then its separator. */
+const ANSWER_OPENING = /^\s*\{\{\s*FrontSide\s*\}\}\s*(?:<hr\b[^>]*>\s*)?/i
+
+/** The second face of a two-way template from a one-way answer (M16): its opening removed. */
+export function faceOfAnswer(back: string): string {
+  return back.replace(ANSWER_OPENING, '')
+}
+
+/** A one-way answer from the second face of a two-way template: the question, a line, the face. */
+export function answerOfFace(face: string): string {
+  return `{{FrontSide}}\n\n<hr id=answer>\n\n${face}`
 }
 
 /** The field a template asks to type (`{{type:Champ}}`, question first), or null. */

@@ -51,11 +51,17 @@ export interface Deck {
   updatedAt: number
 }
 
-/** One card of a custom note type: question and answer templates (Anki syntax, templates.ts). */
+/**
+ * One card of a custom note type: question and answer templates (Anki syntax, templates.ts).
+ * `twoWay` (M16): `front` and `back` are two faces, each asked in turn like a basic note's
+ * sides (deck `alternateSides`); `back` then holds the second face only, without `{{FrontSide}}`.
+ * Absent: asked one way, as before M16.
+ */
 export interface CardTemplate {
   name: string
   front: string
   back: string
+  twoWay?: boolean
 }
 
 /** A note type with named fields and one card per template, like Anki's (02 §2.2, M8). */
@@ -139,7 +145,7 @@ export interface Card {
   // Leitner
   /** 0 = not applicable / new, 1..7. */
   box: number
-  /** Deck `alternateSides`: true = asks back→front (basic notes only). */
+  /** Deck `alternateSides`: true = asks back→front (basic notes and two-way templates, M16). */
   sideFlipped: boolean
   createdAt: number
   /**

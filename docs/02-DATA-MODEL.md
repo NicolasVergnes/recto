@@ -202,7 +202,7 @@ Une note `image_occlusion` a quatre champs : `fields[0]` = `<img src="nom" alt="
 ### 2.2 Types de notes personnalisés (M8)
 
 ```ts
-export interface CardTemplate { name: string; front: string; back: string }
+export interface CardTemplate { name: string; front: string; back: string; twoWay?: boolean }  // twoWay : M16
 export interface NoteType {
   id: string
   name: string
@@ -217,7 +217,8 @@ export interface NoteType {
 ```
 
 - Les modèles utilisent un sous-ensemble de la syntaxe Anki (`src/lib/domain/templates.ts`, ADR-010) : `{{Champ}}`, `{{FrontSide}}` (verso), sections `{{#Champ}}…{{/Champ}}` et `{{^Champ}}…{{/Champ}}`, filtres `text:` (sans HTML), `type:` (réponse tapée : rien n'est rendu, Recto compare), tout autre filtre rend la valeur ; un champ inconnu et les spéciaux (`{{Tags}}`, `{{Deck}}`…) rendent une chaîne vide. Le rendu passe par `sanitize()` comme tout champ (les styles en ligne d'Anki sont retirés ; `<hr>` est permis). Le CSS du type Anki est ignoré.
-- Une note a une carte par modèle dont la question rendue n'est pas vide et diffère de la question rendue avec tous les champs vides (règle d'Anki). En révision, le verso rendu remplace la question (il la reprend par `{{FrontSide}}`) ; pas d'Extra ; Leitner n'échange jamais les faces.
+- Une note a une carte par modèle dont la question rendue n'est pas vide et diffère de la question rendue avec tous les champs vides (règle d'Anki). En révision, le verso rendu remplace la question (il la reprend par `{{FrontSide}}`) ; pas d'Extra ; une telle carte n'échange jamais ses faces.
+- **Modèle posé dans les deux sens** (`twoWay`, M16) : `front` et `back` sont deux faces, chacune écrite seule (`{{FrontSide}}` n'y rend rien). Une seule carte, posée comme une note basique (03 §1.1) : la face 1 est demandée, la face 2 apparaît sous elle à la réponse ; après une réussite, si le paquet alterne, c'est la face 2 qui est demandée (`sideFlipped`). La carte existe si **ses deux faces** passent la règle ci-dessus (chacune peut être la question). Ses deux faces comptent pour les jumelles (03 §5.2). Absent : sens unique, comme avant M16 (les bases et sauvegardes antérieures n'ont rien à migrer).
 - Modifier un type (`updateNoteType`, une transaction) : champs ajoutés (vides), retirés ou réordonnés (M10) dans toutes ses notes, cartes déplacées avec leur modèle quand un modèle est retiré ou réordonné (leur `ord` suit), créées ou supprimées selon la règle ci-dessus (journal conservé). Renommer un champ réécrit ses références dans les modèles (sauf si l'ancien ou le nouveau nom est vide ou porté par un autre champ, sans casse : aucune référence n'est alors fusionnée ni prise à un autre champ). Un type utilisé par une note ne se supprime pas.
 - Champs utilisés (M11) : un champ cité par un modèle (`{{Champ}}`, section ou filtre) ne se retire pas, l'éditeur nomme les cartes qui l'utilisent (`fieldUsers`) ; un modèle qui cite un champ absent du type (hors champs spéciaux d'Anki : `FrontSide`, `Tags`, `Type`, `Deck`, `Subdeck`, `Card`, `CardFlag`) rend le type invalide (`noteTypeUnknownField`, avec la carte et le champ). Retirer un champ non cité qui a du contenu est annoncé avant l'enregistrement, avec le nombre de notes qui le perdent (`NoteTypeEditPlan.lost`).
 - Réordonner (M10) : chaque champ et chaque modèle de l'édition (`NoteTypeEdit`) garde son indice d'origine `from` (null s'il est nouveau) ; c'est cet indice, non le nom ni la position, qui relie la valeur d'une note à son champ et une carte à son modèle. Enregistrer écrit donc `fields` de chaque note dans le nouvel ordre des champs et donne à chaque carte pour `ord` la nouvelle position de son modèle : même `id`, même planification, même journal ; aucune carte n'est créée ni supprimée par un simple changement d'ordre (les modèles désignent les champs par leur nom, la question de chaque carte reste la même). Déplacer, renommer, ajouter et retirer se combinent dans un même enregistrement. L'ordre des champs est celui du formulaire de note et de l'export Anki ; le premier champ est la clé de détection des doublons de l'éditeur de notes. Annuler (`undoReview`) une réponse donnée avant un déplacement rend à la carte sa planification d'avant mais garde son `ord` actuel, comme son paquet actuel : la pile d'annulation d'une séance de révision survit à la navigation vers l'éditeur de types.
@@ -243,14 +244,14 @@ export interface NoteType {
 ## 5. Sauvegarde `.recto.zip`
 
 ```
-manifest.json   { "format": "recto-backup", "schemaVersion": 4, "appVersion": "0.x", "exportedAt": ms, "device": "<navigator.userAgent tronqué à 120 car.>", "deviceId": "<uuid>", "counts": {...} }
+manifest.json   { "format": "recto-backup", "schemaVersion": 5, "appVersion": "0.x", "exportedAt": ms, "device": "<navigator.userAgent tronqué à 120 car.>", "deviceId": "<uuid>", "counts": {...} }
 data.json       { "decks": [...], "noteTypes": [...], "notes": [...], "cards": [...], "reviews": [...], "settings": [...],
                   "media": [{ "name", "mime", "size", "sha256", "createdAt" }],   // sans blobs
                   "deletions": [...] }
 media/<name>    fichiers binaires
 ```
 
-`schemaVersion` : 2 depuis la V1 (ajout du type `image_occlusion`), 3 depuis M8 (table `noteTypes`, notes `custom` ; une note `custom` sans son type est rejetée à la lecture). 4 depuis M12 (`card.updatedAt`, `deletions`, `setting.updatedAt`, `deviceId`) ; une carte d'une sauvegarde plus ancienne est datée comme à la migration Dexie (`lastReview ?? createdAt`), elle n'a pas de suppressions. Une sauvegarde de version 1 ou 2 se restaure telle quelle (pas de type personnalisé), une version plus récente que l'application est refusée. Les lignes sont lues dans une seule transaction en lecture : un instantané cohérent même si l'application écrit pendant l'export. Fusion : un type de note est identifié par `id`, le plus récemment modifié gagne.
+`schemaVersion` : 2 depuis la V1 (ajout du type `image_occlusion`), 3 depuis M8 (table `noteTypes`, notes `custom` ; une note `custom` sans son type est rejetée à la lecture). 4 depuis M12 (`card.updatedAt`, `deletions`, `setting.updatedAt`, `deviceId`) ; une carte d'une sauvegarde plus ancienne est datée comme à la migration Dexie (`lastReview ?? createdAt`), elle n'a pas de suppressions. 5 depuis M16 (`twoWay` des modèles de cartes) ; un modèle d'une sauvegarde plus ancienne est à sens unique. Une sauvegarde de version 1 ou 2 se restaure telle quelle (pas de type personnalisé), une version plus récente que l'application est refusée. Les lignes sont lues dans une seule transaction en lecture : un instantané cohérent même si l'application écrit pendant l'export. Fusion : un type de note est identifié par `id`, le plus récemment modifié gagne.
 
 Restauration « remplacer » : vide la base puis importe (suppressions comprises), sauf les réglages propres à l'appareil, gardés (M12) ; « fusionner » : les entités sont identifiées par `id` (et `sourceGuid` pour les notes) ; en cas de conflit, la version la plus récente (`updatedAt`) gagne, les journaux sont unionnés par `id`.
 

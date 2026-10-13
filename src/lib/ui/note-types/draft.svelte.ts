@@ -1,6 +1,6 @@
-import { editOf, fieldUsers, type NoteTypeEdit } from '$lib/domain/note-types'
+import { editOf, fieldUsers, storedTemplate, type NoteTypeEdit } from '$lib/domain/note-types'
 import type { TypeShape } from '$lib/domain/notes'
-import { renameFieldRefs } from '$lib/domain/templates'
+import { answerOfFace, faceOfAnswer, renameFieldRefs } from '$lib/domain/templates'
 import type { NoteType } from '$lib/domain/types'
 import { t } from '$lib/i18n'
 
@@ -25,7 +25,7 @@ export class NoteTypeDraft {
   /** As it would be saved, for the preview. */
   readonly shape: TypeShape = $derived({
     fields: this.edit.fields.map((f) => f.name.trim()),
-    templates: this.edit.templates.map(({ name, front, back }) => ({ name, front, back })),
+    templates: this.edit.templates.map(storedTemplate),
   })
 
   load(type: NoteType): void {
@@ -88,6 +88,17 @@ export class NoteTypeDraft {
       back: `{{FrontSide}}<hr id=answer>{{${second}}}`,
       from: null,
     })
+  }
+
+  /**
+   * Asks template `i` both ways or one way (M16). Its answer follows: the second face of a
+   * two-way card is written alone, so its `{{FrontSide}}` opening goes, and comes back one way.
+   */
+  setTwoWay(i: number, twoWay: boolean): void {
+    const tpl = this.edit.templates[i]
+    if (!tpl || !!tpl.twoWay === twoWay) return
+    tpl.back = twoWay ? faceOfAnswer(tpl.back) : answerOfFace(tpl.back)
+    tpl.twoWay = twoWay
   }
 
   removeTemplate(i: number): void {

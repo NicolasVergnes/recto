@@ -5,7 +5,7 @@ Python 3.9 ou plus, bibliothèque standard seulement. Tous les champs sont du **
 ```python
 import sys
 sys.path.insert(0, "<dossier du skill>/scripts")
-from recto_apkg import Package, Mask, DeckError, img, sound, image_size
+from recto_apkg import Package, Mask, DeckError, img, sound, image_size, one_way, two_way
 ```
 
 ## Paquet
@@ -56,12 +56,15 @@ Plusieurs masques du même `group` sont révélés ensemble (une seule carte). `
 ## Types personnalisés
 
 ```python
-t = pkg.note_type(name, fields, templates, css=None)     # templates = [(nom, question, réponse), …]
+t = pkg.note_type(name, fields, templates, css=None)     # templates = [one_way(…), two_way(…), …]
+one_way(nom, question, réponse)   # « A → B » : toujours posée ainsi ; réponse = "{{FrontSide}}<hr id=answer>…"
+two_way(nom, face1, face2)        # « A ↔ B » : UNE carte, posée par la face 1 puis par la face 2
 pkg.add_note(t, deck, fields, tags=(), guid=None, suspended=False)   # fields = {champ: html} ou liste
 ```
 
-- Une carte par modèle dont la question rendue n'est pas vide (et dépend de la note).
-- Syntaxe des modèles : `{{Champ}}`, `{{FrontSide}}`, `{{#Champ}}…{{/Champ}}`, `{{^Champ}}…{{/Champ}}`, `{{text:Champ}}`, `{{type:Champ}}`. Un champ inconnu ou `{{cloze:…}}` est refusé.
+- `one_way` : une carte si la question rendue n'est pas vide (et dépend de la note). Un tuple `(nom, question, réponse)` vaut `one_way`.
+- `two_way` : une seule carte, demandée par la face 1, puis par la face 2 après une réussite (réglage « Interroger dans les deux sens » du paquet, actif par défaut ; indicateur « ↔ Sens inversé »). Chaque face s'écrit seule : pas de `{{FrontSide}}` (refusé). La carte n'existe que si **les deux** faces ont un contenu. Anki, lui, reçoit une carte à sens unique (face 1 → face 2).
+- Syntaxe des modèles : `{{Champ}}`, `{{FrontSide}}` (dans une réponse `one_way`), `{{#Champ}}…{{/Champ}}`, `{{^Champ}}…{{/Champ}}`, `{{text:Champ}}`, `{{type:Champ}}`. Un champ inconnu ou `{{cloze:…}}` est refusé.
 - Le nom du type fixe son identifiant : régénérer avec le même nom et les mêmes champs réutilise le type déjà importé.
 - `css` sert à Anki seulement ; Recto centre et met en forme lui-même.
 
@@ -73,13 +76,10 @@ dep = pkg.note_type(
     "Département",
     fields=["Carte", "Nom", "Numéro", "Préfecture", "Région"],
     templates=[
-        ("Carte → Nom", "{{Carte}}<br>Quel département ?",
-         "{{FrontSide}}<hr id=answer><b>{{Nom}}</b> ({{Numéro}})<br>{{Région}}"),
-        ("Nom → Numéro", "Numéro du département : <b>{{Nom}}</b> ?", "{{FrontSide}}<hr id=answer><b>{{Numéro}}</b>"),
-        ("Numéro → Nom", "Département n° <b>{{Numéro}}</b> ?", "{{FrontSide}}<hr id=answer><b>{{Nom}}</b>"),
-        ("Nom → Préfecture", "Préfecture : <b>{{Nom}}</b> ?", "{{FrontSide}}<hr id=answer><b>{{Préfecture}}</b>"),
-        ("Préfecture → Nom", "<b>{{Préfecture}}</b> est la préfecture de… ?",
-         "{{FrontSide}}<hr id=answer><b>{{Nom}}</b> ({{Numéro}})"),
+        one_way("Carte → Nom", "{{Carte}}<br>Quel département ?",
+                "{{FrontSide}}<hr id=answer><b>{{Nom}}</b> ({{Numéro}})<br>{{Région}}"),
+        two_way("Nom ↔ Numéro", "<b>{{Nom}}</b>", "<b>{{Numéro}}</b>"),
+        two_way("Nom ↔ Préfecture", "Département : <b>{{Nom}}</b>", "Préfecture : <b>{{Préfecture}}</b>"),
     ],
 )
 for d in departements:                      # liste de dicts : numero, nom, prefecture, region
@@ -91,7 +91,7 @@ for d in departements:                      # liste de dicts : numero, nom, pref
 pkg.write("departements.apkg")
 ```
 
-Résultat : 5 cartes par note, dans un seul paquet ; le champ Région n'est demandé par aucune carte, il sert de contexte dans les réponses.
+Résultat : 3 cartes par note, dans un seul paquet : Carte → Nom toujours dans ce sens, Nom ↔ Numéro et Nom ↔ Préfecture posées tantôt dans un sens, tantôt dans l'autre. Le champ Région n'est demandé par aucune carte, il sert de contexte dans les réponses (et donne au type plus de 3 champs).
 
 ## Médias
 

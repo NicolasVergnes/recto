@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { cardOrds, convertFields, normalizeFields, renderCard } from '$lib/domain/notes'
 import {
+  answerOfFace,
+  faceOfAnswer,
   fieldValues,
   referencedFields,
   renameFieldRefs,
@@ -103,5 +105,51 @@ describe('custom notes', () => {
       '',
     ])
     expect(convertFields('custom', 'basic', AIN)).toEqual(['01', 'Ain', '<img src="ain.png">'])
+  })
+
+  it('ask a two-way template by either face, like a basic note (M16)', () => {
+    const type: Pick<NoteType, 'fields' | 'templates'> = {
+      fields: ['Carte', 'Nom', 'Numéro'],
+      templates: [
+        { name: 'Carte → Nom', front: '{{Carte}}', back: '{{FrontSide}}<hr id=answer>{{Nom}}' },
+        {
+          name: 'Nom ↔ Numéro',
+          front: '<b>{{Nom}}</b>{{FrontSide}}',
+          back: '{{Numéro}}',
+          twoWay: true,
+        },
+      ],
+    }
+    const note = { modelType: 'custom' as const, fields: ['<img src="ain.png">', 'Ain', '01'] }
+    const ask = (sideFlipped: boolean, flip: boolean, ord = 1) => {
+      const c = renderCard(note, { ord, sideFlipped }, flip, type)
+      return [c.question, c.answer, c.flipped, c.answerReplacesQuestion, c.expected]
+    }
+    // {{FrontSide}} means nothing in a face: rendered empty.
+    expect(ask(false, true)).toEqual(['<b>Ain</b>', '01', false, false, '01'])
+    expect(ask(true, true)).toEqual(['01', '<b>Ain</b>', true, false, '<b>Ain</b>'])
+    // A deck that does not alternate asks the first face.
+    expect(ask(true, false)).toEqual(['<b>Ain</b>', '01', false, false, '01'])
+    // A one-way template keeps its side.
+    expect(ask(true, true, 0)).toEqual([
+      '<img src="ain.png">',
+      '<img src="ain.png"><hr id=answer>Ain',
+      false,
+      true,
+      '',
+    ])
+    // Both faces are questions: the card needs both.
+    expect(templateOrds(type, ['<img src="ain.png">', 'Ain', '01'])).toEqual([0, 1])
+    expect(templateOrds(type, ['<img src="ain.png">', 'Ain', ''])).toEqual([0])
+    expect(templateOrds(type, ['', '', '01'])).toEqual([])
+  })
+
+  it('convert an answer into a face and back (M16)', () => {
+    expect(faceOfAnswer('{{FrontSide}}<hr id=answer>{{B}}')).toBe('{{B}}')
+    expect(faceOfAnswer(' {{ FrontSide }}\n\n<hr id=answer>\n\n<b>{{B}}</b>')).toBe('<b>{{B}}</b>')
+    expect(faceOfAnswer('{{FrontSide}}<br>{{B}}')).toBe('<br>{{B}}')
+    expect(faceOfAnswer('{{B}} {{FrontSide}}')).toBe('{{B}} {{FrontSide}}')
+    expect(answerOfFace('{{B}}')).toBe('{{FrontSide}}\n\n<hr id=answer>\n\n{{B}}')
+    expect(faceOfAnswer(answerOfFace('{{B}}'))).toBe('{{B}}')
   })
 })

@@ -4,6 +4,19 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 ## [Unreleased]
 
+### M16 — Cartes dans les deux sens dans les types de notes
+
+#### Added
+
+- Dans l'éditeur d'un type de note, chaque carte a la case **« Poser dans les deux sens »** : une seule carte (« Nom ↔ Numéro ») demandée par une face puis par l'autre après chaque réussite, comme une note basique (réglage « Interroger dans les deux sens » du paquet, FSRS et Memory Box, indicateur « ↔ Sens inversé », réponse tapée sur la face non demandée). Les autres cartes restent posées dans un seul sens (« Carte → Nom »). Les champs deviennent « Face 1 » et « Face 2 » ; cocher ou décocher garde les cartes, leur planification et leur historique.
+- Export et import `.apkg` : l'option voyage (marque `rectoTwoWay` sur le modèle) ; Anki reçoit une carte à sens unique.
+
+#### Changed
+
+- Sauvegardes au schéma 5 : une version plus ancienne de Recto les refuse au lieu de poser ces cartes dans un seul sens. Les bases et sauvegardes existantes se lisent sans changement (cartes à sens unique).
+- Jumelles : une carte dans les deux sens compte les champs de ses deux faces (Nom ↔ Numéro et Nom ↔ Préfecture ne sont pas posées le même jour).
+- Plugin `recto-deck-builder` 2.1.0 : `one_way()` et `two_way()` ; « A ↔ B » donne une seule carte (et non deux) ; le skill applique les flèches à la lettre et ne dit plus qu'un `{{type:Champ}}` active seul la réponse tapée.
+
 ### Outils — plugin Claude « recto-deck-builder »
 
 #### Added
