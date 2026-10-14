@@ -67,9 +67,11 @@ describe('reconcileCards (invariant 2)', () => {
 
 describe('notes and cards', () => {
   it('generates the ords of each model (invariant 2)', () => {
-    expect(cardOrds('basic', ['a', 'b'])).toEqual([0])
-    expect(cardOrds('cloze', ['{{c1::a}} {{c3::b}} {{c1::c}}'])).toEqual([0, 2])
-    expect(cardOrds('cloze', ['rien'])).toEqual([])
+    expect(cardOrds({ modelType: 'basic', fields: ['a', 'b'] })).toEqual([0])
+    expect(cardOrds({ modelType: 'cloze', fields: ['{{c1::a}} {{c3::b}} {{c1::c}}'] })).toEqual([
+      0, 2,
+    ])
+    expect(cardOrds({ modelType: 'cloze', fields: ['rien'] })).toEqual([])
   })
 
   it('normalises field arrays', () => {
@@ -178,8 +180,10 @@ describe('image occlusion notes', () => {
     const { buildRow } = await import('$lib/domain/browse')
     expect(fieldCount('image_occlusion')).toBe(4)
     expect(normalizeFields('image_occlusion', ['a'])).toEqual(['a', '', '', ''])
-    expect(cardOrds('image_occlusion', note.fields)).toEqual([0, 1])
-    expect(cardOrds('image_occlusion', ['<img src="x.png">', ''])).toEqual([])
+    expect(cardOrds({ modelType: 'image_occlusion', fields: note.fields })).toEqual([0, 1])
+    expect(cardOrds({ modelType: 'image_occlusion', fields: ['<img src="x.png">', ''] })).toEqual(
+      [],
+    )
     const card = makeCard({ id: 'n1', deckId: 'd1' }, 1, 'c1', 0)
     const row = buildRow(
       card,

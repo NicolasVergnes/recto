@@ -40,6 +40,10 @@
       sample && f.from !== null ? (sample.fields[f.from] ?? '') : `[${f.name}]`,
     ),
   )
+  /** Its masks follow their image field the same way (M14). */
+  const sampleMasks = $derived(
+    draft.edit.fields.map((f) => (f.from !== null ? (sample?.masks?.[f.from] ?? '') : '')),
+  )
 
   async function save(e: SubmitEvent) {
     e.preventDefault()
@@ -101,7 +105,10 @@
 
       <div class="stack">
         <p class="muted small">{t(sample ? 'noteTypes.preview' : 'noteTypes.previewSample')}</p>
-        <CardPreview modelType="custom" noteType={draft.shape} fields={sampleFields} />
+        <CardPreview
+          note={{ modelType: 'custom', fields: sampleFields, masks: sampleMasks }}
+          noteType={draft.shape}
+        />
       </div>
     </div>
   {/if}

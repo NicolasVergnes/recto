@@ -1,8 +1,11 @@
 <script lang="ts">
-  import { t } from '$lib/i18n'
+  import { kindOf } from '$lib/domain/templates'
+  import { CARD_KINDS, type CardKind } from '$lib/domain/types'
+  import { t, type MessageKey } from '$lib/i18n'
   import Icon from '../Icon.svelte'
   import type { NoteTypeDraft } from './draft.svelte'
   import MoveButtons, { focusMoved } from './MoveButtons.svelte'
+  import TemplateSides from './TemplateSides.svelte'
 
   interface Props {
     draft: NoteTypeDraft
@@ -11,6 +14,12 @@
   const uid = $props.id()
   /** Spoken after a move; the live region stays in the page (inserted ones are often skipped). */
   let announcement = $state('')
+
+  const KIND_LABEL: Record<CardKind, MessageKey> = {
+    classic: 'editor.classic',
+    cloze: 'editor.cloze',
+    occlusion: 'editor.imageOcclusion',
+  }
 
   function move(i: number, by: -1 | 1) {
     const to = draft.moveTemplate(i, by)
@@ -57,13 +66,21 @@
         </div>
       </div>
       <div class="field">
-        <label for="{uid}-{i}-front">{t('noteTypes.question')}</label>
-        <textarea id="{uid}-{i}-front" class="code" rows="3" bind:value={template.front}></textarea>
+        <label for="{uid}-{i}-kind">{t('noteTypes.kind')}</label>
+        <select
+          id="{uid}-{i}-kind"
+          value={kindOf(template)}
+          onchange={(e) => {
+            const kind = CARD_KINDS.find((k) => k === e.currentTarget.value)
+            if (kind) draft.setKind(i, kind)
+          }}
+        >
+          {#each CARD_KINDS as kind (kind)}
+            <option value={kind}>{t(KIND_LABEL[kind])}</option>
+          {/each}
+        </select>
       </div>
-      <div class="field">
-        <label for="{uid}-{i}-back">{t('noteTypes.answer')}</label>
-        <textarea id="{uid}-{i}-back" class="code" rows="3" bind:value={template.back}></textarea>
-      </div>
+      <TemplateSides {template} fields={draft.shape.fields} id="{uid}-{i}" />
     </fieldset>
   {/each}
   <p class="visually-hidden" role="status" aria-live="polite">{announcement}</p>
@@ -92,10 +109,5 @@
 
   .tools {
     flex-wrap: nowrap;
-  }
-
-  .code {
-    font-family: ui-monospace, monospace;
-    font-size: 0.9rem;
   }
 </style>

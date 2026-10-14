@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { OcclusionCard } from '$lib/domain/notes'
-  import { occlusionGroups } from '$lib/domain/occlusion'
+  import { occlusionGroups, type OcclusionMask } from '$lib/domain/occlusion'
   import { t } from '$lib/i18n'
   import { mediaUrl } from '$lib/media/url'
 
@@ -30,12 +30,14 @@
     }
   })
 
+  /** A mask the card asks: of the target group, or any of a single card (target null, M14). */
+  const asked = (m: OcclusionMask) => occlusion.target === null || m.n === occlusion.target
   // hideAll: every mask is drawn and the target is highlighted; hideOne: only the target.
-  const shown = $derived(
-    occlusion.masks.filter((m) => occlusion.mode === 'hideAll' || m.n === occlusion.target),
-  )
+  const shown = $derived(occlusion.masks.filter((m) => occlusion.mode === 'hideAll' || asked(m)))
   const groups = $derived(occlusionGroups(occlusion))
-  const position = $derived(groups.indexOf(occlusion.target) + 1)
+  const position = $derived(
+    occlusion.target === null ? 0 : Math.max(1, groups.indexOf(occlusion.target) + 1),
+  )
 </script>
 
 <figure class="occlusion">
@@ -45,14 +47,7 @@
       <svg viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true" focusable="false">
         <!-- A white halo under every outline keeps masks readable on dark images. -->
         {#each shown as m, i (i)}
-          <rect
-            class="halo"
-            x={m.x}
-            y={m.y}
-            width={m.w}
-            height={m.h}
-            class:target={m.n === occlusion.target}
-          />
+          <rect class="halo" x={m.x} y={m.y} width={m.w} height={m.h} class:target={asked(m)} />
         {/each}
         {#each shown as m, i (i)}
           <rect
@@ -60,8 +55,8 @@
             y={m.y}
             width={m.w}
             height={m.h}
-            class:target={m.n === occlusion.target}
-            class:open={revealed && m.n === occlusion.target}
+            class:target={asked(m)}
+            class:open={revealed && asked(m)}
           />
         {/each}
       </svg>
@@ -72,7 +67,9 @@
     </p>
   {/if}
   <figcaption class="visually-hidden">
-    {t('occlusion.target', { n: Math.max(1, position), total: groups.length })}
+    {position === 0
+      ? t('occlusion.targetAll', { n: groups.length })
+      : t('occlusion.target', { n: position, total: groups.length })}
   </figcaption>
 </figure>
 

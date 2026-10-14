@@ -1,12 +1,22 @@
 import { clozeAnswers, clozeIndices, renderClozeAnswer, renderClozeQuestion } from './cloze'
 import {
   maskLabels,
+  occlusionGroups,
   occlusionOrds,
   parseOcclusion,
+  type Occlusion,
   type OcclusionMask,
   type OcclusionMode,
 } from './occlusion'
-import { fieldValues, renderTemplate, templateOrds, typedField } from './templates'
+import {
+  fieldValues,
+  kindOf,
+  renderTemplate,
+  subIndex,
+  templateIndex,
+  templateOrds,
+  typedField,
+} from './templates'
 import { escapeHtml, imageRefs, imageTag, removeImage, stripHtml } from './text'
 import type { Card, ModelType, Note, NoteType } from './types'
 
@@ -40,26 +50,33 @@ export function normalizeFields(
   return Array.from({ length: n }, (_, i) => fields[i] ?? '')
 }
 
+/** What generating the cards of a note reads. */
+export type NoteContent = Pick<Note, 'modelType' | 'fields' | 'single' | 'masks'>
+
+/** A single note keeps one card, the first one's ord (0), when its content asks anything. */
+const singly = (ords: number[], single: boolean | undefined) =>
+  single && ords.length > 0 ? [0] : ords
+
 /**
  * Card ords a note must have (02-DATA-MODEL §3 invariant 2): basic → [0] (one card for both sides),
  * cloze → one per distinct index (ord = index - 1), image_occlusion → one per mask group
- * (ord = group - 1), custom → one per template whose question is not empty (none without its
- * note type).
+ * (ord = group - 1), both [0] when `single` (M14); custom → the cards of its templates
+ * (`templateOrds`; none without its note type).
  */
-export function cardOrds(
-  modelType: ModelType,
-  fields: readonly string[],
-  noteType?: TypeShape,
-): number[] {
-  switch (modelType) {
+export function cardOrds(note: NoteContent, noteType?: TypeShape): number[] {
+  const { fields } = note
+  switch (note.modelType) {
     case 'basic':
       return [0]
     case 'cloze':
-      return clozeIndices(fields[0] ?? '').map((i) => i - 1)
+      return singly(
+        clozeIndices(fields[0] ?? '').map((i) => i - 1),
+        note.single,
+      )
     case 'image_occlusion':
-      return occlusionOrds(parseOcclusion(fields[1] ?? ''))
+      return singly(occlusionOrds(parseOcclusion(fields[1] ?? '')), note.single)
     case 'custom':
-      return noteType ? templateOrds(noteType, fields) : []
+      return noteType ? templateOrds(noteType, fields, note.masks) : []
   }
 }
 
@@ -123,8 +140,8 @@ export interface OcclusionCard {
   alt: string
   mode: OcclusionMode
   masks: OcclusionMask[]
-  /** The mask group asked by this card (card ord + 1). */
-  target: number
+  /** The mask group asked by this card (card ord + 1), or null: every group (single card, M14). */
+  target: number | null
 }
 
 export interface RenderedCard {
@@ -143,16 +160,62 @@ export interface RenderedCard {
   occlusion?: OcclusionCard
 }
 
+/** A cloze card: deletion `index`, or every one (null), then what the answer adds. */
+function renderCloze(text: string, index: number | null, extra: string): RenderedCard {
+  return {
+    question: renderClozeQuestion(text, index),
+    answer: renderClozeAnswer(text, index),
+    extra,
+    answerReplacesQuestion: true,
+    flipped: false,
+    expected: clozeAnswers(text, index).join(', '),
+  }
+}
+
+/** An occlusion card: group `target`, or every one (null), under its header. */
+function renderOcclusion(
+  imageField: string,
+  occlusion: Occlusion,
+  target: number | null,
+  header: string,
+  extra: string,
+): RenderedCard {
+  const groups = target === null ? occlusionGroups(occlusion) : [target]
+  // Labels are plain text: escaped once, they are HTML like every other side.
+  const labels = escapeHtml(
+    [...new Set(groups.flatMap((n) => maskLabels(occlusion, n)))].join(', '),
+  )
+  const image = imageRefs(imageField)[0]
+  return {
+    question: header,
+    // P1: the labels are part of the answer, never rendered before the reveal.
+    answer: labels,
+    extra,
+    answerReplacesQuestion: false,
+    flipped: false,
+    expected: labels,
+    occlusion: {
+      image: image?.name ?? '',
+      alt: image?.alt ?? '',
+      mode: occlusion.mode,
+      masks: occlusion.masks,
+      target,
+    },
+  }
+}
+
 /**
- * Question/answer of a custom note's card: its template rendered like Anki, the answer side
- * replacing the question (it usually repeats it through `{{FrontSide}}`).
+ * Question/answer of a custom note's card, by the kind of its template (M14). Classic: the
+ * template rendered like Anki, the answer side replacing the question (it usually repeats it
+ * through `{{FrontSide}}`). Cloze and occlusion: the text or image of `template.field`, the
+ * template's back added to the answer and its front as the occlusion header.
  */
 function renderCustom(
-  fields: readonly string[],
+  note: Pick<Note, 'fields' | 'masks'>,
   ord: number,
   noteType: TypeShape | undefined,
 ): RenderedCard {
-  const template = noteType?.templates[ord]
+  const template = noteType?.templates[templateIndex(ord)]
   if (!noteType || !template) {
     return {
       question: '',
@@ -163,7 +226,17 @@ function renderCustom(
       expected: '',
     }
   }
-  const values = fieldValues(noteType.fields, fields)
+  const values = fieldValues(noteType.fields, note.fields)
+  const kind = kindOf(template)
+  if (kind !== 'classic') {
+    const at = noteType.fields.indexOf(template.field ?? '')
+    const source = note.fields[at] ?? ''
+    const asked = template.single ? null : subIndex(ord) + 1
+    const extra = renderTemplate(template.back, values)
+    if (kind === 'cloze') return renderCloze(source, asked, extra)
+    const occlusion = parseOcclusion(note.masks?.[at] ?? '')
+    return renderOcclusion(source, occlusion, asked, renderTemplate(template.front, values), extra)
+  }
   const question = renderTemplate(template.front, values)
   const typed = typedField(template)
   return {
@@ -182,47 +255,17 @@ function renderCustom(
  * A custom note needs its note type.
  */
 export function renderCard(
-  note: Pick<Note, 'modelType' | 'fields' | 'oneWay'>,
+  note: Pick<Note, 'modelType' | 'fields' | 'oneWay' | 'single' | 'masks'>,
   card: Pick<Card, 'ord' | 'sideFlipped'>,
   flip = false,
   noteType?: TypeShape,
 ): RenderedCard {
-  if (note.modelType === 'custom') return renderCustom(note.fields, card.ord, noteType)
+  if (note.modelType === 'custom') return renderCustom(note, card.ord, noteType)
   const [f0 = '', f1 = '', f2 = '', f3 = ''] = note.fields
-  if (note.modelType === 'image_occlusion') {
-    const occlusion = parseOcclusion(f1)
-    const target = card.ord + 1
-    // Labels are plain text: escaped once, they are HTML like every other side.
-    const labels = escapeHtml(maskLabels(occlusion, target).join(', '))
-    const image = imageRefs(f0)[0]
-    return {
-      question: f2,
-      // P1: the labels are part of the answer, never rendered before the reveal.
-      answer: labels,
-      extra: f3,
-      answerReplacesQuestion: false,
-      flipped: false,
-      expected: labels,
-      occlusion: {
-        image: image?.name ?? '',
-        alt: image?.alt ?? '',
-        mode: occlusion.mode,
-        masks: occlusion.masks,
-        target,
-      },
-    }
-  }
-  if (note.modelType === 'cloze') {
-    const index = card.ord + 1
-    return {
-      question: renderClozeQuestion(f0, index),
-      answer: renderClozeAnswer(f0, index),
-      extra: f1,
-      answerReplacesQuestion: true,
-      flipped: false,
-      expected: clozeAnswers(f0, index).join(', '),
-    }
-  }
+  const asked = note.single ? null : card.ord + 1
+  if (note.modelType === 'image_occlusion')
+    return renderOcclusion(f0, parseOcclusion(f1), asked, f2, f3)
+  if (note.modelType === 'cloze') return renderCloze(f0, asked, f1)
   const flipped = flip && card.sideFlipped && !note.oneWay
   const question = flipped ? f1 : f0
   const answer = flipped ? f0 : f1

@@ -7,9 +7,35 @@
  * - filters, applied right to left: `text:` (HTML removed), `type:` (typed answer: rendered as
  *   nothing, Recto compares the answer itself), any other (`hint:`, `furigana:`…) the value;
  * - an unknown field or special (`{{Tags}}`, `{{Deck}}`…) renders as nothing.
+ *
+ * Cards of kind cloze and occlusion (M14) read their text or image from `template.field`.
  */
-import { escapeHtml, stripHtml } from './text'
-import type { CardTemplate, NoteType } from './types'
+import { clozeIndices } from './cloze'
+import { occlusionGroups, parseOcclusion } from './occlusion'
+import { escapeHtml, imageRefs, stripHtml } from './text'
+import type { CardKind, CardTemplate, NoteType } from './types'
+
+/**
+ * Card ords of a custom note (M14): template index + ORD_STRIDE × sub-index, the sub-index being
+ * the cloze index or mask group - 1 (0 for a classic or single card). Cards stored before M14 all
+ * have a sub-index of 0: their ord is unchanged.
+ */
+export const ORD_STRIDE = 1000
+export const customOrd = (template: number, sub = 0): number => template + ORD_STRIDE * sub
+export const templateIndex = (ord: number): number => ord % ORD_STRIDE
+export const subIndex = (ord: number): number => Math.floor(ord / ORD_STRIDE)
+
+/** A template's kind: absent means classic. */
+export const kindOf = (template: Pick<CardTemplate, 'kind'>): CardKind => template.kind ?? 'classic'
+
+/** Indices of the fields holding the cloze text or the image of a card of `kind`, ascending. */
+export function sourceFields(
+  type: Pick<NoteType, 'fields' | 'templates'>,
+  kind: Exclude<CardKind, 'classic'>,
+): number[] {
+  const names = new Set(type.templates.filter((t) => kindOf(t) === kind).map((t) => t.field))
+  return type.fields.flatMap((name, i) => (names.has(name) ? [i] : []))
+}
 
 export type FieldValues = ReadonlyMap<string, string>
 
@@ -57,21 +83,36 @@ export function renderTemplate(template: string, values: FieldValues, frontSide 
 }
 
 /**
- * Templates that make a card (Anki's rule): the question must show something that comes from
- * the note, i.e. not be empty and differ from the question rendered with every field empty.
+ * Cards of a custom note (02 §3 invariant 2). A classic template makes a card when its question
+ * shows something that comes from the note (Anki's rule: not empty and different from the
+ * question rendered with every field empty). A cloze template makes one card per index of its
+ * field, an occlusion template one per mask group when its field has an image (`masks`: the
+ * note's, aligned with `fields`); `single`, one card when there is at least one.
  */
 export function templateOrds(
   type: Pick<NoteType, 'fields' | 'templates'>,
   fields: readonly string[],
+  masks: readonly string[] = [],
 ): number[] {
   const values = fieldValues(type.fields, fields)
   const blank = fieldValues(type.fields, [])
-  const ords: number[] = []
-  type.templates.forEach((t, ord) => {
-    const front = renderTemplate(t.front, values)
-    if (!isEmptyField(front) && front !== renderTemplate(t.front, blank)) ords.push(ord)
+  return type.templates.flatMap((t, i) => {
+    const kind = kindOf(t)
+    if (kind === 'classic') {
+      const front = renderTemplate(t.front, values)
+      return !isEmptyField(front) && front !== renderTemplate(t.front, blank) ? [i] : []
+    }
+    const at = type.fields.indexOf(t.field ?? '')
+    const source = fields[at] ?? ''
+    const subs =
+      kind === 'cloze'
+        ? clozeIndices(source)
+        : imageRefs(source).length > 0
+          ? occlusionGroups(parseOcclusion(masks[at] ?? ''))
+          : []
+    if (subs.length === 0) return []
+    return t.single ? [i] : subs.map((n) => customOrd(i, n - 1))
   })
-  return ords
 }
 
 /** The field a template asks to type (`{{type:Champ}}`, question first), or null. */

@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest'
+import { at } from '../helpers/at'
 import { strFromU8, unzipSync, zipSync } from 'fflate'
 import type { Database, SqlJsStatic, SqlValue } from 'sql.js'
 import { makeCard, makeDeck } from '$lib/domain/defaults'
@@ -70,7 +71,7 @@ function noteWithCards(
   createdAt: number,
 ): { note: Note; cards: Card[] } {
   const note: Note = { id, deckId, modelType, fields, tags: [], createdAt, updatedAt: createdAt }
-  const cards = cardOrds(modelType, fields).map((ord) =>
+  const cards = cardOrds({ modelType, fields }).map((ord) =>
     makeCard(note, ord, `${id}-${ord}`, createdAt),
   )
   return { note, cards }
@@ -131,6 +132,7 @@ describe('buildApkg: legacy schema 11 package', () => {
       media: 2,
       missingMedia: ['absent.png'],
       retired: 1,
+      leftOut: 0,
     })
     db.close()
   })
@@ -737,7 +739,7 @@ describe('round trip through the Recto importer', () => {
       updatedAt: now + i,
     }))
     const cards = notes.flatMap((n) =>
-      cardOrds('custom', n.fields, type).map((ord) => makeCard(n, ord, `${n.id}-${ord}`, now)),
+      cardOrds(n, type).map((ord) => makeCard(n, ord, `${n.id}-${ord}`, now)),
     )
     expect(cards).toHaveLength(7)
     const input: ApkgExportInput = {
@@ -877,5 +879,85 @@ describe('round trip through the Recto importer', () => {
     expect(pkg.notes).toEqual([])
     expect(pkg.decks.map((d) => d.name)).toEqual(['Default'])
     expect(report).toMatchObject({ notes: 0, cards: 0, decks: 0 })
+  })
+})
+
+describe('custom types with card kinds (M14)', () => {
+  const deck = makeDeck({ name: 'Mixte' }, 'deck', now)
+  const type: NoteType = {
+    id: 'type',
+    name: 'Mixte',
+    fields: ['Carte', 'Pays', 'Phrase'],
+    templates: [
+      { name: 'Où', kind: 'occlusion', field: 'Carte', front: '', back: '' },
+      { name: 'Capitale', front: 'Capitale de {{Pays}} ?', back: '{{FrontSide}}<hr>{{Phrase}}' },
+      { name: 'Trous', kind: 'cloze', field: 'Phrase', front: '', back: '' },
+      { name: 'Pays', front: '{{Phrase}}', back: '{{FrontSide}}<hr>{{Pays}}' },
+    ],
+    sourceId: 1700000000000,
+    createdAt: now,
+    updatedAt: now,
+  }
+  const masks = JSON.stringify({ v: 1, mode: 'hideAll', masks: [{ n: 1, x: 0, y: 0, w: 1, h: 1 }] })
+  const note: Note = {
+    id: 'n',
+    deckId: deck.id,
+    modelType: 'custom',
+    noteTypeId: type.id,
+    fields: ['<img src="fr.png">', 'France', '{{c1::Paris}} et {{c2::Lyon}}'],
+    masks: [masks, '', ''],
+    tags: [],
+    createdAt: now,
+    updatedAt: now,
+  }
+  const cards = cardOrds(note, type).map((ord) => makeCard(note, ord, `c${ord}`, now))
+
+  it('sends the classic cards only, renumbered, and counts the others', async () => {
+    expect(cards.map((c) => c.ord)).toEqual([0, 1, 2, 1002, 3])
+    const input = { decks: [deck], notes: [note], cards, reviews: [], media: [], noteTypes: [type] }
+    const { bytes, db, report } = await open(input)
+    const models = json(rows(db, 'SELECT models FROM col')[0]?.models) as Record<
+      string,
+      { type: number; tmpls: { name: string; ord: number }[]; req: unknown[] }
+    >
+    const model = models[String(type.sourceId)]
+    expect(model?.type).toBe(0)
+    expect(model?.tmpls.map((t) => [t.name, t.ord])).toEqual([
+      ['Capitale', 0],
+      ['Pays', 1],
+    ])
+    expect(model?.req).toHaveLength(2)
+    expect(rows(db, 'SELECT ord FROM cards ORDER BY ord').map((r) => r.ord)).toEqual([0, 1])
+    expect(report).toMatchObject({ notes: 1, cards: 2, leftOut: 3 })
+
+    // Back into Recto next to the type: a new type, the stored one keeps its cloze and occlusion.
+    const pkg = readApkg(bytes, SQL)
+    const plan = await planApkgImport(
+      pkg,
+      importOptions,
+      { ...empty, decks: [deck], noteTypes: [type] },
+      now,
+      newId,
+    )
+    expect(plan.noteTypes?.map((t) => [t.name, t.templates.map((tpl) => tpl.name)])).toEqual([
+      ['Mixte (2)', ['Capitale', 'Pays']],
+    ])
+  })
+
+  it('leaves out the notes of a type without classic cards', async () => {
+    const onlyKinds = { ...type, templates: [at(type.templates, 0), at(type.templates, 2)] }
+    const own = cardOrds(note, onlyKinds).map((ord) => makeCard(note, ord, `k${ord}`, now))
+    const input = {
+      decks: [deck],
+      notes: [note],
+      cards: own,
+      reviews: [],
+      media: [],
+      noteTypes: [onlyKinds],
+    }
+    const { db, report } = await open(input)
+    const models = json(rows(db, 'SELECT models FROM col')[0]?.models) as Record<string, unknown>
+    expect(models[String(type.sourceId)]).toBeUndefined()
+    expect(report).toMatchObject({ notes: 0, cards: 0, leftOut: 3 })
   })
 })

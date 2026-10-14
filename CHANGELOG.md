@@ -4,6 +4,20 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 ## [Unreleased]
 
+### M14 — Texte à trous et occlusion d'image deviennent des types de cartes
+
+#### Added
+
+- **Types de cartes dans les types personnalisés** : chaque carte d'un type choisit son type — Classique, Texte à trous (le texte d'un champ, une carte par trou) ou Occlusion d'image (l'image d'un champ, une carte par groupe de masques). Un même type peut mélanger une occlusion, des cartes classiques et un texte à trous, plusieurs de chaque. Dans l'éditeur de notes, chaque champ image a son éditeur de masques et « Créer un trou » (Ctrl+Maj+C) agit dans les champs à trous.
+- Case **« Génère une seule carte »** pour une carte à trous ou d'occlusion : tous les trous ou tous les masques sont demandés ensemble, sur une seule carte. Elle se coche ou se décoche sur une note existante ; la carte du premier trou garde sa planification.
+- Types de notes : « Basique » apparaît en tête de liste, comme type intégré.
+
+#### Changed
+
+- **« Texte à trous » et « Occlusion d'image » ne sont plus des types de notes** : l'éditeur propose le type Basique (ou un type personnalisé), puis, pour Basique, le « Type de carte » (Classique, Texte à trous, Occlusion d'image). Les notes existantes ne changent pas.
+- Export Anki : un type personnalisé part avec ses seules cartes classiques (Anki ne mélange pas les cartes à trous avec les autres dans un même type) ; le rapport d'export compte les cartes restées dans Recto.
+- Sauvegarde au format 6 (les sauvegardes plus anciennes restent lisibles telles quelles) ; base de données en version 5.
+
 ### M13 — Révision au hasard, compteurs de l'accueil
 
 #### Added

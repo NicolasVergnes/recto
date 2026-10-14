@@ -654,3 +654,93 @@ describe('parseBackup errors', () => {
     expect(old.invalid).toBe(0)
   })
 })
+
+describe('card kinds (M14)', () => {
+  const type = {
+    id: 't',
+    name: 'Mixte',
+    fields: ['Image', 'Phrase'],
+    templates: [
+      { name: 'Où', kind: 'occlusion', field: 'Image', front: '', back: '', single: true },
+      { name: 'Trous', kind: 'cloze', field: 'Phrase', front: '', back: '' },
+    ],
+    createdAt: 1,
+    updatedAt: 1,
+  }
+  const masks = JSON.stringify({ v: 1, mode: 'hideAll', masks: [{ n: 1, x: 0, y: 0, w: 1, h: 1 }] })
+  const custom = {
+    id: 'n1',
+    deckId: 'd',
+    modelType: 'custom',
+    noteTypeId: 't',
+    fields: ['<img src="a.png">', '{{c1::x}}'],
+    masks: [masks, ''],
+    tags: [],
+    createdAt: 1,
+    updatedAt: 1,
+  }
+  const { masks: _masks, noteTypeId: _type, ...plain } = custom
+  const cloze = { ...plain, id: 'n2', modelType: 'cloze', single: true, fields: ['{{c1::x}}', ''] }
+  const zip = (files: Record<string, string>) =>
+    zipSync(Object.fromEntries(Object.entries(files).map(([k, v]) => [k, strToU8(v)])))
+  const manifest = (v: number) => JSON.stringify({ format: 'recto-backup', schemaVersion: v })
+
+  it('reads the kinds of card, single notes and masks; unknown or incomplete kinds are classic', () => {
+    const data = JSON.stringify({
+      noteTypes: [
+        {
+          ...type,
+          templates: [
+            ...type.templates,
+            { name: 'Autre', kind: 'flashy', field: 'Phrase', front: '{{Phrase}}', back: '' },
+            { name: 'Sans champ', kind: 'cloze', front: '{{Phrase}}', back: '', single: true },
+          ],
+        },
+      ],
+      notes: [custom, cloze, { ...plain, id: 'n3', modelType: 'basic', single: true }],
+    })
+    const parsed = parseBackup(zip({ 'manifest.json': manifest(6), 'data.json': data }), 6)
+    expect(parsed.data.noteTypes[0]?.templates).toEqual([
+      ...type.templates,
+      { name: 'Autre', front: '{{Phrase}}', back: '' },
+      { name: 'Sans champ', front: '{{Phrase}}', back: '' },
+    ])
+    expect(parsed.data.notes.map((n) => [n.id, n.single, n.masks])).toEqual([
+      ['n1', undefined, [masks, '']],
+      ['n2', true, undefined],
+      ['n3', undefined, undefined],
+    ])
+    expect(parsed.invalid).toBe(0)
+  })
+
+  it('is refused by a version that does not know them, and reads a version 5 backup as it is', () => {
+    const data = JSON.stringify({ noteTypes: [type], notes: [custom] })
+    expect(() => parseBackup(zip({ 'manifest.json': manifest(6), 'data.json': data }), 5)).toThrow(
+      BackupError,
+    )
+    const v5 = JSON.stringify({ noteTypes: [{ ...type, templates: [type.templates[1]] }] })
+    const parsed = parseBackup(zip({ 'manifest.json': manifest(5), 'data.json': v5 }), 6)
+    expect(parsed.data.noteTypes[0]?.templates).toEqual([type.templates[1]])
+  })
+
+  it('goes through a backup and back', async () => {
+    await env.db.decks.add(makeDeck({ name: 'D' }, 'd', 1))
+    const noteType = {
+      ...type,
+      templates: type.templates.map((t) => ({ ...t, kind: t.kind as 'cloze' })),
+    }
+    await env.db.noteTypes.add(noteType)
+    await env.db.notes.bulkAdd([custom as Note, cloze as Note])
+    const before = await dumpDatabase(env.db)
+    const parsed = parseBackup(await exportBytes(), SCHEMA_VERSION)
+    const target = await freshDatabase()
+    try {
+      await restoreBackup(parsed, 'replace')
+      const after = await dumpDatabase(target)
+      expect(after.noteTypes).toEqual(before.noteTypes)
+      expect(after.notes).toEqual(before.notes)
+    } finally {
+      await target.delete()
+    }
+  })
+})

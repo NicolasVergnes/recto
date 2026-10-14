@@ -70,14 +70,14 @@ Ces règles s'appliquent à tout le produit ; le skill `srs-rules` les détaille
 
 ### 5.2 Notes, cartes et types
 
-Une **note** porte le contenu ; une note génère une ou plusieurs **cartes** (comme Anki).
+Une **note** porte le contenu ; une note génère une ou plusieurs **cartes** (comme Anki). Depuis M14 (ADR-011), il y a deux sortes de types de notes : **Basique**, intégré, à un seul modèle de carte dont on choisit le **type de carte** (classique, texte à trous, occlusion d'image ; valeurs `basic`, `cloze`, `image_occlusion` ci-dessous), et les **types personnalisés**, dont chaque modèle de carte a son type (un même type peut produire une occlusion, deux cartes classiques et un texte à trous). Une carte à trous ou d'occlusion donne une carte par trou ou groupe de masques, ou une seule pour tous (« Génère une seule carte »).
 
 | Type | Champs | Cartes générées |
 |---|---|---|
 | `basic` | Recto, Verso, Extra (optionnel) | 1, posée dans les deux sens : retournée après chaque réussite si le paquet interroge dans les deux sens (défaut), sauf note « Ne jamais retourner » (M11, 03 §1.1) |
 | `cloze` | Texte, Extra | 1 par index `{{cN::…}}` (syntaxe Anki, indice optionnel `{{c1::réponse::indice}}`) |
 | `image_occlusion` (V1) | Image, masques, En-tête, Extra | 1 par groupe de masques rectangulaires (02 §2.1) ; importé/exporté vers le type « Image Occlusion » d'Anki ≥ 23.10 |
-| `custom` (M8) | Champs nommés de son type de note | 1 par modèle de carte dont le recto n'est pas vide, comme Anki (02 §2.2) ; types créés dans « Types de notes » ou importés d'Anki tels quels |
+| `custom` (M8) | Champs nommés de son type de note | Par modèle de carte (02 §2.2) : classique, 1 si le recto n'est pas vide, comme Anki ; à trous, 1 par trou de son champ ; occlusion, 1 par groupe de masques de son champ image (M14) ; types créés dans « Types de notes » ou importés d'Anki tels quels |
 
 Le type « Basique + inversé » (deux cartes jumelles par note) a été retiré en M11 : une carte doit pouvoir être vue dans les deux sens sans en créer une seconde.
 

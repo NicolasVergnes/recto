@@ -9,7 +9,7 @@
   import { errorMessage } from '$lib/ui/errors'
   import FieldInput from './FieldInput.svelte'
   import MathHelp from './MathHelp.svelte'
-  import { targetField, type FieldSlot } from './slots'
+  import { clozeTarget, targetField, type FieldSlot } from './slots'
 
   interface Props {
     /** Text fields to show, each editing `fields[slot.index]`. */
@@ -17,8 +17,10 @@
     fields: string[]
     duplicate: boolean
     clozeMissing: boolean
+    /** Fields holding a cloze text, where « Créer un trou » may wrap the selection (M14). */
+    clozeFields: readonly number[]
   }
-  let { slots, fields = $bindable(), duplicate, clozeMissing }: Props = $props()
+  let { slots, fields = $bindable(), duplicate, clozeMissing, clozeFields }: Props = $props()
   let textareas = $state<(HTMLTextAreaElement | undefined)[]>([])
   /** Index of the last focused field (none yet: the first slot). */
   let active = $state<number>()
@@ -57,10 +59,14 @@
     }
   }
 
-  /** Wraps the selection of the main text (the cloze text) in a new deletion; false elsewhere. */
+  /**
+   * Wraps the selection of the last focused cloze text (else the first one) in a new deletion;
+   * false when the note has no cloze text.
+   */
   export function makeCloze(): boolean {
-    if (target !== first) return false
-    void change(first, (text, start, end) => wrapCloze(text, start, end))
+    const i = clozeTarget(clozeFields, active)
+    if (i === null) return false
+    void change(i, (text, start, end) => wrapCloze(text, start, end))
     return true
   }
 

@@ -38,6 +38,16 @@ describe('cloze', () => {
     )
   })
 
+  it('asks every deletion at once for a single card (M14)', () => {
+    expect(renderClozeQuestion(text, null)).toBe(
+      'La <span class="cloze">[…]</span> tourne autour de la <span class="cloze">[…]</span> en <span class="cloze">[…]</span>.',
+    )
+    expect(renderClozeAnswer('{{c1::a}} et {{c2::b}}', null)).toBe(
+      '<span class="cloze">a</span> et <span class="cloze">b</span>',
+    )
+    expect(clozeAnswers(text, null)).toEqual(['Lune', 'Terre', '27,3 jours'])
+  })
+
   it('wraps a selection with the next index', () => {
     expect(nextClozeIndex(text)).toBe(4)
     expect(wrapCloze('Paris est la capitale', 0, 5)).toEqual({

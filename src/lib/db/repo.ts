@@ -7,6 +7,7 @@ import { deckPath, type DeckCount } from '../domain/decks'
 import { makeCard, makeDeck, resetScheduling, type NewDeckInput } from '../domain/defaults'
 import {
   planNoteTypeEdit,
+  storedTemplate,
   validateNoteType,
   type NoteTypeEdit,
   type NoteTypeEditPlan,
@@ -193,6 +194,10 @@ export interface NoteInput {
   tags: string[]
   /** basic notes only: never asked back → front (M11). */
   oneWay?: boolean
+  /** cloze and image_occlusion notes only: one card for every index or group (M14). */
+  single?: boolean
+  /** custom notes only: occlusion masks of the image fields, aligned with `fields` (M14). */
+  masks?: string[]
   source?: string
 }
 
@@ -211,18 +216,25 @@ async function noteTypeOf(input: Pick<NoteInput, 'modelType' | 'noteTypeId'>) {
   return type
 }
 
-function buildNoteFields(
+/** Occlusion masks in their canonical form (clamped, rounded, invalid ones dropped). */
+const canonicalMasks = (json: string) => (json ? serializeOcclusion(parseOcclusion(json)) : '')
+
+/** What a note stores from `input`, with the cards its content generates. */
+function buildNoteContent(
   input: NoteInput,
   noteType: NoteType | undefined,
-): { fields: string[]; ords: number[] } {
+): { content: Pick<Note, 'fields' | 'single' | 'masks'>; ords: number[] } {
   const fields = normalizeFields(input.modelType, input.fields, noteType)
-  // Occlusion masks are stored in their canonical form (clamped, rounded, invalid ones dropped).
-  if (input.modelType === 'image_occlusion') {
-    fields[1] = serializeOcclusion(parseOcclusion(fields[1] ?? ''))
+  const content: Pick<Note, 'fields' | 'single' | 'masks'> = { fields }
+  if (input.modelType === 'image_occlusion') fields[1] = canonicalMasks(fields[1] ?? '')
+  const kindOfCards = input.modelType === 'cloze' || input.modelType === 'image_occlusion'
+  if (input.single && kindOfCards) content.single = true
+  if (input.modelType === 'custom' && input.masks?.some((m) => m)) {
+    content.masks = fields.map((_, i) => canonicalMasks(input.masks?.[i] ?? ''))
   }
-  const ords = cardOrds(input.modelType, fields, noteType)
+  const ords = cardOrds({ modelType: input.modelType, ...content }, noteType)
   if (ords.length === 0) throw new RepoError(NO_CARD[input.modelType])
-  return { fields, ords }
+  return { content, ords }
 }
 
 export async function createNote(
@@ -232,12 +244,12 @@ export async function createNote(
   return db.transaction('rw', db.decks, db.notes, db.cards, db.noteTypes, async () => {
     await requireDeck(input.deckId)
     const noteType = await noteTypeOf(input)
-    const { fields, ords } = buildNoteFields(input, noteType)
+    const { content, ords } = buildNoteContent(input, noteType)
     const note: Note = {
       id: newId(),
       deckId: input.deckId,
       modelType: input.modelType,
-      fields,
+      ...content,
       tags: [...input.tags],
       createdAt: now,
       updatedAt: now,
@@ -284,15 +296,17 @@ export async function updateNote(
     if (!existing) throw new RepoError('noteNotFound')
     await requireDeck(input.deckId)
     const noteType = await noteTypeOf(input)
-    const { fields, ords } = buildNoteFields(input, noteType)
+    const { content, ords } = buildNoteContent(input, noteType)
     const note: Note = {
       ...existing,
       deckId: input.deckId,
       modelType: input.modelType,
-      fields,
+      ...content,
       tags: [...input.tags],
       updatedAt: now,
     }
+    if (!content.single) delete note.single
+    if (!content.masks) delete note.masks
     if (noteType) note.noteTypeId = noteType.id
     else delete note.noteTypeId
     if (input.oneWay && input.modelType === 'basic') note.oneWay = true
@@ -470,7 +484,7 @@ export async function createNoteType(input: NoteTypeInput, now: number): Promise
     id: newId(),
     name: input.name.trim(),
     fields: input.fields.map((f) => f.trim()),
-    templates: input.templates.map((t) => ({ ...t, name: t.name.trim() })),
+    templates: input.templates.map(storedTemplate),
     createdAt: now,
     updatedAt: now,
   }

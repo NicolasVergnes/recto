@@ -23,8 +23,10 @@ test('create a deck and three notes, then see four cards', async ({ page }) => {
   await expect(page.getByLabel('Recto')).toBeFocused()
 
   // The deck asks both sides with one card (M11): this note only front → back, Ctrl+Enter.
-  await expect(page.getByLabel('Type').locator('option')).toHaveText([
-    'Basique',
+  // M14: one built-in note type, Basique, whose card is classic, cloze or occlusion.
+  await expect(page.getByLabel('Type', { exact: true }).locator('option')).toHaveText(['Basique'])
+  await expect(page.getByLabel('Type de carte').locator('option')).toHaveText([
+    'Classique',
     'Texte à trous',
     'Occlusion d’image',
   ])
@@ -36,10 +38,15 @@ test('create a deck and three notes, then see four cards', async ({ page }) => {
   await expect(page.getByLabel('Recto')).toHaveValue('')
 
   // Cloze with two deletions
-  await page.getByLabel('Type').selectOption({ label: 'Texte à trous' })
+  await page.getByLabel('Type de carte').selectOption({ label: 'Texte à trous' })
   await page
     .getByLabel('Texte', { exact: true })
     .fill('La {{c1::Lune}} tourne autour de la {{c2::Terre}}.')
+  await expect(page.getByText('Cette note produira 2 cartes.')).toBeVisible()
+  // One card for every deletion, or one each (the default).
+  await page.getByLabel('Génère une seule carte').check()
+  await expect(page.getByText('Cette note produira 1 carte.')).toBeVisible()
+  await page.getByLabel('Génère une seule carte').uncheck()
   await expect(page.getByText('Cette note produira 2 cartes.')).toBeVisible()
   await page.getByRole('button', { name: 'Ajouter et fermer' }).click()
   await expect(page.getByRole('heading', { level: 1, name: /Géographie/ })).toBeVisible()

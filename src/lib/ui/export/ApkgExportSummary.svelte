@@ -20,8 +20,14 @@
       media: t('exportApkg.media', { n: report.media }),
     })
     const retired = report.retired > 0 ? t('exportApkg.retired', { n: report.retired }) : ''
+    const leftOut = report.leftOut > 0 ? t('exportApkg.leftOut', { n: report.leftOut }) : ''
     const missing = report.missingMedia.length
-    return [counts, retired, missing > 0 ? t('exportApkg.missingCount', { n: missing }) : '']
+    return [
+      counts,
+      retired,
+      leftOut,
+      missing > 0 ? t('exportApkg.missingCount', { n: missing }) : '',
+    ]
       .filter((s) => s !== '')
       .join(' ')
   })
@@ -39,6 +45,9 @@
     </ul>
     {#if report.retired > 0}
       <p class="small">{t('exportApkg.retired', { n: report.retired })}</p>
+    {/if}
+    {#if report.leftOut > 0}
+      <p class="small">{t('exportApkg.leftOut', { n: report.leftOut })}</p>
     {/if}
     {#if report.missingMedia.length > 0}
       <div class="notice notice-warning small stack">

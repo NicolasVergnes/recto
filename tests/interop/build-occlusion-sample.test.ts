@@ -37,9 +37,7 @@ it('writes an image occlusion .apkg for the real-Anki check', async () => {
     createdAt: now,
     updatedAt: now,
   }
-  const cards = cardOrds(note.modelType, note.fields).map((ord) =>
-    makeCard(note, ord, `io-card-${ord}`, now),
-  )
+  const cards = cardOrds(note).map((ord) => makeCard(note, ord, `io-card-${ord}`, now))
   const { bytes, report } = await buildApkg(
     SQL,
     {

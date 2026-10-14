@@ -4,6 +4,7 @@
 import { makeCard } from '../domain/defaults'
 import { cardOrds, reconcileCards, type ReconcilableCard } from '../domain/notes'
 import { labelsFromAnkiComments, occlusionFromAnki, serializeOcclusion } from '../domain/occlusion'
+import { kindOf } from '../domain/templates'
 import { mediaRefs, renameMediaRefs } from '../domain/text'
 import type {
   Card,
@@ -153,7 +154,9 @@ export function convertModel(model: ApkgModel): ModelConversion {
 
 /**
  * The note type of an imported custom model: the existing one with the same Anki id and the
- * same fields (a re-import), or a new one, named apart from the existing types.
+ * same fields (a re-import), or a new one, named apart from the existing types. A type with cloze
+ * or occlusion cards is never reused (M14): its Anki copy has its classic cards only, under other
+ * ords.
  */
 function resolveNoteType(
   ankiId: string,
@@ -165,7 +168,10 @@ function resolveNoteType(
 ): NoteType {
   const sourceId = Number(ankiId)
   const same = [...existing, ...created].find(
-    (t) => t.sourceId === sourceId && t.fields.join('\u001f') === shape.fields.join('\u001f'),
+    (t) =>
+      t.sourceId === sourceId &&
+      t.fields.join('\u001f') === shape.fields.join('\u001f') &&
+      t.templates.every((tpl) => kindOf(tpl) === 'classic'),
   )
   if (same) return same
   const taken = new Set([...existing, ...created].map((t) => t.name.toLowerCase()))
@@ -389,7 +395,7 @@ export async function planApkgImport(
         report.errors.push({ line: an.id, code: 'orphanCard' })
         continue
       }
-      const wanted = cardOrds(conversion.modelType, fields, noteType)
+      const wanted = cardOrds({ ...known, fields }, noteType)
       if (wanted.length === 0) {
         report.errors.push({ line: an.id, code: noCardError(conversion.modelType) })
         countShapes()
@@ -408,7 +414,7 @@ export async function planApkgImport(
       report.errors.push({ line: an.id, code: 'orphanCard' })
       continue
     }
-    const ords = cardOrds(conversion.modelType, fields, noteType)
+    const ords = cardOrds({ modelType: conversion.modelType, fields }, noteType)
     if (ords.length === 0) {
       report.errors.push({ line: an.id, code: noCardError(conversion.modelType) })
       countShapes()

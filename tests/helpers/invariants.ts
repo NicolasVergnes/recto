@@ -21,7 +21,9 @@ export async function cardProblems(db: RectoDB): Promise<string[]> {
   const noteIds = new Set(notes.map((n) => n.id))
   for (const note of notes) {
     const type = note.noteTypeId ? typeById.get(note.noteTypeId) : undefined
-    const wanted = cardOrds(note.modelType, note.fields, type).join()
+    const wanted = cardOrds(note, type)
+      .sort((a, b) => a - b)
+      .join()
     const own = cardsOf.get(note.id) ?? []
     const have = own.map((c) => c.ord).sort((a, b) => a - b)
     if (have.join() !== wanted)

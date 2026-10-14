@@ -240,7 +240,7 @@ test('mosaic: the flip style is chosen in Settings and reduced motion disables i
   await page.getByRole('button', { name: 'Essayer avec un paquet d’exemple' }).click()
   await expect(page.getByText('101 cartes')).toBeVisible()
   await page.goto('/#/notes/new')
-  await page.getByLabel('Type').selectOption({ label: 'Texte à trous' })
+  await page.getByLabel('Type de carte').selectOption({ label: 'Texte à trous' })
   await page.getByLabel('Texte', { exact: true }).fill('La {{c1::Lune}} tourne autour de la Terre.')
   await page.getByRole('button', { name: 'Ajouter', exact: true }).click()
   await expect(page.getByText('Note ajoutée')).toBeVisible()

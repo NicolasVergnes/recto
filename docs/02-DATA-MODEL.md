@@ -38,6 +38,11 @@ export class RectoDB extends Dexie {
       cards:     'id, noteId, deckId, due, state, box, updatedAt, [deckId+due], [deckId+state], [noteId+ord]',
       deletions: 'id, table, deletedAt',
     }).upgrade(…)
+    // M13 : upgrade des réglages de paquet (newOrder 'random', burySiblings retiré)
+    this.version(4).upgrade(…)
+    // M14 : types de cartes ; propriétés facultatives, rien à migrer : la version empêche une
+    // ancienne copie de l'application de réconcilier les cartes à trous d'un type comme classiques
+    this.version(5).stores({})
   }
 }
 ```
@@ -50,6 +55,8 @@ Règles de migration : chaque changement de schéma = nouvelle `version(n)` avec
 // src/lib/domain/types.ts
 export type SchedulerKind = 'fsrs' | 'leitner'
 export type ModelType = 'basic' | 'cloze' | 'image_occlusion' | 'custom'   // image_occlusion : V1 ; custom : M8 (§2.2) ; basic_reverse retiré en M11
+// M14 : basic, cloze et image_occlusion sont un seul type de note, « Basique », dont la carte est
+// classique, à trous ou d'occlusion (ADR-011) ; la valeur stockée reste celle-ci, sans migration.
 
 export interface Deck {
   id: string
@@ -94,6 +101,9 @@ export interface Note {
                                // custom: un par champ de son type, dans l'ordre
   tags: string[]
   oneWay?: boolean             // basic seulement : toujours Recto → Verso, même si le paquet alterne (M11)
+  single?: boolean             // cloze et image_occlusion seulement : une seule carte pour tous les trous ou groupes (M14)
+  masks?: string[]             // custom seulement (M14) : masques JSON (§2.1) de chaque champ image d'une carte
+                               // d'occlusion, alignés sur `fields` (vides pour les autres) ; absents sans masque
   source?: string
   sourceGuid?: string          // guid Anki à l'import (déduplication : `sourceGuid ?? id`, guid écrit par l'export .apkg, 05 §4)
   createdAt: number
@@ -106,7 +116,9 @@ export interface Card {
   id: string
   noteId: string
   deckId: string               // dénormalisé (= note.deckId) pour les index
-  ord: number                  // 0: recto→verso, 1: verso→recto, cloze: index-1, image_occlusion: groupe-1, custom: indice du modèle de carte
+  ord: number                  // basic: 0 (deux sens par sideFlipped), cloze: index-1, image_occlusion: groupe-1 (0 si `single`),
+                               // custom: indice du modèle + 1000 × (index ou groupe - 1) (M14, §2.2 ; 0 de sous-indice
+                               // pour une carte classique ou unique)
   // Commun
   due: number                  // prochaine échéance (ms). Nouvelle carte : createdAt
   state: CardState
@@ -193,7 +205,7 @@ Une note `image_occlusion` a quatre champs : `fields[0]` = `<img src="nom" alt="
 ```
 
 - Coordonnées normalisées (0–1, origine en haut à gauche) : elles survivent au redimensionnement de l'image ; arrondies à 4 décimales, bornées à l'image, côté minimal 0,5 %.
-- `n` = groupe (≥ 1) : une carte par groupe distinct, `ord = n − 1` (comme `cN` d'Anki). Les masques d'un même groupe sont révélés ensemble. `n` n'est jamais recalculé depuis l'ordre des masques : supprimer un masque ne change pas l'identité des autres cartes.
+- `n` = groupe (≥ 1) : une carte par groupe distinct, `ord = n − 1` (comme `cN` d'Anki) ; une note `single` (M14) n'a qu'une carte, `ord = 0`, qui demande tous les groupes à la fois. Les masques d'un même groupe sont révélés ensemble. `n` n'est jamais recalculé depuis l'ordre des masques : supprimer un masque ne change pas l'identité des autres cartes.
 - `label` (facultatif) : réponse affichée après la demande (P1) et attendue en réponse tapée.
 - `hideAll` (défaut) : tous les masques cachent leur zone, celui de la carte est mis en évidence ; `hideOne` : seul le masque de la carte est dessiné.
 - Le JSON est relu avec tolérance (`parseOcclusion`) et réécrit sous forme canonique à l'enregistrement (`serializeOcclusion`).
@@ -201,12 +213,20 @@ Une note `image_occlusion` a quatre champs : `fields[0]` = `<img src="nom" alt="
 ### 2.2 Types de notes personnalisés (M8)
 
 ```ts
-export interface CardTemplate { name: string; front: string; back: string }
+export type CardKind = 'classic' | 'cloze' | 'occlusion'      // M14
+export interface CardTemplate {
+  name: string
+  front: string              // classique : la question ; occlusion : l'en-tête ; texte à trous : inutilisé
+  back: string               // classique : la réponse ; à trous et occlusion : ce que la réponse ajoute
+  kind?: CardKind            // M14 ; absent = classique (tous les types d'avant M14)
+  field?: string             // à trous et occlusion : nom du champ qui porte le texte à trous ou l'image
+  single?: boolean           // à trous et occlusion : une seule carte pour tous les trous ou groupes
+}
 export interface NoteType {
   id: string
   name: string
   fields: string[]           // noms uniques (sans casse), sans { } : " ni # ^ / en tête
-  templates: CardTemplate[]  // au moins un ; ord d'une carte = indice de son modèle
+  templates: CardTemplate[]  // au moins un ; ord d'une carte : indice de son modèle (+ 1000 × sous-indice, M14)
   sourceId?: number          // id du type Anki à l'import (réimport et réexport le réutilisent)
   anki?: { css?: string; latexPre?: string; latexPost?: string; sortField?: number }
                              // M10 : style du type Anki, inutilisé par Recto, rendu par l'export .apkg
@@ -216,15 +236,18 @@ export interface NoteType {
 ```
 
 - Les modèles utilisent un sous-ensemble de la syntaxe Anki (`src/lib/domain/templates.ts`, ADR-010) : `{{Champ}}`, `{{FrontSide}}` (verso), sections `{{#Champ}}…{{/Champ}}` et `{{^Champ}}…{{/Champ}}`, filtres `text:` (sans HTML), `type:` (réponse tapée : rien n'est rendu, Recto compare), tout autre filtre rend la valeur ; un champ inconnu et les spéciaux (`{{Tags}}`, `{{Deck}}`…) rendent une chaîne vide. Le rendu passe par `sanitize()` comme tout champ (les styles en ligne d'Anki sont retirés ; `<hr>` est permis). Le CSS du type Anki est ignoré.
-- Une note a une carte par modèle dont la question rendue n'est pas vide et diffère de la question rendue avec tous les champs vides (règle d'Anki). En révision, le verso rendu remplace la question (il la reprend par `{{FrontSide}}`) ; pas d'Extra ; Leitner n'échange jamais les faces.
+- Une note a une carte par modèle **classique** dont la question rendue n'est pas vide et diffère de la question rendue avec tous les champs vides (règle d'Anki). En révision, le verso rendu remplace la question (il la reprend par `{{FrontSide}}`) ; pas d'Extra ; Leitner n'échange jamais les faces.
+- Types de cartes (M14, ADR-011) : chaque modèle a son type. Un modèle **à trous** lit le texte de son champ `field` : une carte par index `{{cN::…}}`, rendue comme une note à trous, `back` ajouté après la réponse ; un modèle **d'occlusion** lit l'image de son champ `field` et les masques de la note pour ce champ (`note.masks[i]`, §2.1) : une carte par groupe, `front` en en-tête, `back` ajouté après la réponse. Avec `single`, une seule carte (dès qu'il y a un trou ou un groupe) les demande tous. Un même type peut avoir autant de modèles de chaque type que voulu, chacun sur son champ.
+- `ord` d'une carte personnalisée (M14) : `indice du modèle + ORD_STRIDE × sous-indice` (`ORD_STRIDE = 1000`, `customOrd`, `templateIndex`, `subIndex` dans `templates.ts`) ; le sous-indice vaut index − 1 ou groupe − 1, 0 pour une carte classique ou unique. Les cartes d'avant M14 ont toutes un sous-indice nul : leur `ord` ne change pas, l'index `[noteId+ord]` sert toujours.
 - Modifier un type (`updateNoteType`, une transaction) : champs ajoutés (vides), retirés ou réordonnés (M10) dans toutes ses notes, cartes déplacées avec leur modèle quand un modèle est retiré ou réordonné (leur `ord` suit), créées ou supprimées selon la règle ci-dessus (journal conservé). Renommer un champ réécrit ses références dans les modèles (sauf si l'ancien ou le nouveau nom est vide ou porté par un autre champ, sans casse : aucune référence n'est alors fusionnée ni prise à un autre champ). Un type utilisé par une note ne se supprime pas.
-- Champs utilisés (M11) : un champ cité par un modèle (`{{Champ}}`, section ou filtre) ne se retire pas, l'éditeur nomme les cartes qui l'utilisent (`fieldUsers`) ; un modèle qui cite un champ absent du type (hors champs spéciaux d'Anki : `FrontSide`, `Tags`, `Type`, `Deck`, `Subdeck`, `Card`, `CardFlag`) rend le type invalide (`noteTypeUnknownField`, avec la carte et le champ). Retirer un champ non cité qui a du contenu est annoncé avant l'enregistrement, avec le nombre de notes qui le perdent (`NoteTypeEditPlan.lost`).
+- Changer le type d'un modèle, ou le champ source d'un modèle à trous ou d'occlusion, remplace ses cartes (journal conservé) ; cocher ou décocher `single` garde la carte du premier trou ou groupe (`ord` à sous-indice nul). Les masques suivent leur champ quand les champs sont réordonnés.
+- Champs utilisés (M11) : un champ cité par un modèle (`{{Champ}}`, section ou filtre) ou source d'un modèle à trous ou d'occlusion (M14) ne se retire pas, l'éditeur nomme les cartes qui l'utilisent (`fieldUsers`) ; un modèle qui cite un champ absent du type (hors champs spéciaux d'Anki : `FrontSide`, `Tags`, `Type`, `Deck`, `Subdeck`, `Card`, `CardFlag`) rend le type invalide (`noteTypeUnknownField`, avec la carte et le champ). Retirer un champ non cité qui a du contenu est annoncé avant l'enregistrement, avec le nombre de notes qui le perdent (`NoteTypeEditPlan.lost`).
 - Réordonner (M10) : chaque champ et chaque modèle de l'édition (`NoteTypeEdit`) garde son indice d'origine `from` (null s'il est nouveau) ; c'est cet indice, non le nom ni la position, qui relie la valeur d'une note à son champ et une carte à son modèle. Enregistrer écrit donc `fields` de chaque note dans le nouvel ordre des champs et donne à chaque carte pour `ord` la nouvelle position de son modèle : même `id`, même planification, même journal ; aucune carte n'est créée ni supprimée par un simple changement d'ordre (les modèles désignent les champs par leur nom, la question de chaque carte reste la même). Déplacer, renommer, ajouter et retirer se combinent dans un même enregistrement. L'ordre des champs est celui du formulaire de note et de l'export Anki ; le premier champ est la clé de détection des doublons de l'éditeur de notes. Annuler (`undoReview`) une réponse donnée avant un déplacement rend à la carte sa planification d'avant mais garde son `ord` actuel, comme son paquet actuel : la pile d'annulation d'une séance de révision survit à la navigation vers l'éditeur de types.
 
 ## 3. Invariants (à tester)
 
 1. `card.deckId === note.deckId` pour toute carte (mise à jour en transaction lors d'un déplacement de note).
-2. Une note `basic` a exactement une carte `ord=0`, posée dans les deux sens par `sideFlipped` (M11 : plus de `basic_reverse` ni de carte jumelle) ; `cloze` une carte par index distinct présent dans le texte ; `image_occlusion` une carte par groupe de masques distinct ; `custom` une carte par modèle de carte dont la question n'est pas vide (§2.2) (les cartes des index, groupes ou modèles supprimés sont supprimées avec leur journal conservé). Vaut aussi pour une note mise à jour hors de l'éditeur (M10) : réimport `.apkg` (05 §2.3) et fusion de sauvegarde (§5) réconcilient ses cartes avec son nouveau contenu, avec la même fonction `reconcileCards` que l'éditeur (deux cartes de même `ord` n'en font plus qu'une).
+2. Une note `basic` a exactement une carte `ord=0`, posée dans les deux sens par `sideFlipped` (M11 : plus de `basic_reverse` ni de carte jumelle) ; `cloze` une carte par index distinct présent dans le texte ; `image_occlusion` une carte par groupe de masques distinct (une seule, `ord=0`, pour une note `single`, M14) ; `custom` une carte par modèle classique dont la question n'est pas vide, par trou d'un modèle à trous et par groupe d'un modèle d'occlusion (une pour un modèle `single`) (§2.2) (les cartes des index, groupes ou modèles supprimés sont supprimées avec leur journal conservé). Vaut aussi pour une note mise à jour hors de l'éditeur (M10) : réimport `.apkg` (05 §2.3) et fusion de sauvegarde (§5) réconcilient ses cartes avec son nouveau contenu, avec la même fonction `reconcileCards` que l'éditeur (deux cartes de même `ord` n'en font plus qu'une).
 3. `reviews` est *append-only* : aucune fonction ne modifie ni ne supprime une ligne, sauf `rollback` de la dernière révision d'une carte (suppression de cette seule ligne) et la suppression explicite d'une carte/note par l'utilisateur, et la fusion qui applique ces deux suppressions faites sur un autre appareil (M12).
 8. (M12) Toute suppression laisse sa trace dans `deletions`, dans la même transaction ; toute modification d'une carte met à jour `card.updatedAt`.
 4. Une carte `retired` ou `suspended` n'apparaît jamais dans la file.
@@ -242,14 +265,14 @@ export interface NoteType {
 ## 5. Sauvegarde `.recto.zip`
 
 ```
-manifest.json   { "format": "recto-backup", "schemaVersion": 5, "appVersion": "0.x", "exportedAt": ms, "device": "<navigator.userAgent tronqué à 120 car.>", "deviceId": "<uuid>", "counts": {...} }
+manifest.json   { "format": "recto-backup", "schemaVersion": 6, "appVersion": "0.x", "exportedAt": ms, "device": "<navigator.userAgent tronqué à 120 car.>", "deviceId": "<uuid>", "counts": {...} }
 data.json       { "decks": [...], "noteTypes": [...], "notes": [...], "cards": [...], "reviews": [...], "settings": [...],
                   "media": [{ "name", "mime", "size", "sha256", "createdAt" }],   // sans blobs
                   "deletions": [...] }
 media/<name>    fichiers binaires
 ```
 
-`schemaVersion` : 2 depuis la V1 (ajout du type `image_occlusion`), 3 depuis M8 (table `noteTypes`, notes `custom` ; une note `custom` sans son type est rejetée à la lecture). 4 depuis M12 (`card.updatedAt`, `deletions`, `setting.updatedAt`, `deviceId`) ; une carte d'une sauvegarde plus ancienne est datée comme à la migration Dexie (`lastReview ?? createdAt`), elle n'a pas de suppressions. 5 depuis M13 (Dexie version 4) : `burySiblings` retiré des réglages de paquet, `newOrder` passé à `'random'` pour tous les paquets ; une sauvegarde plus ancienne est migrée de même à la lecture, la date `updatedAt` du paquet est gardée. Une sauvegarde de version 1 ou 2 se restaure telle quelle (pas de type personnalisé), une version plus récente que l'application est refusée. Les lignes sont lues dans une seule transaction en lecture : un instantané cohérent même si l'application écrit pendant l'export. Fusion : un type de note est identifié par `id`, le plus récemment modifié gagne.
+`schemaVersion` : 2 depuis la V1 (ajout du type `image_occlusion`), 3 depuis M8 (table `noteTypes`, notes `custom` ; une note `custom` sans son type est rejetée à la lecture). 4 depuis M12 (`card.updatedAt`, `deletions`, `setting.updatedAt`, `deviceId`) ; une carte d'une sauvegarde plus ancienne est datée comme à la migration Dexie (`lastReview ?? createdAt`), elle n'a pas de suppressions. 5 depuis M13 (Dexie version 4) : `burySiblings` retiré des réglages de paquet, `newOrder` passé à `'random'` pour tous les paquets ; une sauvegarde plus ancienne est migrée de même à la lecture, la date `updatedAt` du paquet est gardée. 6 depuis M14 (Dexie version 5) : types de cartes des modèles (`kind`, `field`, `single`), `note.single`, `note.masks` ; une sauvegarde plus ancienne se lit telle quelle (cartes classiques, une carte par trou ou groupe, pas de masques) ; un type inconnu ou un modèle à trous ou d'occlusion sans champ est lu comme classique. Une sauvegarde de version 1 ou 2 se restaure telle quelle (pas de type personnalisé), une version plus récente que l'application est refusée. Les lignes sont lues dans une seule transaction en lecture : un instantané cohérent même si l'application écrit pendant l'export. Fusion : un type de note est identifié par `id`, le plus récemment modifié gagne.
 
 Restauration « remplacer » : vide la base puis importe (suppressions comprises), sauf les réglages propres à l'appareil, gardés (M12) ; « fusionner » : les entités sont identifiées par `id` (et `sourceGuid` pour les notes) ; en cas de conflit, la version la plus récente (`updatedAt`) gagne, les journaux sont unionnés par `id`.
 

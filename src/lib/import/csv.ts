@@ -264,7 +264,7 @@ export function planCsvImport(
         report.errors.push({ line, code: 'emptyFront' })
         return
       }
-      const ords = cardOrds('custom', fields, type)
+      const ords = cardOrds({ modelType: 'custom', fields }, type)
       if (ords.length === 0) {
         report.errors.push({ line, code: 'noCard' })
         return
@@ -285,7 +285,7 @@ export function planCsvImport(
           updatedAt: now,
         }
         keep(key, next)
-        setCards(next, cardOrds('custom', next.fields, type), now)
+        setCards(next, cardOrds(next, type), now)
       } else {
         const note: Note = {
           id: newId(),
@@ -314,7 +314,7 @@ export function planCsvImport(
         modelType === 'cloze'
           ? [front, [extra, back].filter(Boolean).join('<br>')]
           : [front, back, extra]
-      const ords = cardOrds(modelType, fields)
+      const ords = cardOrds({ modelType, fields })
       if (ords.length === 0) {
         report.errors.push({ line, code: 'noCloze' })
         return

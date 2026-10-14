@@ -66,7 +66,8 @@ function json(entries: Record<string, Uint8Array>, name: string): unknown {
  * (05 §3). 1 → 2 only adds a note type and 2 → 3 the `noteTypes` table (absent: none); 3 → 4
  * (M12) dates the cards like the Dexie version 3 upgrade (`readCard`) and has no deletions
  * (absent: none); 4 → 5 (M13) puts the new cards of every deck in random order and drops
- * `burySiblings`, like the Dexie version 4 upgrade.
+ * `burySiblings`, like the Dexie version 4 upgrade. 5 → 6 (M14) only adds card kinds, single
+ * notes and masks of custom notes (absent: classic cards, one card per index or group, no masks).
  */
 function migrate(data: Record<string, unknown>, fromVersion: number): Record<string, unknown> {
   if (fromVersion < 5 && Array.isArray(data.decks))

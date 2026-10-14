@@ -1,16 +1,38 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-10-14 · Branche : m13-random-review (créée depuis `main`, non fusionnée) · **M7 à M12 fusionnés sur `main`** (2026-10-13) · **M13 (révision au hasard, compteurs de l'accueil, plus de jumelles) livré**, en attente de relecture et de fusion par Nicolas
+Dernière mise à jour : 2026-10-14 · Branche : m14-card-kinds (créée depuis `m13-random-review`, M13 n'étant pas encore fusionné) · **M7 à M12 fusionnés sur `main`** (2026-10-13) · **M13 (révision au hasard) et M14 (texte à trous et occlusion : des types de cartes) livrés**, en attente de relecture et de fusion par Nicolas (M13 d'abord)
 
 ## Jalon en cours
 
-Aucun : M13 est terminé. Recto reste une PWA installable (décision du 2026-10-12). En attente, sans numéro ni date :
+Aucun : M14 est terminé. Recto reste une PWA installable (décision du 2026-10-12). En attente, sans numéro ni date :
 
 - Application Android avec Capacitor (couche plateforme, projet `android/`, bouton retour, micro, sons, flux Maestro, APK de débogage en CI) ; l'identifiant d'application (`appId`) sera à décider à ce moment (proposition : `fr.nicolasvergnes.recto`).
 - Publication sur le Play Store (politique de confidentialité, signature, fiche, test fermé : 12 testeurs pendant 14 jours).
 - Synchronisation automatique PC ↔ Android (dossier, Drive ou Syncthing).
 
 ## Terminé
+
+### M14 — Texte à trous et occlusion d'image deviennent des types de cartes (2026-10-14)
+
+Demande de Nicolas : « Textes à trous » et « Occlusion d'images » ne doivent pas être des types de notes mais des types de cartes ; dans le type Basique (une carte), on choisit le type de carte ; dans un type personnalisé, chaque carte ajoutée choisit le sien (« un type de note qui génère une occlusion, 2 basiques et un texte à trous »). Précisions de Nicolas : une carte par trou par défaut, avec une case « Génère une seule carte » ; plusieurs cartes à trous ou d'occlusion par type, sans limite ; export Anki : « le but c'est d'utiliser Recto », cartes classiques seulement.
+
+Plan suivi :
+
+1. Domaine (tests d'abord) : `cloze.ts` (index `null` = tous les trous), `templates.ts` (`kindOf`, `customOrd`/`templateIndex`/`subIndex`, `templateOrds` par type de carte, `sourceFields`), `notes.ts` (`cardOrds(note, type)`, `single`, rendu à trous et d'occlusion des types personnalisés, `OcclusionCard.target: null`), `note-types.ts` (champ source protégé et exigé, `storedTemplate`, cartes et masques qui suivent les modèles et les champs) — `tests/unit/domain/card-kinds.test.ts`, `cloze.test.ts`.
+2. Base et sauvegardes : Dexie version 5, `SCHEMA_VERSION` 6, `readNoteType`/`readNote` (`kind`, `field`, `single`, `masks`), `repo.ts` (`single`, `masks` canoniques) — `tests/unit/db/migration.test.ts`, `tests/unit/import/backup.test.ts`, `tests/unit/db/card-kinds.test.ts`.
+3. Éditeur de types (`TemplateList`, nouveau `TemplateSides`, `draft.svelte.ts` `setKind`) et liste des types (« Basique » intégré).
+4. Éditeur de notes (`NoteTypeRow` : Type + Type de carte + « Génère une seule carte » ; `Editor` : éditeur de masques par champ image ; `NoteFields`/`slots.ts` : trou dans le champ à trous actif ; `CardPreview` nommé par carte et trou) ; `OcclusionView` (carte unique), `browse.ts`.
+5. Export `.apkg` (`ankiOrds`, rapport `leftOut`), import (`resolveNoteType` ne réutilise pas un type mixte) — `tests/unit/export-apkg.test.ts`.
+6. E2E `tests/e2e/card-kinds.spec.ts` et sélecteurs des specs existantes ; docs 01, 02, 04, 05, 07, 08 (ADR-011), CHANGELOG ; `npm run verify`.
+
+Critères (07-ROADMAP M14) :
+
+- ✔ Éditeur de notes : Type (Basique, types personnalisés), Type de carte, « Génère une seule carte » — E2E `create-notes.spec.ts` (options, 2 cartes ↔ 1 carte), `card-kinds.spec.ts` › « a Basique cloze note can ask every hole on one card » ; carte du premier trou gardée — `tests/unit/db/card-kinds.test.ts` › « keeps the card of the first hole… ».
+- ✔ Éditeur de types : type de chaque carte, champ source, en-tête, ajout au verso, carte unique, champ source protégé, Basique listé — `card-kinds.spec.ts` › « a note type mixes… », `tests/unit/domain/card-kinds.test.ts` (validation, `fieldUsers`, déplacement des cartes de chaque trou, masques qui suivent leur champ, changement de type ou de champ, carte unique).
+- ✔ Note d'un type mixte : masques par champ image, trous au bouton et au clavier, aperçu « Carte 4 · 2 », révision des 6 cartes (2 occlusions, 2 classiques, 2 trous) — `card-kinds.spec.ts` (bureau et mobile) ; réconciliation — `tests/unit/db/card-kinds.test.ts`.
+- ✔ Données : aucune réécriture ; base version 4 ouverte en version 5 (notes, cartes et rendu identiques) — `migration.test.ts` › « opens a version 4 database… (M14) » ; sauvegardes — `backup.test.ts` › « card kinds (M14) » (lecture, refus par une version 5, aller-retour).
+- ✔ Export Anki : cartes classiques renumérotées, `leftOut` compté, type sans carte classique laissé, type mixte non réutilisé au réimport — `export-apkg.test.ts` › « custom types with card kinds (M14) ».
+- ✔ `npm run verify` vert : check 0 erreur 0 avertissement, lint, format, 558 tests unitaires (couverture 92,2 % des lignes), build, E2E 111 réussis et 1 ignoré (bureau et mobile). Vérifié dans l'application réelle : le vrai paquet « Les départements français » s'importe toujours en 404 cartes ; son type affiche « Classique » pour ses 4 cartes ; y ajouter une carte à trous sur un champ sans trou ne crée aucune carte (404 cartes) ; éditeur de note Basique « Texte à trous » + carte unique lisible sur ordinateur et téléphone.
 
 ### M13 — Révision au hasard, compteurs de l'accueil, plus de jumelles (2026-10-14)
 
@@ -291,6 +313,14 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## Décisions prises en session
 
+- 2026-10-14 (M14) : les notes intégrées gardent leur `modelType` stocké (`basic`, `cloze`, `image_occlusion`), lu comme « Basique + type de carte » : aucune note des testeurs n'est réécrite. Alternative écartée : un champ `cardKind` sur des notes `basic` (migration de toutes les notes, des sauvegardes et de l'import pour un nom).
+- 2026-10-14 (M14) : `ord` d'une carte personnalisée = indice du modèle + 1000 × (trou ou groupe − 1) ; les cartes existantes ont un sous-indice nul et ne changent pas. Alternative écartée : un champ `Card.template` (migration de toutes les cartes personnalisées, de la fusion et de l'export).
+- 2026-10-14 (M14) : masques d'un type personnalisé dans `note.masks`, aligné sur les champs (un champ image partagé par deux occlusions partage ses masques). Alternative écartée : un champ caché par occlusion dans le type.
+- 2026-10-14 (M14) : Dexie version 5 sans `upgrade()` et sauvegarde `schemaVersion` 6 sans transformation (propriétés facultatives) ; les numéros servent de verrou contre une ancienne copie de l'application qui réconcilierait les cartes à trous d'un type comme classiques (et les supprimerait).
+- 2026-10-14 (M14) : changer le type d'une carte (ou le champ source d'une carte à trous ou d'occlusion) remplace ses cartes, journal conservé ; revenir au type d'origine avant d'enregistrer ne change rien. Cocher « Génère une seule carte » garde la carte du premier trou ou groupe.
+- 2026-10-14 (M14) : le type et le type de carte d'une note existante restent verrouillés dans l'éditeur, comme avant ; « Génère une seule carte » reste modifiable.
+- 2026-10-14 (M14) : « Créer un trou » sans champ à trous affiche « Pour créer un trou, choisissez le type de carte « Texte à trous » » ; avec un champ à trous, il agit dans le dernier champ à trous actif, sinon dans le premier.
+
 - 2026-10-14 (M13) : retards mélangés, mais quand le plafond de révisions coupe, les retards gardés restent ceux de plus faible récupérabilité (FSRS) ou de plus petit compartiment (Leitner) : P6 tenu, seul l'ordre de présentation est tiré au hasard. Alternative écartée : tirer au hasard aussi la sélection (on pourrait laisser de côté la carte la plus fragile).
 - 2026-10-14 (M13) : plus d'enterrement ni d'espacement des cartes d'une note (choix de Nicolas, il revoit le modèle « Departements ») ; renverse M9 (jumelles) et l'espacement de 10 positions (03 §5.6). Les trous d'un texte à trous et les zones d'une occlusion peuvent donc passer le même jour.
 - 2026-10-14 (M13) : la migration passe tous les paquets en `newOrder: 'random'` sans changer leur `updatedAt` : chaque appareil et chaque sauvegarde migrent de même, une fusion ne voit pas de différence. Alternative écartée : dater le paquet à la migration (une ancienne sauvegarde ne pourrait plus faire gagner un réglage modifié après).
@@ -436,6 +466,9 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 - Chromium ne passe pas la requête du favicon SVG par le service worker : hors ligne, la console signale l'échec de `logo.svg` (sans effet sur l'application, les icônes du manifeste sont précachées).
 
 ## À vérifier manuellement par Nicolas
+
+- M14 — Éditeur de notes : « Type » propose Basique puis vos types ; avec Basique, « Type de carte » (Classique, Texte à trous, Occlusion d'image) ; cocher « Génère une seule carte » sur un texte à trous à deux trous (1 carte qui demande les deux), puis la décocher sur la note enregistrée.
+- M14 — Types de notes : créer un type qui mélange une occlusion, deux cartes classiques et un texte à trous ; ajouter une note (masques sur l'image, trous avec « Créer un trou »), la réviser sur le téléphone. Exporter ce paquet pour Anki : le rapport annonce les cartes restées dans Recto.
 
 - M12 — Sur le PC et le téléphone (PWA) : faire une sauvegarde de chaque côté, supprimer une note sur l'un, puis fusionner la sauvegarde de l'autre : la note ne revient pas ; fusionner dans l'autre sens : elle disparaît aussi (le rapport l'indique). La première ouverture après la mise à jour migre la base (aucune action, rien ne doit changer à l'écran).
 - M13 — Révision : sur le paquet des départements, les cartes du jour arrivent dans un ordre mélangé (plus dans l'ordre d'ajout) ; deux cartes d'une même note peuvent passer dans la même séance. Réglages d'un paquet : plus de case « Pas de cartes jumelles », « Ordre des nouvelles cartes » sur « Aléatoire » (aussi pour les paquets existants, après la mise à jour).

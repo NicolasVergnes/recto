@@ -1,7 +1,7 @@
-import { editOf, fieldUsers, type NoteTypeEdit } from '$lib/domain/note-types'
+import { editOf, fieldUsers, storedTemplate, type NoteTypeEdit } from '$lib/domain/note-types'
 import type { TypeShape } from '$lib/domain/notes'
 import { renameFieldRefs } from '$lib/domain/templates'
-import type { NoteType } from '$lib/domain/types'
+import type { CardKind, NoteType } from '$lib/domain/types'
 import { t } from '$lib/i18n'
 
 /**
@@ -25,7 +25,7 @@ export class NoteTypeDraft {
   /** As it would be saved, for the preview. */
   readonly shape: TypeShape = $derived({
     fields: this.edit.fields.map((f) => f.name.trim()),
-    templates: this.edit.templates.map(({ name, front, back }) => ({ name, front, back })),
+    templates: this.edit.templates.map(storedTemplate),
   })
 
   load(type: NoteType): void {
@@ -49,6 +49,7 @@ export class NoteTypeDraft {
     for (const tpl of this.edit.templates) {
       tpl.front = renameFieldRefs(tpl.front, old, name)
       tpl.back = renameFieldRefs(tpl.back, old, name)
+      if (tpl.field?.trim() === old) tpl.field = name
     }
   }
 
@@ -81,13 +82,37 @@ export class NoteTypeDraft {
 
   /** A new card asks the first field and answers with the second. */
   addTemplate(): void {
-    const [first = '', second = first] = this.shape.fields
     this.edit.templates.push({
       name: t('noteTypes.newCard', { n: this.edit.templates.length + 1 }),
-      front: `{{${first}}}`,
-      back: `{{FrontSide}}<hr id=answer>{{${second}}}`,
+      ...this.classicSides(),
       from: null,
     })
+  }
+
+  private classicSides(): { front: string; back: string } {
+    const [first = '', second = first] = this.shape.fields
+    return { front: `{{${first}}}`, back: `{{FrontSide}}<hr id=answer>{{${second}}}` }
+  }
+
+  /**
+   * Gives template `i` another kind of card (M14), starting from empty sides: a classic card asks
+   * the first field, a cloze or occlusion card reads the first field. Its cards are replaced on
+   * saving (`planNoteTypeEdit`), unless it goes back to its stored kind and field.
+   */
+  setKind(i: number, kind: CardKind): void {
+    const template = this.edit.templates[i]
+    if (!template || (template.kind ?? 'classic') === kind) return
+    delete template.single
+    if (kind === 'classic') {
+      delete template.kind
+      delete template.field
+      Object.assign(template, this.classicSides())
+      return
+    }
+    template.kind = kind
+    template.field = this.shape.fields[0] ?? ''
+    template.front = ''
+    template.back = ''
   }
 
   removeTemplate(i: number): void {

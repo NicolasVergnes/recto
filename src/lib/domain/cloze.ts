@@ -18,24 +18,27 @@ function replaceClozes(text: string, fn: (index: number, answer: string, hint?: 
   )
 }
 
+/** The deletion a card asks: `index` (≥ 1), or null for a single card asking them all (M14). */
+const asks = (index: number | null, n: number) => index === null || n === index
+
 /** Question side: the target deletion becomes `[…]` (or `[hint]`), the others are shown. */
-export function renderClozeQuestion(text: string, index: number): string {
+export function renderClozeQuestion(text: string, index: number | null): string {
   return replaceClozes(text, (n, answer, hint) =>
-    n === index ? `<span class="cloze">[${hint ? hint : '…'}]</span>` : answer,
+    asks(index, n) ? `<span class="cloze">[${hint ? hint : '…'}]</span>` : answer,
   )
 }
 
 /** Answer side: the target deletion is revealed and highlighted. */
-export function renderClozeAnswer(text: string, index: number): string {
+export function renderClozeAnswer(text: string, index: number | null): string {
   return replaceClozes(text, (n, answer) =>
-    n === index ? `<span class="cloze">${answer}</span>` : answer,
+    asks(index, n) ? `<span class="cloze">${answer}</span>` : answer,
   )
 }
 
-/** The answers hidden by deletion `index` (for typed-answer comparison). */
-export function clozeAnswers(text: string, index: number): string[] {
+/** The answers hidden by deletion `index`, or by every one (for typed-answer comparison). */
+export function clozeAnswers(text: string, index: number | null): string[] {
   const answers: string[] = []
-  for (const m of text.matchAll(CLOZE_RE)) if (Number(m[1]) === index) answers.push(m[2] ?? '')
+  for (const m of text.matchAll(CLOZE_RE)) if (asks(index, Number(m[1]))) answers.push(m[2] ?? '')
   return answers
 }
 

@@ -27,7 +27,7 @@ test('an Anki note type with 4 card templates is kept: one card per template', a
   await page.getByRole('link', { name: /Laon est la préfecture de/ }).click()
   await expect(page.getByLabel('Dept', { exact: true })).toHaveValue('Aisne')
   await expect(page.getByLabel('Prefecture', { exact: true })).toHaveValue('Laon')
-  await expect(page.getByLabel('Type')).toBeDisabled()
+  await expect(page.getByLabel('Type', { exact: true })).toBeDisabled()
   const preview = page.getByRole('region', { name: /^Aperçu/ })
   await expect(preview.getByText('QNumero')).toBeVisible()
   await expect(preview.locator('.preview')).toHaveCount(4)
@@ -59,7 +59,7 @@ test('a note type is created, used and given a second card', async ({ page }) =>
 
   // A note of this type: its fields are named.
   await page.goto('/#/notes/new')
-  await page.getByLabel('Type').selectOption({ label: 'Pays' })
+  await page.getByLabel('Type', { exact: true }).selectOption({ label: 'Pays' })
   await page.getByLabel('Pays', { exact: true }).fill('France')
   await page.getByLabel('Capitale', { exact: true }).fill('Paris')
   await expect(page.getByText('Cette note produira 1 carte.')).toBeVisible()
@@ -69,7 +69,7 @@ test('a note type is created, used and given a second card', async ({ page }) =>
   // A second template asking the capital: saving announces the card it creates.
   await page.goto('/#/note-types')
   await expect(page.getByRole('listitem').filter({ hasText: 'Pays' })).toContainText(
-    '2 champs · 1 carte par note · 1 note',
+    '2 champs · 1 modèle de carte · 1 note',
   )
   await page.getByRole('link', { name: 'Pays', exact: true }).click()
   await page.getByRole('button', { name: 'Ajouter une carte' }).click()
@@ -125,7 +125,7 @@ async function capitales(page: Page) {
   await expect(page.getByText('Type de note enregistré')).toHaveCount(0)
 
   await page.goto('/#/notes/new')
-  await page.getByLabel('Type').selectOption({ label: 'Capitales' })
+  await page.getByLabel('Type', { exact: true }).selectOption({ label: 'Capitales' })
   await page.getByLabel('Pays', { exact: true }).fill('France')
   await page.getByLabel('Capitale', { exact: true }).fill('Paris')
   await page.getByLabel('Continent', { exact: true }).fill('Europe')

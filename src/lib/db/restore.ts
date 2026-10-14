@@ -182,7 +182,7 @@ async function mergeCards(
   for (const note of notes.values()) {
     const cards = [...(candidates.get(note.id)?.values() ?? [])]
     const type = note.noteTypeId ? types.get(note.noteTypeId) : undefined
-    const wanted = cardOrds(note.modelType, note.fields, type)
+    const wanted = cardOrds(note, type)
     // Content that generates no card is not something the app writes: its cards are left alone.
     const result =
       wanted.length > 0 ? reconcileCards(cards, wanted) : { keep: cards, create: [], remove: [] }

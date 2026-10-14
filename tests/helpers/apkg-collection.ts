@@ -44,7 +44,7 @@ export function representativeCollection(now: number): ApkgExportInput {
       ...extra,
     }
     notes.push(n)
-    for (const ord of cardOrds(modelType, fields))
+    for (const ord of cardOrds({ modelType, fields }))
       cards.push(makeCard(n, ord, `${n.id}-${ord}`, createdAt))
     return n
   }
@@ -182,7 +182,7 @@ export function customTypeCollection(now: number): ApkgExportInput {
       ...extra,
     }
     notes.push(n)
-    for (const ord of cardOrds('custom', fields, type))
+    for (const ord of cardOrds({ modelType: 'custom', fields }, type))
       cards.push(makeCard(n, ord, `${n.id}-${ord}`, createdAt))
     return n
   }

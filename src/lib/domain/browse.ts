@@ -37,9 +37,11 @@ export function buildRow(
 ): BrowserRow {
   const r = renderCard(note, card, false, noteType)
   const occlusion = r.occlusion
-  // Occlusion: "header (or image) #group" and the mask labels (or the extra).
+  // Occlusion: "header (or image) #group" (no group: a single card) and the mask labels (or the
+  // extra).
+  const group = occlusion?.target ? ` #${occlusion.target}` : ''
   const question = occlusion
-    ? `${stripHtml(r.question) || occlusion.alt || occlusion.image} #${occlusion.target}`
+    ? `${stripHtml(r.question) || occlusion.alt || occlusion.image}${group}`
     : stripHtml(r.question)
   const answer = occlusion
     ? stripHtml(r.expected) || stripHtml(r.extra)

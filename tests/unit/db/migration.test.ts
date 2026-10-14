@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import { at } from '../../helpers/at'
 import Dexie from 'dexie'
 import { RectoDB } from '$lib/db/schema'
 import { makeCard, makeDeck } from '$lib/domain/defaults'
+import { cardOrds, renderCard } from '$lib/domain/notes'
+import type { Note, NoteType } from '$lib/domain/types'
 
 /** The published version 1 layout (V0–M7), frozen here to open « old » databases. */
 class RectoDBv1 extends Dexie {
@@ -38,6 +41,14 @@ class RectoDBv3 extends RectoDBv2 {
         'id, noteId, deckId, due, state, box, updatedAt, [deckId+due], [deckId+state], [noteId+ord]',
       deletions: 'id, table, deletedAt',
     })
+  }
+}
+
+/** The published version 4 layout (M13), frozen here to open « old » databases. */
+class RectoDBv4 extends RectoDBv3 {
+  constructor(name: string) {
+    super(name)
+    this.version(4).stores({})
   }
 }
 
@@ -93,7 +104,7 @@ describe('schema migrations', () => {
 
     const db = new RectoDB(name)
     await db.open()
-    expect(db.verno).toBe(4)
+    expect(db.verno).toBe(5)
     expect((await db.notes.get('n1'))?.fields).toEqual(['a', 'b', ''])
     expect(await db.noteTypes.count()).toBe(0)
     await db.noteTypes.add({
@@ -120,7 +131,7 @@ describe('schema migrations', () => {
     await current
       .table('cards')
       .add({ ...makeCard({ id: 'n1', deckId: 'd1' }, 1, 'c2', 1), flag: 3 })
-    expect(current.verno).toBe(4)
+    expect(current.verno).toBe(5)
     current.close()
 
     const next = new RectoDBNext(name)
@@ -151,7 +162,7 @@ describe('schema migrations', () => {
 
     const db = new RectoDB(name)
     await db.open()
-    expect(db.verno).toBe(4)
+    expect(db.verno).toBe(5)
     // Dated by their last review, else by their creation.
     expect((await db.cards.get('c1'))?.updatedAt).toBe(50)
     expect((await db.cards.get('c2'))?.updatedAt).toBe(20)
@@ -178,7 +189,7 @@ describe('schema migrations', () => {
 
     const db = new RectoDB(name)
     await db.open()
-    expect(db.verno).toBe(4)
+    expect(db.verno).toBe(5)
     // Same settings as a deck created today; the change dates are kept.
     expect(await db.decks.get('d1')).toEqual(deck)
     expect(await db.decks.get('d2')).toEqual({
@@ -191,10 +202,53 @@ describe('schema migrations', () => {
     db.close()
   })
 
-  it('the published schema is version 4', async () => {
+  it('opens a version 4 database: custom notes, their cards and what they ask unchanged (M14)', async () => {
+    const name = uniqueName('v4')
+    const v4 = new RectoDBv4(name)
+    const type: NoteType = {
+      id: 't1',
+      name: 'Departements',
+      fields: ['Numero', 'Dept'],
+      templates: [
+        { name: 'QNumero', front: '{{Numero}}', back: '{{FrontSide}}<hr>{{Dept}}' },
+        { name: 'QDept', front: '{{Dept}}', back: '{{FrontSide}}<hr>{{Numero}}' },
+      ],
+      createdAt: 1,
+      updatedAt: 1,
+    }
+    const notes: Note[] = [
+      { ...base('n1'), modelType: 'custom', noteTypeId: 't1', fields: ['01', 'Ain'] },
+      { ...base('n2'), modelType: 'cloze', fields: ['{{c1::a}} {{c2::b}}', ''] },
+    ]
+    const cards = [
+      makeCard(at(notes, 0), 0, 'c0', 10),
+      makeCard(at(notes, 0), 1, 'c1', 10),
+      makeCard(at(notes, 1), 0, 'z0', 10),
+      makeCard(at(notes, 1), 1, 'z1', 10),
+    ]
+    await v4.table('noteTypes').add(type)
+    await v4.table('notes').bulkAdd(notes)
+    await v4.table('cards').bulkAdd(cards)
+    v4.close()
+
+    const db = new RectoDB(name)
+    await db.open()
+    expect(db.verno).toBe(5)
+    expect(await db.noteTypes.get('t1')).toEqual(type)
+    expect(await db.notes.toArray()).toEqual(notes)
+    expect(await db.cards.toArray()).toEqual(cards)
+    // The cards their content asks for are the stored ones, asking what they asked before.
+    expect(cardOrds(at(notes, 0), type)).toEqual([0, 1])
+    expect(cardOrds(at(notes, 1))).toEqual([0, 1])
+    expect(renderCard(at(notes, 0), at(cards, 1), false, type).question).toBe('Ain')
+    expect(renderCard(at(notes, 1), at(cards, 3)).expected).toBe('b')
+    db.close()
+  })
+
+  it('the published schema is version 5', async () => {
     const db = new RectoDB(uniqueName('schema'))
     await db.open()
-    expect(db.verno).toBe(4)
+    expect(db.verno).toBe(5)
     expect(db.tables.map((t) => t.name).sort()).toEqual([
       'cards',
       'decks',
@@ -208,3 +262,7 @@ describe('schema migrations', () => {
     db.close()
   })
 })
+
+function base(id: string) {
+  return { id, deckId: 'd1', tags: [], createdAt: 1, updatedAt: 1 }
+}

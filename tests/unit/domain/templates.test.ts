@@ -86,9 +86,9 @@ describe('custom notes', () => {
     // Leitner never swaps the sides of a template card.
     expect(card.flipped).toBe(false)
     expect(card.expected).toBe('')
-    expect(cardOrds('custom', AIN, DEPARTEMENTS)).toEqual([0, 1, 2, 3])
+    expect(cardOrds({ modelType: 'custom', fields: AIN }, DEPARTEMENTS)).toEqual([0, 1, 2, 3])
     // Without its note type: no card, nothing rendered.
-    expect(cardOrds('custom', AIN)).toEqual([])
+    expect(cardOrds({ modelType: 'custom', fields: AIN })).toEqual([])
     expect(renderCard(note, { ord: 0, sideFlipped: false }).question).toBe('')
   })
 

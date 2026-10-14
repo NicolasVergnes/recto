@@ -60,6 +60,13 @@
   </div>
   <p class="muted">{t('noteTypes.help')}</p>
 
+  <ul class="types stack">
+    <!-- M14: the built-in type, whose single card is classic, cloze or occlusion. -->
+    <li class="card-surface">
+      <p class="name">{t('editor.basic')}</p>
+      <p class="muted small">{t('noteTypes.builtIn')}</p>
+    </li>
+  </ul>
   {#if types.loaded && types.value.length === 0}
     <p class="notice">{t('noteTypes.empty')}</p>
   {:else}

@@ -3,7 +3,15 @@
  * and cards of the type. Pure: the repository applies the plan in one transaction.
  */
 import { makeCard } from './defaults'
-import { isEmptyField, referencedFields, templateOrds } from './templates'
+import {
+  customOrd,
+  isEmptyField,
+  kindOf,
+  referencedFields,
+  subIndex,
+  templateIndex,
+  templateOrds,
+} from './templates'
 import type { Card, CardTemplate, Note, NoteType } from './types'
 
 export type NoteTypeErrorCode =
@@ -35,10 +43,19 @@ export const DEFAULT_NOTE_TYPE: Pick<NoteType, 'fields' | 'templates'> = {
 /** Anki's special fields: a template may use them without a field of that name. */
 const SPECIAL_FIELDS = new Set(['FrontSide', 'Tags', 'Type', 'Deck', 'Subdeck', 'Card', 'CardFlag'])
 
-const usesField = (template: CardTemplate, name: string) =>
-  referencedFields(template.front).includes(name) || referencedFields(template.back).includes(name)
+/** Fields a template reads: its references, and the text or image of a cloze or occlusion card. */
+const fieldsOf = (template: CardTemplate): string[] => [
+  ...(kindOf(template) === 'classic' ? [] : [template.field ?? '']),
+  ...referencedFields(template.front),
+  ...referencedFields(template.back),
+]
 
-/** Names of the templates whose question or answer uses field `name` (M11: it cannot be removed). */
+const usesField = (template: CardTemplate, name: string) => fieldsOf(template).includes(name)
+
+/**
+ * Names of the templates whose question or answer uses field `name`, or that ask its cloze text or
+ * image (M11, M14: it cannot be removed).
+ */
 export function fieldUsers(templates: readonly CardTemplate[], name: string): string[] {
   return templates.filter((t) => usesField(t, name.trim())).map((t) => t.name)
 }
@@ -49,7 +66,7 @@ export function unknownReference(
 ): { field: string; card: string } | null {
   const known = new Set(input.fields.map((f) => f.trim()))
   for (const t of input.templates) {
-    for (const field of [...referencedFields(t.front), ...referencedFields(t.back)]) {
+    for (const field of fieldsOf(t)) {
       if (!known.has(field) && !SPECIAL_FIELDS.has(field)) return { field, card: t.name }
     }
   }
@@ -77,17 +94,23 @@ export function validateNoteType(
   return null
 }
 
+/** A template as stored: trimmed name, and the kind's settings only when it is not classic. */
+export function storedTemplate(t: CardTemplate): CardTemplate {
+  const out: CardTemplate = { name: t.name.trim(), front: t.front, back: t.back }
+  const kind = kindOf(t)
+  if (kind === 'classic') return out
+  out.kind = kind
+  out.field = t.field?.trim() ?? ''
+  if (t.single) out.single = true
+  return out
+}
+
 /** The edit of a stored type that changes nothing (the editor's starting point). */
 export function editOf(type: Pick<NoteType, 'name' | 'fields' | 'templates'>): NoteTypeEdit {
   return {
     name: type.name,
     fields: type.fields.map((name, i) => ({ name, from: i })),
-    templates: type.templates.map((t, i) => ({
-      name: t.name,
-      front: t.front,
-      back: t.back,
-      from: i,
-    })),
+    templates: type.templates.map((t, i) => ({ ...t, from: i })),
   }
 }
 
@@ -121,7 +144,7 @@ export function planNoteTypeEdit(
     ...type,
     name: edit.name.trim(),
     fields: edit.fields.map((f) => f.name.trim()),
-    templates: edit.templates.map(({ name, front, back }) => ({ name: name.trim(), front, back })),
+    templates: edit.templates.map(storedTemplate),
     updatedAt: now,
   }
   // Anki's sort field follows its field; a removed one falls back to the first (M10).
@@ -137,10 +160,29 @@ export function planNoteTypeEdit(
   }
   const fieldsChanged =
     edit.fields.length !== type.fields.length || edit.fields.some((f, i) => f.from !== i)
-  const newOrd = new Map<number, number>()
+  // A template keeps its cards while it asks the same thing: same kind, same source field (M14).
+  const sourceOf = (t: CardTemplate, fields: readonly (number | null)[], names: string[]) =>
+    kindOf(t) === 'classic' ? null : (fields[names.indexOf(t.field ?? '')] ?? null)
+  const newTemplate = new Map<number, number>()
   edit.templates.forEach((t, i) => {
-    if (t.from !== null) newOrd.set(t.from, i)
+    const old = t.from === null ? undefined : type.templates[t.from]
+    if (t.from === null || !old || kindOf(old) !== kindOf(t)) return
+    const before = sourceOf(
+      old,
+      type.fields.map((_, j) => j),
+      type.fields,
+    )
+    const after = sourceOf(
+      t,
+      edit.fields.map((f) => f.from),
+      next.fields,
+    )
+    if (before === after) newTemplate.set(t.from, i)
   })
+  const newOrd = (ord: number) => {
+    const t = newTemplate.get(templateIndex(ord))
+    return t === undefined ? undefined : customOrd(t, subIndex(ord))
+  }
   const cardsByNote = new Map<string, Card[]>()
   for (const c of cards) cardsByNote.set(c.noteId, [...(cardsByNote.get(c.noteId) ?? []), c])
 
@@ -159,14 +201,20 @@ export function planNoteTypeEdit(
     if (n > 0) plan.lost.push({ field, notes: n })
   })
   for (const note of notes) {
-    const fields = fieldsChanged
-      ? edit.fields.map((f) => (f.from === null ? '' : (note.fields[f.from] ?? '')))
-      : note.fields
-    if (fieldsChanged) plan.notes.push({ ...note, fields, updatedAt: now })
-    const wanted = new Set(templateOrds(next, fields))
+    const reorder = (values: readonly string[]) =>
+      edit.fields.map((f) => (f.from === null ? '' : (values[f.from] ?? '')))
+    const fields = fieldsChanged ? reorder(note.fields) : note.fields
+    // Masks follow their image field (M14).
+    const masks = fieldsChanged && note.masks ? reorder(note.masks) : note.masks
+    if (fieldsChanged) {
+      const changed: Note = { ...note, fields, updatedAt: now }
+      if (masks) changed.masks = masks
+      plan.notes.push(changed)
+    }
+    const wanted = new Set(templateOrds(next, fields, masks))
     const keptOrds = new Set<number>()
     for (const card of cardsByNote.get(note.id) ?? []) {
-      const ord = newOrd.get(card.ord)
+      const ord = newOrd(card.ord)
       if (ord === undefined || !wanted.has(ord) || keptOrds.has(ord)) {
         plan.removed.push(card.id)
         continue

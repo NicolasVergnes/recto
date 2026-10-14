@@ -12,10 +12,10 @@
   import MediaButtons from '$lib/ui/editor/MediaButtons.svelte'
   import MediaTray from '$lib/ui/editor/MediaTray.svelte'
   import NoteFields from '$lib/ui/editor/NoteFields.svelte'
+  import NoteOcclusions from '$lib/ui/editor/NoteOcclusions.svelte'
   import NoteTypeRow from '$lib/ui/editor/NoteTypeRow.svelte'
   import TagInput from '$lib/ui/editor/TagInput.svelte'
   import { errorMessage } from '$lib/ui/errors'
-  import OcclusionEditor from '$lib/ui/occlusion/OcclusionEditor.svelte'
 
   let { params, query }: RouteProps = $props()
   const editingId = $derived(params.id)
@@ -61,7 +61,7 @@
   })
 
   function makeCloze() {
-    if (draft.modelType !== 'cloze' || !noteFields?.makeCloze()) toast(t('editor.clozeOnly'))
+    if (!noteFields?.makeCloze()) toast(t('editor.clozeOnly'))
   }
 
   async function save(close: boolean) {
@@ -133,6 +133,7 @@
           decks={decks.value}
           bind:deckId={draft.deckId}
           bind:oneWay={draft.oneWay}
+          bind:single={draft.single}
           modelType={draft.modelType}
           noteType={draft.noteType}
           noteTypes={noteTypes.value}
@@ -140,13 +141,7 @@
           ontypechange={(next, type) => draft.changeType(next, type)}
         />
 
-        {#if draft.modelType === 'image_occlusion'}
-          <OcclusionEditor
-            bind:image={() => draft.fields[0] ?? '', (v) => (draft.fields[0] = v)}
-            bind:masks={() => draft.fields[1] ?? '', (v) => (draft.fields[1] = v)}
-            firstGroup={draft.nextGroup}
-          />
-        {/if}
+        <NoteOcclusions {draft} />
 
         <NoteFields
           bind:this={noteFields}
@@ -154,10 +149,11 @@
           slots={draft.slots}
           {duplicate}
           clozeMissing={draft.clozeMissing}
+          clozeFields={draft.clozeFields}
         />
 
         <MediaButtons
-          cloze={draft.modelType === 'cloze'}
+          cloze={draft.clozeFields.length > 0}
           onfiles={(files) => noteFields?.addFiles(files)}
           onmakecloze={makeCloze}
         />
@@ -186,7 +182,7 @@
         </p>
       </form>
 
-      <CardPreview modelType={draft.modelType} noteType={draft.noteType} fields={draft.fields} />
+      <CardPreview note={draft.content} noteType={draft.noteType} />
     </div>
   {/if}
 </section>

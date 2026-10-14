@@ -8,7 +8,7 @@ import type { SqlJsStatic } from 'sql.js'
 import { deckPath } from '../domain/decks'
 import { normalizeFields } from '../domain/notes'
 import { labelsToAnkiComments, occlusionToAnki, parseOcclusion } from '../domain/occlusion'
-import { referencedFields } from '../domain/templates'
+import { kindOf, referencedFields, templateIndex } from '../domain/templates'
 import { decodeEntities, escapeHtml, mediaRefs } from '../domain/text'
 import {
   MODEL_TYPES,
@@ -55,6 +55,11 @@ export interface ApkgExportReport {
   missingMedia: string[]
   /** Retired cards (P7): Anki has no equivalent, they are exported as suspended. */
   retired: number
+  /**
+   * Cloze and occlusion cards of custom note types (M14), left in Recto: Anki's note types are
+   * either standard or cloze, never both.
+   */
+  leftOut: number
 }
 
 export interface ApkgExportResult {
@@ -189,11 +194,22 @@ const commonModel = (id: number, mod: number) => ({
 })
 
 /**
- * A custom note type as a standard Anki note type: its fields and templates, as written, and the
- * styling it came with from Anki (M10), so that Anki keeps its look when it takes the type back.
+ * Anki ord of each template of a custom type: its classic templates only, numbered in order
+ * (M14); undefined for a cloze or occlusion template, whose cards stay in Recto.
+ */
+export function ankiOrds(type: Pick<NoteType, 'templates'>): (number | undefined)[] {
+  let next = 0
+  return type.templates.map((t) => (kindOf(t) === 'classic' ? next++ : undefined))
+}
+
+/**
+ * A custom note type as a standard Anki note type: its fields and classic templates, as written,
+ * and the styling it came with from Anki (M10), so that Anki keeps its look when it takes the
+ * type back.
  */
 function customModel(type: NoteType) {
   const sortField = type.anki?.sortField ?? 0
+  const classic = type.templates.filter((t) => kindOf(t) === 'classic')
   return {
     ...commonModel(customModelId(type), Math.floor(type.updatedAt / 1000)),
     ...(type.anki?.css !== undefined ? { css: type.anki.css } : {}),
@@ -203,9 +219,9 @@ function customModel(type: NoteType) {
     name: type.name,
     type: 0,
     flds: type.fields.map((name, ord) => field(name, ord)),
-    tmpls: type.templates.map((t, ord) => template(t.name, ord, t.front, t.back)),
+    tmpls: classic.map((t, ord) => template(t.name, ord, t.front, t.back)),
     // Legacy « required fields » of each template: the fields its question uses.
-    req: type.templates.map((t, ord) => [
+    req: classic.map((t, ord) => [
       ord,
       'any',
       referencedFields(t.front)
@@ -428,14 +444,23 @@ export async function buildApkg(
 ): Promise<ApkgExportResult> {
   const { now, dayStartHour } = options
   // A note without cards would be removed by Anki's "Check database"; a custom note needs its type.
-  const withCards = new Set(input.cards.map((c) => c.noteId))
   const noteTypes = new Map((input.noteTypes ?? []).map((t) => [t.id, t]))
   const typeOf = (note: Note) => (note.noteTypeId ? noteTypes.get(note.noteTypeId) : undefined)
+  // Cards of custom notes leave with their Anki ord: those of cloze and occlusion templates stay.
+  const ordsOfType = new Map([...noteTypes.values()].map((t) => [t.id, ankiOrds(t)]))
+  const noteById = new Map(input.notes.map((n) => [n.id, n]))
+  const ankiOrd = (card: Card): number | undefined => {
+    const typeId = noteById.get(card.noteId)?.noteTypeId
+    const ords = typeId === undefined ? undefined : ordsOfType.get(typeId)
+    return ords ? ords[templateIndex(card.ord)] : card.ord
+  }
+  const leaving = input.cards.filter((c) => ankiOrd(c) !== undefined)
+  const withCards = new Set(leaving.map((c) => c.noteId))
   const notes = input.notes
     .filter((n) => withCards.has(n.id) && (n.modelType !== 'custom' || typeOf(n)))
     .sort((a, b) => a.createdAt - b.createdAt || compareIds(a, b))
   const noteIds = new Set(notes.map((n) => n.id))
-  const cards = input.cards
+  const cards = leaving
     .filter((c) => noteIds.has(c.noteId))
     .sort((a, b) => a.createdAt - b.createdAt || a.ord - b.ord || compareIds(a, b))
   const cardIds = new Set(cards.map((c) => c.id))
@@ -543,7 +568,7 @@ export async function buildApkg(
         id,
         ankiNoteIds.get(card.noteId) ?? 0,
         deckIds.get(card.deckId) ?? DEFAULT_DECK_ID,
-        card.ord,
+        ankiOrd(card) ?? 0,
         Math.floor((card.lastReview ?? card.createdAt) / 1000),
         a.type,
         a.queue,
@@ -630,6 +655,7 @@ export async function buildApkg(
         media: included.length,
         missingMedia: [...missing].sort(),
         retired,
+        leftOut: input.cards.length - leaving.length,
       },
     }
   } finally {

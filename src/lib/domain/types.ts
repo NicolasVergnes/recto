@@ -49,11 +49,26 @@ export interface Deck {
   updatedAt: number
 }
 
-/** One card of a custom note type: question and answer templates (Anki syntax, templates.ts). */
+/** What a card asks (M14): a question and its answer, a cloze text, or masks on an image. */
+export const CARD_KINDS = ['classic', 'cloze', 'occlusion'] as const
+export type CardKind = (typeof CARD_KINDS)[number]
+
+/**
+ * One card of a custom note type (templates in Anki syntax, templates.ts). Classic: `front` asks,
+ * `back` answers. Cloze and occlusion (M14): `field` holds the cloze text or the image, `front` is
+ * the occlusion header (unused by cloze), `back` what the answer adds; one card per cloze index
+ * or mask group, or a single card asking them all.
+ */
 export interface CardTemplate {
   name: string
   front: string
   back: string
+  /** Absent: classic (every type stored before M14). */
+  kind?: CardKind
+  /** Cloze and occlusion: the name of the field holding the text or the image. */
+  field?: string
+  /** Cloze and occlusion: one card for every index or group instead of one each. */
+  single?: boolean
 }
 
 /** A note type with named fields and one card per template, like Anki's (02 §2.2, M8). */
@@ -98,6 +113,13 @@ export interface Note {
   tags: string[]
   /** basic only: always asked front → back, even in a deck that alternates (M11). */
   oneWay?: boolean
+  /** cloze and image_occlusion only: one card asking every index or group (M14). */
+  single?: boolean
+  /**
+   * custom only (M14): occlusion masks JSON of each image field asked by an occlusion card,
+   * aligned with `fields` (empty for the others).
+   */
+  masks?: string[]
   source?: string
   /** Anki guid on import (deduplication). */
   sourceGuid?: string
@@ -118,7 +140,8 @@ export interface Card {
   deckId: string
   /**
    * basic: 0 (both sides through `sideFlipped`), cloze: index - 1, image_occlusion: mask
-   * group - 1, custom: template index.
+   * group - 1 (0 for a `single` note), custom: template index + 1000 × (index or group - 1)
+   * (`customOrd`, templates.ts; 0 for a classic or single card).
    */
   ord: number
   due: number

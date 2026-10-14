@@ -32,7 +32,7 @@ async function mapPng(page: Page): Promise<Buffer> {
 test('image occlusion: draw and place masks, then review one card per mask', async ({ page }) => {
   await createDeck(page, 'Cartes')
   await page.getByRole('link', { name: 'Ajouter une note' }).click()
-  await page.getByLabel('Type').selectOption({ label: 'Occlusion d’image' })
+  await page.getByLabel('Type de carte').selectOption({ label: 'Occlusion d’image' })
   await page.getByLabel('Choisir une image').setInputFiles({
     name: 'carte.png',
     mimeType: 'image/png',
@@ -114,7 +114,7 @@ test('image occlusion: « ne cacher que la zone à deviner » draws the target o
 }) => {
   await createDeck(page, 'Une zone')
   await page.getByRole('link', { name: 'Ajouter une note' }).click()
-  await page.getByLabel('Type').selectOption({ label: 'Occlusion d’image' })
+  await page.getByLabel('Type de carte').selectOption({ label: 'Occlusion d’image' })
   await page.getByLabel('Choisir une image').setInputFiles({
     name: 'carte.png',
     mimeType: 'image/png',
@@ -140,7 +140,7 @@ test('image occlusion: « ne cacher que la zone à deviner » draws the target o
 test('image occlusion notes need an image and a mask', async ({ page }) => {
   await createDeck(page, 'Vide')
   await page.getByRole('link', { name: 'Ajouter une note' }).click()
-  await page.getByLabel('Type').selectOption({ label: 'Occlusion d’image' })
+  await page.getByLabel('Type de carte').selectOption({ label: 'Occlusion d’image' })
   await expect(page.getByText('Aucune image : choisissez-en une.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Ajouter', exact: true })).toBeDisabled()
 })

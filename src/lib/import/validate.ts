@@ -110,9 +110,13 @@ export function readNote(x: unknown): Note | null {
   if (isStr(x.source)) note.source = x.source
   if (isStr(x.sourceGuid)) note.sourceGuid = x.sourceGuid
   if (x.modelType === 'basic' && x.oneWay === true) note.oneWay = true
+  // M14: a wrong value is dropped, not the note (one card per index or group, no masks).
+  if ((x.modelType === 'cloze' || x.modelType === 'image_occlusion') && x.single === true)
+    note.single = true
   if (x.modelType === 'custom') {
     if (!isStr(x.noteTypeId)) return null
     note.noteTypeId = x.noteTypeId
+    if (isStrArray(x.masks) && x.masks.some((m) => m)) note.masks = x.masks
   }
   return note
 }
@@ -291,7 +295,14 @@ export function readNoteType(x: unknown): NoteType | null {
   const templates: CardTemplate[] = []
   for (const t of x.templates) {
     if (!isObj(t) || !isStr(t.name) || !isStr(t.front) || !isStr(t.back)) return null
-    templates.push({ name: t.name, front: t.front, back: t.back })
+    const template: CardTemplate = { name: t.name, front: t.front, back: t.back }
+    // M14: an unknown kind is read as classic; a cloze or occlusion card needs its field.
+    if ((t.kind === 'cloze' || t.kind === 'occlusion') && isStr(t.field)) {
+      template.kind = t.kind
+      template.field = t.field
+      if (t.single === true) template.single = true
+    }
+    templates.push(template)
   }
   if (x.fields.length === 0 || templates.length === 0) return null
   const type: NoteType = {

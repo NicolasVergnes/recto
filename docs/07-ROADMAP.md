@@ -149,3 +149,15 @@ Critères d'acceptation :
 - [x] Plus d'enterrement ni d'espacement des cartes d'une note ; réglage `burySiblings` retiré (écran, données, sauvegardes anciennes lisibles).
 - [x] Accueil : « n notes · n cartes » sous chaque paquet, sous-paquets compris dans le parent.
 - [x] Tests unitaires et E2E mis à jour ; `npm run verify` vert.
+
+## M14 — Texte à trous et occlusion d'image deviennent des types de cartes (demande de Nicolas, 2026-10-14)
+
+Hors roadmap initiale (ADR-011). « Texte à trous » et « Occlusion d'image » ne sont plus des types de notes mais des types de cartes : le type de note Basique (un modèle de carte) laisse choisir le type de sa carte ; dans un type personnalisé, chaque carte choisit le sien, et un même type peut produire une occlusion, deux cartes classiques et un texte à trous. Une carte à trous ou d'occlusion produit une carte par trou ou groupe, ou une seule (« Génère une seule carte »). L'export Anki n'est pas un but : un type mixte n'y part qu'avec ses cartes classiques.
+
+Critères d'acceptation :
+- [x] Éditeur de notes : Type (Basique, types personnalisés) ; pour Basique, « Type de carte » (Classique, Texte à trous, Occlusion d'image) ; « Génère une seule carte » pour une carte à trous ou d'occlusion, modifiable sur une note existante (la carte du premier trou ou groupe garde sa planification).
+- [x] Éditeur de types : « Type de carte » de chaque carte ; à trous : champ du texte, ajout au verso ; occlusion : champ de l'image, en-tête, ajout au verso ; « Génère une seule carte » ; plusieurs cartes de chaque type, chacune sur son champ ; le champ source d'une carte ne se retire pas ; « Basique » listé comme type intégré.
+- [x] Note d'un type mixte : éditeur de masques pour chaque champ image, « Créer un trou » et Ctrl+Maj+C dans les champs à trous, aperçu nommé par carte et par trou ou groupe, révision de chaque type de carte.
+- [x] Données : aucune note ni carte réécrite ; Dexie version 5, sauvegarde `schemaVersion` 6 ; une base version 4 et une sauvegarde au schéma 5 s'ouvrent et se lisent telles quelles.
+- [x] Export Anki : cartes classiques seulement pour un type personnalisé, cartes laissées comptées dans le rapport ; au réimport, un type mixte n'est pas réutilisé.
+- [x] Tests unitaires et E2E mis à jour ; `npm run verify` vert.

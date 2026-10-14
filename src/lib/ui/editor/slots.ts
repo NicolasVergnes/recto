@@ -1,3 +1,4 @@
+import { sourceFields } from '$lib/domain/templates'
 import type { ModelType, NoteType } from '$lib/domain/types'
 import type { MessageKey } from '$lib/i18n'
 
@@ -40,13 +41,28 @@ export const SLOTS: Record<ModelType, readonly FieldSlot[]> = {
   custom: [],
 }
 
-/** The form's text fields: fixed per built-in type, one per field of a custom note type. */
+/**
+ * The form's text fields: fixed per built-in type, one per field of a custom note type but the
+ * images of its occlusion cards, edited by OcclusionEditor (M14).
+ */
 export function slotsFor(
   modelType: ModelType,
-  noteType?: Pick<NoteType, 'fields'>,
+  noteType?: Pick<NoteType, 'fields' | 'templates'>,
 ): readonly FieldSlot[] {
   if (modelType !== 'custom') return SLOTS[modelType]
-  return (noteType?.fields ?? []).map((text, index) => ({ label: 'editor.field', text, index }))
+  if (!noteType) return []
+  const images = new Set(sourceFields(noteType, 'occlusion'))
+  return noteType.fields.flatMap((text, index) =>
+    images.has(index) ? [] : [{ label: 'editor.field' as const, text, index }],
+  )
+}
+
+/**
+ * The field « Créer un trou » wraps (M14): the last focused one when it holds a cloze text, else
+ * the first that does; null when no field does.
+ */
+export function clozeTarget(clozeFields: readonly number[], active: number | undefined) {
+  return active !== undefined && clozeFields.includes(active) ? active : (clozeFields[0] ?? null)
 }
 
 /**

@@ -8,9 +8,12 @@ export const DB_NAME = 'recto'
  * `image_occlusion` note type: older versions refuse such backups instead of dropping notes.
  * 3 (M8) adds the `noteTypes` table and `custom` notes (Dexie version 2). 4 (M12) adds
  * `card.updatedAt`, the `deletions` table and `setting.updatedAt` (Dexie version 3). 5 (M13) drops
- * `settings.burySiblings` of decks and puts their new cards in random order (Dexie version 4).
+ * `settings.burySiblings` of decks and puts their new cards in random order (Dexie version 4). 6
+ * (M14) adds the kinds of card of custom note types (`kind`, `field`, `single`), `note.single` and
+ * `note.masks` (Dexie version 5): older versions refuse such backups instead of reading a cloze
+ * card as a classic one and deleting its cards.
  */
-export const SCHEMA_VERSION = 5
+export const SCHEMA_VERSION = 6
 
 /**
  * IndexedDB schema (02-DATA-MODEL §1). Never edit a published `version()` block: add a new one
@@ -64,6 +67,10 @@ export class RectoDB extends Dexie {
         .toCollection()
         .modify((deck) => migrateDeckSettingsM13(deck.settings)),
     )
+    // M14: card kinds. Absent properties keep the previous behaviour: nothing to upgrade. The
+    // version only keeps an older copy of the app (still cached) from opening this database and
+    // reconciling the cards of a cloze or occlusion template as classic ones.
+    this.version(5).stores({})
   }
 }
 
