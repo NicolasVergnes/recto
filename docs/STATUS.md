@@ -1,10 +1,10 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-10-14 · Branche : `m17-card-formats` (créée depuis `main`, non fusionnée) · **M13, M14, M16 et le plugin `recto-deck-builder` fusionnés sur `main`** (2026-10-14) · **M17 (formats de cartes à introduire, par paquet) livré**, en attente de relecture et de fusion par Nicolas
+Dernière mise à jour : 2026-10-14 · Branche : `main` · **M13, M14, M16, M17 et le plugin `recto-deck-builder` 2.2.0 fusionnés sur `main` et publiés** (2026-10-14)
 
 ## Jalon en cours
 
-Aucun : M17 est terminé (M13, M14 et M16 fusionnés). Recto reste une PWA installable (décision du 2026-10-12). En attente, sans numéro ni date :
+Aucun : M13 à M17 sont terminés et fusionnés. Recto reste une PWA installable (décision du 2026-10-12). En attente, sans numéro ni date :
 
 - Application Android avec Capacitor (couche plateforme, projet `android/`, bouton retour, micro, sons, flux Maestro, APK de débogage en CI) ; l'identifiant d'application (`appId`) sera à décider à ce moment (proposition : `fr.nicolasvergnes.recto`).
 - Publication sur le Play Store (politique de confidentialité, signature, fiche, test fermé : 12 testeurs pendant 14 jours).
@@ -342,8 +342,8 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## Reste à faire / dettes
 
-- V2 (SPEC §2, §3) : synchronisation par fichier (dossier choisi par File System Access API, un fichier par appareil, et surtout des « pierres tombales » pour propager les suppressions : sans elles, une fusion ressuscite les notes supprimées ; étude faite en M6, non implémentée) et empaquetage Android (TWA ou Capacitor ; l'hébergement sous `/recto/` impose un `assetlinks.json` à la racine du domaine pour une TWA).
-- Composants de plus de 200 lignes restants : `Heatmap.svelte` (271), `ApkgImport.svelte` (249), `Cards.svelte` (223), `ColumnChart.svelte` (210), `Editor.svelte` (206, une ligne de plus en M11 pour « Ne jamais retourner »), `CardMosaic.svelte` (203). Une copie de travail M10 a commencé l'extraction de la navigation clavier commune des deux graphiques (`src/lib/ui/charts/keys.ts`, non intégrée).
+- V2, en attente (« Jalon en cours ») : synchronisation automatique PC ↔ Android et application Android (Capacitor). Les suppressions sont déjà enregistrées et suivies par la fusion de sauvegardes (M12) : seul le transport automatique manque.
+- Composants de plus de 200 lignes restants : `Heatmap.svelte` (271), `ApkgImport.svelte` (264), `ColumnChart.svelte` (210), `CardMosaic.svelte` (203), `Editor.svelte` (202). `Cards.svelte` est repassé sous 200 lignes en M17 (193). Une copie de travail M10 a commencé l'extraction de la navigation clavier commune des deux graphiques : branche locale `wip/chart-keys` (`src/lib/ui/charts/keys.ts` et son test, non intégrés).
 - Optimiseur : évaluation sur les révisions mêmes de l'entraînement (pas de validation croisée, comme Anki) ; il fonctionne dans Firefox (M10) ; Safari non testé (le WebKit de Playwright refuse les `Blob` dans IndexedDB).
 - Les filtres avancés d'Anki (`furigana:`, `tts:`…) rendent la valeur brute ; `[latex]…[/latex]` reste en source (LaTeX en mode texte, que KaTeX ne rend pas).
 - Réimport Anki : un type dont on a réordonné ou modifié les champs dans Recto n'est plus reconnu (ses notes sont ignorées et comptées) ; un type dont Anki a changé les champs aussi. L'export rend le style d'un type importé, pas les options de ses champs (police, taille).
