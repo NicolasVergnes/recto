@@ -85,9 +85,10 @@ export function renderTemplate(template: string, values: FieldValues, frontSide 
 /**
  * Cards of a custom note (02 §3 invariant 2). A classic template makes a card when its question
  * shows something that comes from the note (Anki's rule: not empty and different from the
- * question rendered with every field empty). A cloze template makes one card per index of its
- * field, an occlusion template one per mask group when its field has an image (`masks`: the
- * note's, aligned with `fields`); `single`, one card when there is at least one.
+ * question rendered with every field empty); a two-way one (M16) when both faces do. A cloze
+ * template makes one card per index of its field, an occlusion template one per mask group when
+ * its field has an image (`masks`: the note's, aligned with `fields`); `single`, one card when
+ * there is at least one.
  */
 export function templateOrds(
   type: Pick<NoteType, 'fields' | 'templates'>,
@@ -96,12 +97,13 @@ export function templateOrds(
 ): number[] {
   const values = fieldValues(type.fields, fields)
   const blank = fieldValues(type.fields, [])
+  const asks = (side: string) => {
+    const rendered = renderTemplate(side, values)
+    return !isEmptyField(rendered) && rendered !== renderTemplate(side, blank)
+  }
   return type.templates.flatMap((t, i) => {
     const kind = kindOf(t)
-    if (kind === 'classic') {
-      const front = renderTemplate(t.front, values)
-      return !isEmptyField(front) && front !== renderTemplate(t.front, blank) ? [i] : []
-    }
+    if (kind === 'classic') return asks(t.front) && (!t.twoWay || asks(t.back)) ? [i] : []
     const at = type.fields.indexOf(t.field ?? '')
     const source = fields[at] ?? ''
     const subs =
@@ -113,6 +115,19 @@ export function templateOrds(
     if (subs.length === 0) return []
     return t.single ? [i] : subs.map((n) => customOrd(i, n - 1))
   })
+}
+
+/** Anki's answer opening: the question repeated (`{{FrontSide}}`), then its separator. */
+const ANSWER_OPENING = /^\s*\{\{\s*FrontSide\s*\}\}\s*(?:<hr\b[^>]*>\s*)?/i
+
+/** The second face of a two-way template from a one-way answer (M16): its opening removed. */
+export function faceOfAnswer(back: string): string {
+  return back.replace(ANSWER_OPENING, '')
+}
+
+/** A one-way answer from the second face of a two-way template: the question, a line, the face. */
+export function answerOfFace(face: string): string {
+  return `{{FrontSide}}\n\n<hr id=answer>\n\n${face}`
 }
 
 /** The field a template asks to type (`{{type:Champ}}`, question first), or null. */

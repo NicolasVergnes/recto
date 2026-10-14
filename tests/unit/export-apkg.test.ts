@@ -803,6 +803,59 @@ describe('round trip through the Recto importer', () => {
     expect(again.report.skipped).toBe(2)
   })
 
+  it('exports a two-way template as a one-way Anki card that comes back two-way (M16)', async () => {
+    const deck = makeDeck({ name: 'Départements' }, 'deck', now)
+    const type: NoteType = {
+      id: 'type',
+      name: 'Département',
+      fields: ['Carte', 'Nom', 'Numéro', 'Préfecture'],
+      templates: [
+        { name: 'Carte → Nom', front: '{{Carte}}', back: '{{FrontSide}}<hr id=answer>{{Nom}}' },
+        { name: 'Nom ↔ Numéro', front: '{{Nom}}', back: '<b>{{Numéro}}</b>', twoWay: true },
+      ],
+      createdAt: now,
+      updatedAt: now,
+    }
+    const note: Note = {
+      id: 'n',
+      deckId: deck.id,
+      modelType: 'custom',
+      noteTypeId: type.id,
+      fields: ['<img src="ain.png">', 'Ain', '01', 'Bourg-en-Bresse'],
+      tags: [],
+      createdAt: now,
+      updatedAt: now,
+    }
+    const cards = [0, 1].map((ord) => makeCard(note, ord, `c${ord}`, now))
+    const { bytes, db } = await open({
+      decks: [deck],
+      notes: [note],
+      cards,
+      reviews: [],
+      media: [{ name: 'ain.png', data: PNG }],
+      noteTypes: [type],
+    })
+    const models = JSON.parse(String(rows(db, 'SELECT models FROM col')[0]?.models)) as Record<
+      string,
+      { tmpls: { qfmt: string; afmt: string; rectoTwoWay?: boolean }[] }
+    >
+    // Anki asks the first face and answers with the second, under its usual answer opening.
+    expect(models[String(now)]?.tmpls).toMatchObject([
+      { qfmt: '{{Carte}}', afmt: '{{FrontSide}}<hr id=answer>{{Nom}}' },
+      {
+        qfmt: '{{Nom}}',
+        afmt: '{{FrontSide}}\n\n<hr id=answer>\n\n<b>{{Numéro}}</b>',
+        rectoTwoWay: true,
+      },
+    ])
+    expect(models[String(now)]?.tmpls[0]).not.toHaveProperty('rectoTwoWay')
+
+    const plan = await planApkgImport(readApkg(bytes, SQL), importOptions, empty, now, newId)
+    expect(plan.report.errors).toEqual([])
+    expect(plan.noteTypes?.[0]?.templates).toEqual(type.templates)
+    expect(plan.cards.map((c) => c.ord)).toEqual([0, 1])
+  })
+
   it("gives Anki back an imported type's styling and date (M10)", async () => {
     const deck = makeDeck({ name: 'Styles' }, 'deck', now)
     const ankiMod = 1477379557

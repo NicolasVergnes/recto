@@ -80,7 +80,12 @@
           {/each}
         </select>
       </div>
-      <TemplateSides {template} fields={draft.shape.fields} id="{uid}-{i}" />
+      <TemplateSides
+        {template}
+        fields={draft.shape.fields}
+        id="{uid}-{i}"
+        ontwoway={(twoWay) => draft.setTwoWay(i, twoWay)}
+      />
     </fieldset>
   {/each}
   <p class="visually-hidden" role="status" aria-live="polite">{announcement}</p>

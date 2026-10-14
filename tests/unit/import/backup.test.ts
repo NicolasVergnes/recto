@@ -611,6 +611,33 @@ describe('parseBackup errors', () => {
     expect(parsed.manifest.deviceId).toBe('tel')
   })
 
+  it('reads two-way templates (version 5); older ones and other values are asked one way', () => {
+    const type = (templates: unknown[]) => ({
+      id: 't',
+      name: 'T',
+      fields: ['A', 'B'],
+      templates,
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    const oneWay = { name: 'A → B', front: '{{A}}', back: '{{FrontSide}}<hr id=answer>{{B}}' }
+    const twoWay = { name: 'A ↔ B', front: '{{A}}', back: '{{B}}', twoWay: true }
+    const read = (version: number, templates: unknown[]) =>
+      parseBackup(
+        zip({
+          'manifest.json': JSON.stringify({ format: 'recto-backup', schemaVersion: version }),
+          'data.json': JSON.stringify({ noteTypes: [type(templates)] }),
+        }),
+        SCHEMA_VERSION,
+      ).data.noteTypes[0]?.templates
+    expect(read(5, [oneWay, twoWay])).toEqual([oneWay, twoWay])
+    expect(read(5, [{ ...twoWay, twoWay: 'yes' }])).toEqual([{ ...twoWay, twoWay: undefined }])
+    expect(read(4, [oneWay])).toEqual([oneWay])
+    // A version 4 Recto refuses a version 5 backup rather than asking its two-way cards one way.
+    const v5 = JSON.stringify({ format: 'recto-backup', schemaVersion: 5 })
+    expect(code(() => parseBackup(zip({ 'manifest.json': v5 }), 4))).toBe('newerVersion')
+  })
+
   it('reads note types (version 3), and older backups without them', () => {
     const note = (id: string, noteTypeId?: string) => ({
       id,

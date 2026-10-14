@@ -1,6 +1,6 @@
 import { editOf, fieldUsers, storedTemplate, type NoteTypeEdit } from '$lib/domain/note-types'
 import type { TypeShape } from '$lib/domain/notes'
-import { renameFieldRefs } from '$lib/domain/templates'
+import { answerOfFace, faceOfAnswer, renameFieldRefs } from '$lib/domain/templates'
 import type { CardKind, NoteType } from '$lib/domain/types'
 import { t } from '$lib/i18n'
 
@@ -103,6 +103,7 @@ export class NoteTypeDraft {
     const template = this.edit.templates[i]
     if (!template || (template.kind ?? 'classic') === kind) return
     delete template.single
+    delete template.twoWay
     if (kind === 'classic') {
       delete template.kind
       delete template.field
@@ -113,6 +114,17 @@ export class NoteTypeDraft {
     template.field = this.shape.fields[0] ?? ''
     template.front = ''
     template.back = ''
+  }
+
+  /**
+   * Asks template `i` both ways or one way (M16). Its answer follows: the second face of a
+   * two-way card is written alone, so its `{{FrontSide}}` opening goes, and comes back one way.
+   */
+  setTwoWay(i: number, twoWay: boolean): void {
+    const tpl = this.edit.templates[i]
+    if (!tpl || !!tpl.twoWay === twoWay) return
+    tpl.back = twoWay ? faceOfAnswer(tpl.back) : answerOfFace(tpl.back)
+    tpl.twoWay = twoWay
   }
 
   removeTemplate(i: number): void {

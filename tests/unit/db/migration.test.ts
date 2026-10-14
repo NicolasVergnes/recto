@@ -245,6 +245,39 @@ describe('schema migrations', () => {
     db.close()
   })
 
+  it('reads note types stored before M16: their templates are asked one way', async () => {
+    const name = uniqueName('m16')
+    const db = new RectoDB(name)
+    const type = {
+      id: 't',
+      name: 'T',
+      fields: ['A', 'B'],
+      templates: [{ name: 'A → B', front: '{{A}}', back: '{{FrontSide}}<hr id=answer>{{B}}' }],
+      createdAt: 1,
+      updatedAt: 1,
+    }
+    await db.noteTypes.add(type)
+    db.close()
+
+    // Nothing to upgrade: an absent `twoWay` is the one-way template it always was.
+    const again = new RectoDB(name)
+    const stored = await again.noteTypes.get('t')
+    expect(stored).toEqual(type)
+    const note = { modelType: 'custom' as const, fields: ['a', 'b'] }
+    const rendered = renderCard(note, { ord: 0, sideFlipped: true }, true, stored)
+    expect([rendered.question, rendered.answer, rendered.flipped]).toEqual([
+      'a',
+      'a<hr id=answer>b',
+      false,
+    ])
+    await again.noteTypes.put({
+      ...type,
+      templates: type.templates.map((t) => ({ ...t, twoWay: true })),
+    })
+    expect((await again.noteTypes.get('t'))?.templates[0]?.twoWay).toBe(true)
+    again.close()
+  })
+
   it('the published schema is version 5', async () => {
     const db = new RectoDB(uniqueName('schema'))
     await db.open()

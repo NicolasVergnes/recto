@@ -5,6 +5,7 @@ import {
   editOf,
   fieldUsers,
   planNoteTypeEdit,
+  storedTemplate,
   unknownReference,
   validateNoteType,
 } from '$lib/domain/note-types'
@@ -117,6 +118,42 @@ describe('note types', () => {
     const plan = planNoteTypeEdit(TYPE, edit, [france, italie], cards, 2, newId)
     expect(plan.added.map((c) => [c.noteId, c.ord])).toEqual([['n1', 3]])
     expect(plan.removed).toEqual([])
+  })
+
+  it('asks a template both ways or one way: its cards, schedule and history stay (M16)', () => {
+    const edit = editOf(TYPE)
+    edit.templates = edit.templates.map((t, i) => (i === 0 ? { ...t, twoWay: true } : t))
+    const plan = planNoteTypeEdit(TYPE, edit, [france, italie], cards, 2, newId)
+    expect(plan).toMatchObject({ notes: [], moved: [], removed: [], added: [] })
+    expect(plan.type.templates[0]).toEqual({
+      name: 'Capitale',
+      front: 'Capitale de {{Pays}} ?',
+      back: '{{Capitale}}',
+      twoWay: true,
+    })
+    expect(editOf(plan.type).templates[0]?.twoWay).toBe(true)
+    // Back to one way: the option is no longer stored.
+    const back = editOf(plan.type)
+    back.templates = back.templates.map((t) => ({ ...t, twoWay: false }))
+    expect(planNoteTypeEdit(plan.type, back, [], [], 3, newId).type.templates[0]).toEqual(
+      TYPE.templates[0],
+    )
+    expect(storedTemplate({ name: ' A ', front: 'f', back: 'b', twoWay: false })).toEqual({
+      name: 'A',
+      front: 'f',
+      back: 'b',
+    })
+  })
+
+  it('removes a two-way card when its second face is empty for a note (M16)', () => {
+    const edit = editOf(TYPE)
+    edit.templates = edit.templates.map((t, i) =>
+      i === 1 ? { ...t, back: '{{Drapeau}}', twoWay: true } : t,
+    )
+    const plan = planNoteTypeEdit(TYPE, edit, [france, italie], cards, 2, newId)
+    // Italy has no flag: « Rome » could be asked, its other face would be empty.
+    expect(plan.removed).toEqual(['i1'])
+    expect(plan.added).toEqual([])
   })
 
   it('adds and removes fields, keeping the values of the others', () => {

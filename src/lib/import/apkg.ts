@@ -4,7 +4,7 @@
 import { makeCard } from '../domain/defaults'
 import { cardOrds, reconcileCards, type ReconcilableCard } from '../domain/notes'
 import { labelsFromAnkiComments, occlusionFromAnki, serializeOcclusion } from '../domain/occlusion'
-import { kindOf } from '../domain/templates'
+import { faceOfAnswer, kindOf } from '../domain/templates'
 import { mediaRefs, renameMediaRefs } from '../domain/text'
 import type {
   Card,
@@ -132,10 +132,11 @@ export function convertModel(model: ApkgModel): ModelConversion {
     noteType: {
       name: model.name || 'Anki',
       fields: model.fields.map((name, i) => name.trim() || `Champ ${i + 1}`),
+      // A two-way template (M16) left Recto with Anki's answer: its second face comes back.
       templates: model.templates.map((t, i) => ({
         name: t.name || `Carte ${i + 1}`,
         front: t.qfmt,
-        back: t.afmt,
+        ...(t.twoWay ? { back: faceOfAnswer(t.afmt), twoWay: true } : { back: t.afmt }),
       })),
       // Kept for the export (M10): Anki updates its note type only from a more recent `mod`, so an
       // unchanged type keeps Anki's date, and an edited one gives back Anki's styling.

@@ -28,7 +28,8 @@ export interface ApkgModel {
   /** 0 standard, 1 cloze */
   type: number
   fields: string[]
-  templates: { name: string; qfmt: string; afmt: string }[]
+  /** `twoWay`: Recto's mark on a template asked both ways (`rectoTwoWay`, 05 §4, M16). */
+  templates: { name: string; qfmt: string; afmt: string; twoWay?: boolean }[]
   /** Modification time, seconds. */
   mod?: number
   css?: string
@@ -174,6 +175,7 @@ function readModels(json: string): ApkgModel[] {
           name: typeof t.name === 'string' ? t.name : '',
           qfmt: typeof t.qfmt === 'string' ? t.qfmt : '',
           afmt: typeof t.afmt === 'string' ? t.afmt : '',
+          ...(t.rectoTwoWay === true ? { twoWay: true } : {}),
         })),
       ...(typeof m.mod === 'number' && Number.isFinite(m.mod) ? { mod: m.mod } : {}),
       ...(typeof m.css === 'string' ? { css: m.css } : {}),

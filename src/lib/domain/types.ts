@@ -55,7 +55,9 @@ export type CardKind = (typeof CARD_KINDS)[number]
 
 /**
  * One card of a custom note type (templates in Anki syntax, templates.ts). Classic: `front` asks,
- * `back` answers. Cloze and occlusion (M14): `field` holds the cloze text or the image, `front` is
+ * `back` answers; `twoWay` (M16): `front` and `back` are two faces, each asked in turn like a
+ * basic note's sides (deck `alternateSides`), `back` holding the second face only, without
+ * `{{FrontSide}}`. Cloze and occlusion (M14): `field` holds the cloze text or the image, `front` is
  * the occlusion header (unused by cloze), `back` what the answer adds; one card per cloze index
  * or mask group, or a single card asking them all.
  */
@@ -65,6 +67,8 @@ export interface CardTemplate {
   back: string
   /** Absent: classic (every type stored before M14). */
   kind?: CardKind
+  /** Classic only (M16): asked both ways. Absent: one way. */
+  twoWay?: boolean
   /** Cloze and occlusion: the name of the field holding the text or the image. */
   field?: string
   /** Cloze and occlusion: one card for every index or group instead of one each. */
@@ -160,7 +164,7 @@ export interface Card {
   // Leitner
   /** 0 = not applicable / new, 1..7. */
   box: number
-  /** Deck `alternateSides`: true = asks back→front (basic notes only). */
+  /** Deck `alternateSides`: true = asks back→front (basic notes and two-way templates, M16). */
   sideFlipped: boolean
   createdAt: number
   /**

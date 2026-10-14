@@ -9,6 +9,7 @@ test-results/
 .env*
 .DS_Store
 Thumbs.db
+__pycache__/
 
 # Agent worktrees (Claude Code)
 .claude/worktrees/

@@ -9,9 +9,10 @@ export const DB_NAME = 'recto'
  * 3 (M8) adds the `noteTypes` table and `custom` notes (Dexie version 2). 4 (M12) adds
  * `card.updatedAt`, the `deletions` table and `setting.updatedAt` (Dexie version 3). 5 (M13) drops
  * `settings.burySiblings` of decks and puts their new cards in random order (Dexie version 4). 6
- * (M14) adds the kinds of card of custom note types (`kind`, `field`, `single`), `note.single` and
- * `note.masks` (Dexie version 5): older versions refuse such backups instead of reading a cloze
- * card as a classic one and deleting its cards.
+ * (M14, M16) adds the kinds of card of custom note types (`kind`, `field`, `single`), two-way
+ * classic templates (`twoWay`), `note.single` and `note.masks` (Dexie version 5): older versions
+ * refuse such backups instead of reading a cloze card as a classic one and deleting its cards, or
+ * asking a two-way card one way only.
  */
 export const SCHEMA_VERSION = 6
 

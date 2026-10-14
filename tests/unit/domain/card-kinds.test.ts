@@ -226,3 +226,39 @@ describe('editing a type with card kinds (M14)', () => {
     expect(plan.type.templates[3]).toEqual({ ...MIXTE.templates[3], single: true })
   })
 })
+
+describe('two-way cards and card kinds (M14 with M16)', () => {
+  it('keeps twoWay for a classic card only', async () => {
+    const { storedTemplate } = await import('$lib/domain/note-types')
+    expect(storedTemplate({ name: ' A ', front: '{{A}}', back: '{{B}}', twoWay: true })).toEqual({
+      name: 'A',
+      front: '{{A}}',
+      back: '{{B}}',
+      twoWay: true,
+    })
+    expect(
+      storedTemplate({
+        name: 'T',
+        kind: 'cloze',
+        field: 'Phrase',
+        front: '',
+        back: '',
+        twoWay: true,
+      }),
+    ).toEqual({ name: 'T', kind: 'cloze', field: 'Phrase', front: '', back: '' })
+  })
+
+  it('asks a two-way card of a mixed type either way, its cloze cards as they are', () => {
+    const type: NoteType = {
+      ...MIXTE,
+      templates: [
+        { name: 'Ville ↔ Pays', front: '{{Ville}}', back: '{{Pays}}', twoWay: true },
+        ...MIXTE.templates.slice(3),
+      ],
+    }
+    expect(cardOrds(FRANCE, type)).toEqual([0, 1, 1001])
+    const flipped = renderCard(FRANCE, { ord: 0, sideFlipped: true }, true, type)
+    expect([flipped.question, flipped.answer, flipped.flipped]).toEqual(['France', 'Paris', true])
+    expect(renderCard(FRANCE, { ord: 1001, sideFlipped: true }, true, type).flipped).toBe(false)
+  })
+})

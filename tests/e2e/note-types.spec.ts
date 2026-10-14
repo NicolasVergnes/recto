@@ -369,3 +369,52 @@ test('a field used by a card stays; removing a filled field asks first', async (
     ),
   ).toBeVisible()
 })
+
+// M16: a template asked both ways is one card, turned over after a success like a basic note.
+test('a card asked both ways: one card, turned over after a success', async ({ page }) => {
+  await page.clock.install()
+  await capitales(page)
+  await page.getByLabel('Poser dans les deux sens').first().check()
+  // Its answer becomes the second face, written alone.
+  await expect(page.getByLabel('Face 1')).toHaveValue('{{Pays}}')
+  await expect(page.getByLabel('Face 2')).toHaveValue('{{Capitale}}')
+  // The cards stay as they are: saved without a question.
+  await page.getByRole('button', { name: 'Enregistrer' }).click()
+  await expect(page.getByText('Type de note enregistré')).toBeVisible()
+  await page.reload()
+  await expect(page.getByLabel('Poser dans les deux sens').first()).toBeChecked()
+
+  await page.goto('/#/')
+  await page.getByRole('link', { name: 'Monde', exact: true }).click()
+  await page.getByRole('link', { name: 'Réviser ce paquet' }).click()
+  const card = page.getByRole('article', { name: 'Carte' })
+  const reveal = page.getByRole('button', { name: 'Afficher la réponse' })
+  // The note's one-way card « Paris est la capitale de ? » shares the day, in any order (M13).
+  const isOneWay = async () => {
+    await expect(reveal).toBeVisible()
+    return ((await card.textContent()) ?? '').includes('capitale de')
+  }
+  for (let i = 0; i < 2; i++) {
+    if (!(await isOneWay())) {
+      await expect(card).toContainText('France')
+      await expect(card).not.toContainText('Paris')
+      await reveal.click()
+      await expect(card).toContainText('Paris')
+    } else await reveal.click()
+    await page.getByRole('button', { name: /^Bien/ }).click()
+  }
+
+  // Back after its learning step, turned over: the capital is asked, the country answers.
+  await page.getByRole('button', { name: 'Attendre' }).click()
+  await page.clock.fastForward('11:00')
+  if (await isOneWay()) {
+    await reveal.click()
+    await page.getByRole('button', { name: /^Bien/ }).click()
+    await expect(card).not.toContainText('capitale de')
+  }
+  await expect(page.getByText('Sens inversé')).toBeVisible()
+  await expect(card).toContainText('Paris')
+  await expect(card).not.toContainText('France')
+  await reveal.click()
+  await expect(card).toContainText('France')
+})

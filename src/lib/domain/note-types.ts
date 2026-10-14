@@ -94,11 +94,17 @@ export function validateNoteType(
   return null
 }
 
-/** A template as stored: trimmed name, and the kind's settings only when it is not classic. */
+/**
+ * A template as stored: trimmed name; `twoWay` only for a classic template that has it (M16), the
+ * kind's settings only when it is not classic (M14).
+ */
 export function storedTemplate(t: CardTemplate): CardTemplate {
   const out: CardTemplate = { name: t.name.trim(), front: t.front, back: t.back }
   const kind = kindOf(t)
-  if (kind === 'classic') return out
+  if (kind === 'classic') {
+    if (t.twoWay) out.twoWay = true
+    return out
+  }
   out.kind = kind
   out.field = t.field?.trim() ?? ''
   if (t.single) out.single = true
@@ -110,7 +116,7 @@ export function editOf(type: Pick<NoteType, 'name' | 'fields' | 'templates'>): N
   return {
     name: type.name,
     fields: type.fields.map((name, i) => ({ name, from: i })),
-    templates: type.templates.map((t, i) => ({ ...t, from: i })),
+    templates: type.templates.map((t, i) => ({ ...storedTemplate(t), name: t.name, from: i })),
   }
 }
 

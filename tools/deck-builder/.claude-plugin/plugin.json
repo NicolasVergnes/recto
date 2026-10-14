@@ -1,0 +1,6 @@
+{
+  "name": "recto-deck-builder",
+  "version": "2.1.0",
+  "description": "Crée des paquets de flashcards clé en main (.apkg) pour l'application Recto : types de notes à plusieurs champs et plusieurs cartes, images, sons, texte à trous, occlusion d'image, formules ; vérifiés comme Recto les importe.",
+  "author": { "name": "Nicolas" }
+}

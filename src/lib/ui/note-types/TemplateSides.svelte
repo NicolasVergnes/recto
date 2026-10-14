@@ -9,18 +9,32 @@
     /** Field names of the type, for the source of a cloze or occlusion card. */
     fields: readonly string[]
     id: string
+    /** A classic card asked both ways or one way (M16). */
+    ontwoway: (twoWay: boolean) => void
   }
-  let { template, fields, id }: Props = $props()
+  let { template, fields, id, ontwoway }: Props = $props()
   const kind = $derived(kindOf(template))
 </script>
 
 {#if kind === 'classic'}
   <div class="field">
-    <label for="{id}-front">{t('noteTypes.question')}</label>
+    <label class="check">
+      <input
+        type="checkbox"
+        checked={!!template.twoWay}
+        aria-describedby="{id}-two-way-help"
+        onchange={(e) => ontwoway(e.currentTarget.checked)}
+      />
+      {t('noteTypes.twoWay')}
+    </label>
+    <p id="{id}-two-way-help" class="muted small">{t('noteTypes.twoWayHelp')}</p>
+  </div>
+  <div class="field">
+    <label for="{id}-front">{t(template.twoWay ? 'noteTypes.face1' : 'noteTypes.question')}</label>
     <textarea id="{id}-front" class="code" rows="3" bind:value={template.front}></textarea>
   </div>
   <div class="field">
-    <label for="{id}-back">{t('noteTypes.answer')}</label>
+    <label for="{id}-back">{t(template.twoWay ? 'noteTypes.face2' : 'noteTypes.answer')}</label>
     <textarea id="{id}-back" class="code" rows="3" bind:value={template.back}></textarea>
   </div>
 {:else}

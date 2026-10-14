@@ -301,6 +301,9 @@ export function readNoteType(x: unknown): NoteType | null {
       template.kind = t.kind
       template.field = t.field
       if (t.single === true) template.single = true
+    } else if (t.twoWay === true) {
+      // M16: a two-way classic template; any other value asks it one way.
+      template.twoWay = true
     }
     templates.push(template)
   }

@@ -18,6 +18,25 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 - Export Anki : un type personnalisé part avec ses seules cartes classiques (Anki ne mélange pas les cartes à trous avec les autres dans un même type) ; le rapport d'export compte les cartes restées dans Recto.
 - Sauvegarde au format 6 (les sauvegardes plus anciennes restent lisibles telles quelles) ; base de données en version 5.
 
+### M16 — Cartes dans les deux sens dans les types de notes
+
+#### Added
+
+- Dans l'éditeur d'un type de note, chaque carte classique a la case **« Poser dans les deux sens »** : une seule carte (« Nom ↔ Numéro ») demandée par une face puis par l'autre après chaque réussite, comme une note basique (réglage « Interroger dans les deux sens » du paquet, FSRS et Memory Box, indicateur « ↔ Sens inversé », réponse tapée sur la face non demandée). Les autres cartes restent posées dans un seul sens (« Carte → Nom »). Les champs deviennent « Face 1 » et « Face 2 » ; cocher ou décocher garde les cartes, leur planification et leur historique.
+- Export et import `.apkg` : l'option voyage (marque `rectoTwoWay` sur le modèle) ; Anki reçoit une carte à sens unique.
+
+#### Changed
+
+- Sauvegardes au schéma 6 (avec M14) : une version plus ancienne de Recto les refuse au lieu de poser ces cartes dans un seul sens. Les bases et sauvegardes existantes se lisent sans changement (cartes à sens unique).
+- Plugin `recto-deck-builder` 2.1.0 : `one_way()` et `two_way()` ; « A ↔ B » donne une seule carte (et non deux) ; le skill applique les flèches à la lettre et ne dit plus qu'un `{{type:Champ}}` active seul la réponse tapée.
+
+### Outils — plugin Claude « recto-deck-builder »
+
+#### Added
+
+- `tools/deck-builder/` : plugin Claude autonome qui crée des paquets **clé en main** au format `.apkg` (importés par « Paquet Anki ») : types de notes personnalisés à plusieurs champs et plusieurs cartes, notes basiques, questions à sens unique, texte à trous, occlusion d'image avec réponses, images, sons, formules, sous-paquets, tags. Bibliothèque Python `recto_apkg.py` (bibliothèque standard seulement) qui écrit les paquets sous la forme de l'export de Recto et les vérifie selon les règles de son importeur (`python recto_apkg.py check x.apkg`, utilisable aussi sur un paquet Anki) ; skill, références (API, médias) et exemple complet. `npm run plugin:zip` produit `recto-deck-builder.zip` à téléverser dans l'application Claude. Aucun changement dans l'application.
+- Test `deck-builder-plugin.test.ts` (Python 3 requis) : les paquets du plugin passent par l'importeur `.apkg` de Recto (types, cartes, masques, médias, réimportation d'un paquet régénéré sans doublon, refus de ce qui serait mal importé).
+
 ### M13 — Révision au hasard, compteurs de l'accueil
 
 #### Added

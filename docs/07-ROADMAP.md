@@ -161,3 +161,15 @@ Critères d'acceptation :
 - [x] Données : aucune note ni carte réécrite ; Dexie version 5, sauvegarde `schemaVersion` 6 ; une base version 4 et une sauvegarde au schéma 5 s'ouvrent et se lisent telles quelles.
 - [x] Export Anki : cartes classiques seulement pour un type personnalisé, cartes laissées comptées dans le rapport ; au réimport, un type mixte n'est pas réutilisé.
 - [x] Tests unitaires et E2E mis à jour ; `npm run verify` vert.
+
+## M16 — Cartes dans les deux sens dans les types de notes (demande de Nicolas, 2026-10-14)
+
+Hors roadmap initiale (M13 à M15, Android et synchronisation, restent suspendus). Dans un type de note personnalisé, une carte peut être posée dans un seul sens (« Carte → Nom » : toujours la même question) ou dans les deux (« Nom ↔ Numéro » : **une seule carte**, posée dans un sens puis dans l'autre comme une note basique), et non deux cartes jumelles. Le plugin Claude `recto-deck-builder` produit ces cartes.
+
+Critères d'acceptation :
+- [x] Un modèle de carte a l'option « Poser dans les deux sens » (`twoWay`) : ses deux faces sont des questions possibles ; la carte suit le réglage « Interroger dans les deux sens » du paquet (FSRS et Memory Box), avec l'indicateur « ↔ Sens inversé » ; la réponse tapée compare la face non demandée.
+- [x] La carte n'existe que si ses deux faces ont un contenu propre à la note ; cocher ou décocher l'option dans l'éditeur garde les cartes, leur planification et leur historique.
+- [x] Sauvegarde `schemaVersion` 5 sur sa branche, 6 après la fusion avec M13 et M14 (une version plus ancienne la refuse au lieu de perdre l'option) ; une base et une sauvegarde de la version précédente se lisent (modèles à sens unique).
+- [x] Export et import `.apkg` : l'option voyage (aller-retour Recto sans perte) ; Anki reçoit une carte à sens unique.
+- [x] Plugin : `two_way()` dans la bibliothèque, vérificateur et skill à jour ; un paquet « Carte → Nom, Nom ↔ Numéro, Nom ↔ Préfecture » donne 3 cartes par note.
+- [x] Tests unitaires et E2E ; `npm run verify` vert.

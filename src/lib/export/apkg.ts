@@ -8,7 +8,7 @@ import type { SqlJsStatic } from 'sql.js'
 import { deckPath } from '../domain/decks'
 import { normalizeFields } from '../domain/notes'
 import { labelsToAnkiComments, occlusionToAnki, parseOcclusion } from '../domain/occlusion'
-import { kindOf, referencedFields, templateIndex } from '../domain/templates'
+import { answerOfFace, kindOf, referencedFields, templateIndex } from '../domain/templates'
 import { decodeEntities, escapeHtml, mediaRefs } from '../domain/text'
 import {
   MODEL_TYPES,
@@ -219,7 +219,13 @@ function customModel(type: NoteType) {
     name: type.name,
     type: 0,
     flds: type.fields.map((name, ord) => field(name, ord)),
-    tmpls: classic.map((t, ord) => template(t.name, ord, t.front, t.back)),
+    // A two-way template (M16): Anki asks it one way, the second face under Anki's answer
+    // opening; `rectoTwoWay` brings the option back when Recto imports the package.
+    tmpls: classic.map((t, ord) =>
+      t.twoWay
+        ? { ...template(t.name, ord, t.front, answerOfFace(t.back)), rectoTwoWay: true }
+        : template(t.name, ord, t.front, t.back),
+    ),
     // Legacy « required fields » of each template: the fields its question uses.
     req: classic.map((t, ord) => [
       ord,
