@@ -12,6 +12,14 @@ Aucun : M13, M14 et M16 sont terminés et fusionnés. Recto reste une PWA instal
 
 ## Terminé
 
+### Plugin `recto-deck-builder` 2.2.0 — charte de rédaction des cartes (2026-10-14)
+
+Demande de Nicolas : à partir de l'analyse bibliographique (`Dossier-Flashcards.html` §1.4, §2.1-2.3) et de la théorie du format des cartes (vingt règles de Wozniak, dix règles d'or et chapitre « Améliorer ses flashcards » du livret Memory Box), mettre à jour le plugin pour qu'il produise des cartes dans un format pertinent pour l'apprentissage. Fait hors jalon, dans `tools/deck-builder/` seulement (aucun changement dans l'application) :
+
+- `reference/format-cartes.md` (charte R1-R13 sourcée, formats par sujet, avant/après, grille de relecture) ; `SKILL.md` réécrit autour de la charte ; `api.md`, `README.md`, `plugin.json` 2.2.0.
+- `recto_apkg.py` : `add_sequence()`, `pendu()`, avertissements « charte Rn » dans le rapport (`Report.charte`), non bloquants ; `examples/charte.py`. Convention des faces d'une carte à deux sens (question de Nicolas, 17 h 41) : Recto n'affichant pas le nom du modèle en révision, chaque face dit ce qu'on cherche (`<b>{{Nom}}</b><br><i>numéro ?</i>` ↔ `<b>{{Numéro}}</b><br><i>département ?</i>`) ; deux cartes d'une note qui posent la même face sont signalées (R5). Le paquet `paquets/departements.apkg` (2.1.0) a cette ambiguïté sur ses 101 notes (« Département : Ain » pour Nom ↔ Numéro et Nom ↔ Préfecture) : corriger les deux modèles dans Recto (Types de notes › Département) pour garder la progression, ou régénérer.
+- Vérifié : `tests/unit/deck-builder-plugin.test.ts` (6 tests, dont 2 nouveaux : `charte.py` importé par l'importeur de Recto sans avertissement ; cartes fautives signalées), `tsc -p tsconfig.test.json`, eslint, prettier ; `recto_apkg.py check` sur `paquets/departements.apkg` (303 cartes) et `docs/Les_dpartements_franais.apkg` (404 cartes) : aucun avertissement « charte » (pas de faux positif). `npm run verify` vert (573 tests unitaires, E2E 113 réussis et 1 ignoré), commité sur `main`. À faire par Nicolas : téléverser le nouveau `recto-deck-builder.zip` dans l'application Claude.
+
 ### M14 — Texte à trous et occlusion d'image deviennent des types de cartes (2026-10-14)
 
 Demande de Nicolas : « Textes à trous » et « Occlusion d'images » ne doivent pas être des types de notes mais des types de cartes ; dans le type Basique (une carte), on choisit le type de carte ; dans un type personnalisé, chaque carte ajoutée choisit le sien (« un type de note qui génère une occlusion, 2 basiques et un texte à trous »). Précisions de Nicolas : une carte par trou par défaut, avec une case « Génère une seule carte » ; plusieurs cartes à trous ou d'occlusion par type, sans limite ; export Anki : « le but c'est d'utiliser Recto », cartes classiques seulement.

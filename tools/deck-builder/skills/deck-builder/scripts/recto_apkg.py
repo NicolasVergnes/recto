@@ -57,6 +57,7 @@ __all__ = [
     "image_size",
     "img",
     "one_way",
+    "pendu",
     "sound",
     "two_way",
 ]
@@ -91,6 +92,32 @@ ALLOWED_ATTRS = {"src", "alt", "title", "class"}
 SPECIAL_FIELDS = {"FrontSide", "Tags", "Type", "Deck", "Subdeck", "Card", "CardFlag"}
 MIN_MASK_SIZE = 0.005
 LONG_TEXT = 200
+
+# ─── Charte de rédaction (reference/format-cartes.md) : seuils des avertissements « charte » ────
+LONG_ANSWER_WORDS = 25  # R1 : une réponse courte, le reste dans Extra
+MAX_LIST_ITEMS = 4  # R6 : pas de liste de plus de 4 éléments (Olicard règle 7, Wozniak 8-9)
+LONG_HOLE_WORDS = 6  # R7 : un trou = un mot, un nombre, une expression courte
+MIN_CLOZE_CONTEXT = 15  # R7 : le texte visible doit poser une question
+INTERFERENCE_MIN = 3  # R5 : même réponse pour 3 cartes ou plus = interférence (Wozniak 11)
+YES_NO_ANSWERS = {"oui", "non", "vrai", "faux", "yes", "no", "true", "false", "si"}
+RECOGNITION_RE = re.compile(r"^\s*(est-ce\s+qu|vrai\s+ou\s+faux|v\s*/\s*f\b|qcm\b)", re.I)
+MCQ_OPTION_RE = re.compile(r"(?:^|[\s(])[a-dA-D1-4][).]\s+\S")
+ENUMERATION_RE = re.compile(
+    r"^\s*(?:cite[sz]?|liste[sz]?|[ée]num[èe]re[sz]?|nomme[sz]?|donne[sz]?\s+(?:les|tous|toutes)|"
+    r"quel(?:le)?s\s+sont\s+(?:les|tous|toutes)|combien\s+(?:et\s+)?lesquel)",
+    re.I,
+)
+SENTENCE_QUESTION_RE = re.compile(
+    r"^\s*(?:quel(?:le)?s?|qui|que|qu'|quoi|quand|où|combien|comment|pourquoi|lequel|laquelle|lesquel(?:le)?s|"
+    r"est-ce|[àade]\s+quel(?:le)?s?|dans\s+quel(?:le)?s?|en\s+quel(?:le)?s?|what|which|who|when|where|how|why)\b"
+    r"|(?:\w-t-(?:il|elle)s?\b|\w-(?:vous|tu|nous|ils|elles|on)\b)[^?]*\?\s*$",
+    re.I,
+)
+OPEN_RE = re.compile(
+    r"^\s*(?:parle[sz]?[- ]moi|d[ée]cri[st]|r[ée]sume[sz]?|pr[ée]sente[sz]?|raconte[sz]?|que\s+sais[- ]tu|"
+    r"explique[sz]?\s+(?:en\s+d[ée]tail|tout|le\s+fonctionnement\s+complet))\b",
+    re.I,
+)
 
 # Types intégrés : identifiants, noms, champs et modèles de l'export .apkg de Recto
 # (src/lib/export/apkg.ts) ; le type « Question » est propre à ce plugin (4 champs : il reste un
@@ -378,6 +405,37 @@ def sound(name: str) -> str:
     return f"[sound:{name}]"
 
 
+def pendu(answer: str, keep: int = 1) -> str:
+    """Indice récupérateur « façon pendu » (Olicard, règle 4 et p. 38) : un trait par caractère de
+    la réponse, les `keep` premiers caractères révélés ; espaces, traits d'union et apostrophes
+    gardés. pendu("1969") → "1 _ _ _", pendu("Strasbourg", 2) → "St _ _ _ _ _ _ _ _",
+    pendu("1515", 0) → "_ _ _ _". À placer dans une question à sens unique ou comme indice
+    d'un trou ({{c1::1969::1 _ _ _}}) ; jamais dans la face d'une carte à deux sens."""
+    text = strip_html(str(answer))
+    if not text:
+        raise DeckError("pendu : réponse vide")
+    tokens: list[str] = []
+    shown, run = 0, False  # `run` : le dernier jeton est une suite de lettres révélées
+    for c in text:
+        if c == " ":
+            tokens.append("/")  # séparation des mots : « R _ _ / _ _ / _ _ _ _ _ _ _ »
+            run = False
+        elif not c.isalnum():
+            tokens.append(c)
+            run = False
+        elif shown < max(0, keep):
+            if run:
+                tokens[-1] += c
+            else:
+                tokens.append(c)
+            shown, run = shown + 1, True
+        else:
+            tokens.append("_")
+            run = False
+    # Un espace entre les traits pour qu'on puisse les compter (« 1 _ _ _ »).
+    return " ".join(tokens)
+
+
 # ─── Types de notes et masques ───────────────────────────────────────────────────────────────────
 
 
@@ -553,15 +611,27 @@ class Report:
         if example:
             self.warnings[key].append(example)
 
+    @property
+    def charte(self) -> dict[str, list[str]]:
+        """Les avertissements de la charte de rédaction (clés « charte Rn — … »)."""
+        return {k: v for k, v in self.warnings.items() if k.startswith("charte ")}
+
     def text(self) -> str:
         out = list(self.lines)
-        for key, examples in self.warnings.items():
-            if examples:
-                shown = " ; ".join(dict.fromkeys(examples[:3]))
-                more = f" (et {len(examples) - 3} autres)" if len(examples) > 3 else ""
-                out.append(f"avertissement : {key} — {len(examples)} : {shown}{more}")
-            else:
-                out.append(f"avertissement : {key}")
+
+        def line(key: str, examples: list[str]) -> str:
+            if not examples:
+                return f"avertissement : {key}"
+            shown = " ; ".join(dict.fromkeys(examples[:3]))
+            more = f" (et {len(examples) - 3} autres)" if len(examples) > 3 else ""
+            return f"avertissement : {key} — {len(examples)} : {shown}{more}"
+
+        out += [line(k, v) for k, v in self.warnings.items() if not k.startswith("charte ")]
+        charte = self.charte
+        if charte:
+            out.append("Charte de rédaction (reference/format-cartes.md) : "
+                       f"{sum(len(v) for v in charte.values())} carte(s) à revoir ou à justifier")
+            out += ["  " + line(k, v) for k, v in charte.items()]
         out += [f"ERREUR : {e}" for e in self.errors]
         out.append("OK : importable dans Recto" if self.ok else f"{len(self.errors)} erreur(s) : à corriger")
         return "\n".join(out)
@@ -745,6 +815,39 @@ class Package:
         if not numbers:
             raise DeckError(f"texte à trous sans {{{{c1::…}}}} : « {strip_html(text)[:60]} »")
         self._add(CLOZE, deck, [text, extra], tags, guid, suspended, [n - 1 for n in numbers], sort_field(text))
+
+    def add_sequence(self, deck: str, title: str, items: list, window: int = 1, numbered: bool = True,
+                     extra: str = "", tags=(), guid: str | None = None, suspended: bool = False) -> int:
+        """Liste ordonnée (planètes, étapes, couches, rois…) en trous chevauchants (Wozniak, règle 9 ;
+        Olicard, règle 7) : une note à trous par élément, qui ne montre que ses voisins.
+
+            add_sequence("Astronomie", "Planètes, du Soleil vers l'extérieur",
+                         ["Mercure", "Vénus", "Terre", "Mars", "Jupiter", "Saturne", "Uranus", "Neptune"])
+            → « Planètes, du Soleil vers l'extérieur — 3/8 : …, Vénus, [Terre], Mars, … »
+
+        `window` : voisins montrés de chaque côté (1 par défaut) ; `numbered` : rang « 3/8 » dans la
+        question (un indice de plus, et la position elle-même est apprise). `guid` sert de préfixe
+        (`guid-1`, `guid-2`…). Renvoie le nombre de notes créées. Pour un ensemble sans ordre, ne
+        pas s'en servir : une carte par élément, ou des groupes de 4 au plus (format-cartes.md, R6).
+        """
+        items = [str(x).strip() for x in items]
+        if len(items) < 2:
+            raise DeckError(f"add_sequence « {strip_html(title)[:40]} » : au moins 2 éléments")
+        for it in items:
+            if not it or "{{" in it or "}}" in it or "::" in it:
+                raise DeckError(f"add_sequence « {strip_html(title)[:40]} » : élément vide ou contenant {{{{, }}}} ou :: ({it!r})")
+        if "{{" in title or window < 0:
+            raise DeckError("add_sequence : titre sans {{…}} et window ≥ 0")
+        n = len(items)
+        for i, it in enumerate(items):
+            lo, hi = max(0, i - window), min(n, i + window + 1)
+            parts = (["…"] if lo > 0 else []) + [
+                f"{{{{c1::{items[j]}}}}}" if j == i else items[j] for j in range(lo, hi)
+            ] + (["…"] if hi < n else [])
+            head = f"{title} — {i + 1}/{n} : " if numbered else f"{title} : "
+            self.add_cloze(deck, head + ", ".join(parts), extra=extra, tags=tags,
+                           guid=f"{guid}-{i + 1}" if guid else None, suspended=suspended)
+        return n
 
     def add_occlusion(self, deck: str, image: str, masks: list[Mask], header: str = "", extra: str = "",
                       hide_all: bool = True, alt: str = "", tags=(), guid: str | None = None,
@@ -1039,6 +1142,208 @@ def _cloze_side(text: str, n: int, answer: bool) -> str:
     return CLOZE_RE.sub(repl, text)
 
 
+# ─── Charte de rédaction : avertissements « charte Rn » (reference/format-cartes.md) ─────────────
+
+
+def _words(s: str) -> int:
+    return len(strip_html(s).split())
+
+
+def _norm(s: str) -> str:
+    return re.sub(r"\s+", " ", strip_html(s)).strip().casefold()
+
+
+def _norm_with_images(s: str) -> str:
+    """Comme _norm, mais les noms d'images restent (deux questions-images différentes diffèrent)."""
+    return re.sub(r"\s+", " ", sort_field(SOUND_RE.sub(" ", s))).strip().casefold()
+
+
+def _list_items(s: str) -> int:
+    """Nombre d'éléments si le champ est une liste (puces, ou éléments courts séparés par , ; • ·
+    ou des retours à la ligne) de plus de MAX_LIST_ITEMS éléments ; 0 sinon."""
+    n_li = len(re.findall(r"<li\b", s, re.I))
+    if n_li:
+        return n_li if n_li > MAX_LIST_ITEMS else 0
+    text = strip_html(re.sub(r"<br\s*/?>|</p>|</li>", " ¦ ", s, flags=re.I))
+    parts = [p.strip() for p in re.split(r"\s*[;,¦•·]\s*", text) if p.strip()]
+    if len(parts) > MAX_LIST_ITEMS and max(len(p) for p in parts) <= 40 and sum(map(len, parts)) / len(parts) <= 25:
+        return len(parts)
+    return 0
+
+
+def _answer_in(question: str, answer: str) -> bool:
+    """La réponse (2 à 60 caractères) se lit telle quelle dans la question."""
+    q, a = _norm(question), _norm(answer)
+    return 2 <= len(a) <= 60 and re.search(r"(?<!\w)" + re.escape(a) + r"(?!\w)", q) is not None
+
+
+def _asked_value(front: str, back: str, fields: list[str], values: list[str]) -> str:
+    """Ce qu'une carte one_way demande : le premier champ cité par la réponse et pas par la question."""
+    shown = set(referenced_fields(front))
+    asked = [f for f in referenced_fields(back) if f in fields and f not in shown]
+    return values[fields.index(asked[0])] if asked else ""
+
+
+def _alts(s: str) -> list[str]:
+    return [html.unescape(a or b) for a, b in re.findall(r"""\balt\s*=\s*(?:"([^"]*)"|'([^']*)')""", s, re.I)]
+
+
+ALT_STOP = {"avec", "sans", "dans", "pour", "carte", "image", "photo", "schéma", "dessin", "plan", "vue", "fond"}
+
+
+def _alt_leaks(question: str, answer: str) -> bool:
+    """Un mot de la réponse (4 lettres ou plus) se lit dans le texte alternatif d'une image de la question."""
+    words = [w for w in re.findall(r"\w+", _norm(answer)) if len(w) >= 4 and w not in ALT_STOP]
+    for alt in _alts(question):
+        a = _norm(alt)
+        if any(re.search(r"(?<!\w)" + re.escape(w) + r"(?!\w)", a) for w in words):
+            return True
+    return False
+
+
+def _charte_question(r: Report, q: str, label: str) -> None:
+    """Face posée : reconnaissance (R4), énumération (R6), question ouverte (R4)."""
+    t = strip_html(q)
+    if RECOGNITION_RE.search(t) or len(MCQ_OPTION_RE.findall(t)) >= 2:
+        r.warn("charte R4 — question de reconnaissance (vrai/faux, « est-ce que », QCM) : demander la valeur "
+               "elle-même (« Australie : capitale » → Canberra)", label)
+    if ENUMERATION_RE.search(t):
+        r.warn("charte R6 — la question demande une énumération (« cite », « quels sont les ») : une carte par "
+               "élément, des groupes de 4 au plus, ou add_sequence si l'ordre compte", label)
+    if OPEN_RE.search(t):
+        r.warn("charte R4 — question ouverte sans réponse unique (« décris », « parle-moi de », « résume ») : "
+               "découper en faits, ou add_question « pourquoi / comment » à réponse courte", label)
+
+
+def _charte_answer(r: Report, a: str, label: str) -> None:
+    """Face attendue : oui/non (R4), réponse longue (R1), liste (R6)."""
+    t = strip_html(a)
+    if t.casefold().strip(" .!") in YES_NO_ANSWERS:
+        r.warn("charte R4 — réponse oui/non ou vrai/faux (une chance sur deux, aucun rappel) : demander la "
+               "valeur elle-même", label)
+    if _words(a) > LONG_ANSWER_WORDS:
+        r.warn(f"charte R1 — réponse de plus de {LONG_ANSWER_WORDS} mots : garder l'essentiel, le reste dans "
+               "Extra ou Explication", label)
+    n = _list_items(a)
+    if n:
+        r.warn(f"charte R6 — réponse en liste de {n} éléments (plus de {MAX_LIST_ITEMS}) : découper (une carte "
+               "par élément, groupes de 4, ou add_sequence si l'ordre compte)", label)
+
+
+def _charte_pair(r: Report, q: str, a: str, label: str, two_way: bool) -> None:
+    """Question et réponse ensemble : réponse visible (R5), alt bavard (R8), face « ? » (R9)."""
+    if _answer_in(q, a):
+        r.warn("charte R5 — la question contient la réponse : ne montrer que ce qui est demandé", label)
+    if _alt_leaks(q, a):
+        r.warn("charte R8 — le texte alternatif (alt) de l'image donne la réponse : décrire l'image sans la "
+               "nommer", label)
+    if two_way:
+        if _answer_in(a, q):
+            r.warn("charte R5 — la face 2 contient la face 1 : dans l'autre sens, la question contiendrait "
+                   "la réponse", label)
+        if any(strip_html(face).endswith("?") and SENTENCE_QUESTION_RE.search(strip_html(face))
+               for face in (q, a)):
+            r.warn("charte R9 — face en phrase interrogative (« Quel est … ? ») dans une carte posée dans les "
+                   "deux sens : elle deviendra une réponse ; écrire chaque face comme une étiquette qui dit ce "
+                   "qu'on cherche (« Terre : périmètre ? » ↔ « 40 075 km : de quoi ? ») ou passer en sens "
+                   "unique (add_question, one_way)", label)
+
+
+def _charte_cloze(r: Report, text: str, ords: list[int], label: str) -> None:
+    """Texte à trous : trou long (R7), trou-liste (R6), sans contexte (R7), réponse visible (R5)."""
+    for o in ords:
+        n = o + 1
+        answers = [m.group(2) for m in CLOZE_RE.finditer(text) if int(m.group(1)) == n]
+        visible = _cloze_side(text, n, False)
+        context = strip_html(re.sub(r"\[[^\]]*\]", " ", visible))
+        lab = f"{label} [trou {n}]"
+        for ans in answers:
+            if _words(ans) > LONG_HOLE_WORDS:
+                r.warn(f"charte R7 — trou de plus de {LONG_HOLE_WORDS} mots : un trou = un mot, un nombre, une "
+                       "expression courte ; sinon plusieurs trous", lab)
+            if _list_items(ans):
+                r.warn("charte R6 — un trou cache une liste : un trou par élément, ou add_sequence", lab)
+            if _answer_in(visible, ans):
+                r.warn("charte R5 — la réponse du trou se lit ailleurs dans le texte", lab)
+        if len(context) < MIN_CLOZE_CONTEXT:
+            r.warn("charte R7 — texte à trous presque sans contexte : le texte visible doit poser une question "
+                   "(sujet, précision de lieu ou de date)", lab)
+
+
+def _charte_note(r: Report, kind: str, question_type: bool, mfields: list[str], tmpls: list[Template],
+                 values: list[str], ords: list[int], label: str, groups: dict, group_key: tuple) -> None:
+    """Applique la charte à une note ; `groups` accumule les faces pour les contrôles entre notes."""
+
+    def group(part: str, name: str, value: str) -> None:
+        if value:
+            groups.setdefault((group_key, name, part), {}).setdefault(value, []).append(label)
+
+    if kind == "basic":
+        front, back = values[0], values[1]
+        _charte_question(r, front, label)
+        _charte_answer(r, back, label)
+        _charte_answer(r, front, label)
+        _charte_pair(r, front, back, label, True)
+        if _alt_leaks(back, front):
+            r.warn("charte R8 — le texte alternatif (alt) de l'image donne la réponse : décrire l'image sans la "
+                   "nommer", label)
+        group("verso", "basique", _norm(back))
+    elif question_type:
+        _charte_question(r, values[0], label)
+        _charte_answer(r, values[1], label)
+        _charte_pair(r, values[0], values[1], label, False)
+    elif kind == "custom":
+        vals = dict(zip(mfields, values))
+        asked_faces: dict[str, str] = {}  # face posée (normalisée) → nom du modèle qui la pose
+        for o in ords:
+            t = tmpls[o]
+            lab = f"{label} [{t.name}]"
+            q = render_template(t.front, vals)
+            for face in (q, render_template(t.back, vals)) if t.two_way else (q,):
+                key = _norm_with_images(face)
+                other = asked_faces.get(key)
+                if other and other != t.name:
+                    r.warn("charte R5 — deux cartes d'une même note posent la même face : l'apprenant ne sait "
+                           "pas ce qu'on lui demande ; écrire sur la face ce qui est cherché "
+                           "(« {{Nom}} : numéro ? » et « {{Nom}} : préfecture ? »)",
+                           f"{label} [{other} / {t.name}] « {_preview(face, 40)} »")
+                asked_faces.setdefault(key, t.name)
+            if t.two_way:
+                a = render_template(t.back, vals)
+                _charte_answer(r, q, lab)
+                _charte_answer(r, a, lab)
+                _charte_pair(r, q, a, lab, True)
+                if _alt_leaks(a, q):
+                    r.warn("charte R8 — le texte alternatif (alt) de l'image donne la réponse : décrire l'image "
+                           "sans la nommer", lab)
+                group("face 1", t.name, _norm_with_images(q))
+                group("face 2", t.name, _norm_with_images(a))
+            else:
+                a = render_template(t.back, vals, front_side="")
+                asked = _asked_value(t.front, t.back, mfields, values)
+                _charte_question(r, q, lab)
+                _charte_answer(r, a, lab)
+                _charte_pair(r, q, asked or a, lab, False)
+                group("question", t.name, _norm_with_images(q))
+    elif kind == "cloze":
+        _charte_cloze(r, values[0], ords, label)
+
+
+def _charte_groups(r: Report, groups: dict) -> None:
+    for (_key, name, part), by_value in groups.items():
+        for value, labels in by_value.items():
+            if len(labels) < 2:
+                continue
+            example = f"« {value[:40]} » × {len(labels)} ({labels[0]}…)"
+            if part == "question":
+                r.warn(f"charte R5 — même question pour plusieurs notes (modèle « {name} ») : ambiguë, une seule "
+                       "bonne réponse attendue", example)
+            else:
+                r.warn(f"charte R9 — {part} identique pour plusieurs notes (« {name} ») : posée dans l'autre sens, "
+                       "la carte aurait plusieurs bonnes réponses ; sens unique (add_question, one_way) ou "
+                       "préciser la face (Olicard, règle 8)", example)
+
+
 def check_apkg(path: str) -> Report:
     with open(path, "rb") as f:
         return check_bytes(f.read())
@@ -1124,6 +1429,7 @@ def check_bytes(data: bytes) -> Report:
     referenced: set[str] = set()
     seen_guid: set[str] = set()
     seen_front: set[tuple] = set()
+    charte_groups: dict = {}
     total_cards = 0
     for nid, guid, mid, _tags, flds in notes:
         mid = str(mid)
@@ -1161,6 +1467,8 @@ def check_bytes(data: bytes) -> Report:
         total_cards += len(ords)
         cards_per_deck[deck] = cards_per_deck.get(deck, 0) + len(ords)
         notes_per_model[mid] = notes_per_model.get(mid, 0) + 1
+        _charte_note(r, kind, int(mid) == QUESTION_ID, mfields, tmpls, values, ords, label, charte_groups,
+                     (deck, mid))
         for v in values:
             for name in media_refs(v):
                 referenced.add(name)
@@ -1221,6 +1529,7 @@ def check_bytes(data: bytes) -> Report:
     for deck in cards_per_deck:
         if deck.count("::") > 1:
             r.warn("paquet à plus de deux niveaux : Recto aplatit au-delà de « A::B »", deck)
+    _charte_groups(r, charte_groups)
 
     kinds = {
         "basic": "basique (une carte, posée dans les deux sens si le paquet alterne)",

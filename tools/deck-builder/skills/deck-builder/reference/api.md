@@ -5,7 +5,7 @@ Python 3.9 ou plus, bibliothèque standard seulement. Tous les champs sont du **
 ```python
 import sys
 sys.path.insert(0, "<dossier du skill>/scripts")
-from recto_apkg import Package, Mask, DeckError, img, sound, image_size, one_way, two_way
+from recto_apkg import Package, Mask, DeckError, img, sound, pendu, image_size, one_way, two_way
 ```
 
 ## Paquet
@@ -30,7 +30,7 @@ Arguments communs des notes :
 ```python
 pkg.add_basic(deck, front, back, extra="", tags=(), guid=None, suspended=False)
 ```
-Paire réversible : une carte, posée Recto → Verso puis Verso → Recto. `extra` s'affiche après la réponse, dans les deux sens.
+Paire réversible : une carte, posée Recto → Verso puis Verso → Recto. `extra` s'affiche après la réponse, dans les deux sens. Chaque face est une étiquette à réponse unique (« Terre : périmètre » ↔ « 40 075 km »), jamais une question « … ? » (charte R9) ; pour une relation à sens unique, `add_question`.
 
 ```python
 pkg.add_question(deck, question, answer, explanation="", source="", tags=(), guid=None, suspended=False)
@@ -40,7 +40,17 @@ Question à sens unique (type « Recto · Question ») : une carte, jamais retou
 ```python
 pkg.add_cloze(deck, text, extra="", tags=(), guid=None, suspended=False)
 ```
-Texte à trous : `{{c1::réponse}}`, `{{c1::réponse::indice}}` ; une carte par numéro, les trous de même numéro sont cachés ensemble.
+Texte à trous : `{{c1::réponse}}`, `{{c1::réponse::indice}}` ; une carte par numéro, les trous de même numéro sont cachés ensemble. Un trou = un mot, un nombre, une expression courte (charte R7).
+
+```python
+pkg.add_sequence(deck, title, items, window=1, numbered=True, extra="", tags=(), guid=None, suspended=False) -> int
+```
+Liste **ordonnée** en trous chevauchants (charte R6) : une note à trous par élément, qui ne montre que ses `window` voisins de chaque côté et, si `numbered`, son rang. `add_sequence("Astronomie", "Planètes, du Soleil vers l'extérieur", ["Mercure", "Vénus", "Terre", …])` donne « Planètes, du Soleil vers l'extérieur — 3/8 : …, Vénus, [Terre], Mars, … ». `guid` sert de préfixe (`guid-1`, `guid-2`…). Renvoie le nombre de notes. Pour un ensemble sans ordre, ne pas s'en servir (une carte par élément, ou des groupes de 4 au plus).
+
+```python
+pendu(answer, keep=1) -> str
+```
+Indice récupérateur « façon pendu » (charte R10) : un trait par caractère, les `keep` premiers révélés, espaces rendus par « / ». `pendu("1515")` → `1 _ _ _`, `pendu("Strasbourg", 2)` → `St _ _ _ _ _ _ _ _`, `pendu("Rio de Janeiro")` → `R _ _ / _ _ / _ _ _ _ _ _ _`. À placer dans la question d'un `add_question` / `one_way` (`f"Marignan : année ({pendu('1515')})"`) ou comme indice d'un trou (`{{c1::1515::1 _ _ _}}`). Jamais dans une face `two_way` (elle deviendrait une réponse).
 
 ```python
 pkg.add_occlusion(deck, image, masks, header="", extra="", hide_all=True, alt="", tags=(), guid=None, suspended=False)
@@ -77,9 +87,12 @@ dep = pkg.note_type(
     fields=["Carte", "Nom", "Numéro", "Préfecture", "Région"],
     templates=[
         one_way("Carte → Nom", "{{Carte}}<br>Quel département ?",
-                "{{FrontSide}}<hr id=answer><b>{{Nom}}</b> ({{Numéro}})<br>{{Région}}"),
-        two_way("Nom ↔ Numéro", "<b>{{Nom}}</b>", "<b>{{Numéro}}</b>"),
-        two_way("Nom ↔ Préfecture", "Département : <b>{{Nom}}</b>", "Préfecture : <b>{{Préfecture}}</b>"),
+                "{{FrontSide}}<hr id=answer><b>{{Nom}}</b> ({{Numéro}}), préfecture {{Préfecture}}<br>{{Région}}"),
+        # Chaque face dit ce qu'on cherche de l'autre côté : posée seule, « Bas-Rhin » ne dirait pas
+        # s'il faut trouver le numéro ou la préfecture, et « 67 » ne dirait pas qu'on cherche un département.
+        two_way("Nom ↔ Numéro", "<b>{{Nom}}</b><br><i>numéro ?</i>", "<b>{{Numéro}}</b><br><i>département ?</i>"),
+        two_way("Nom ↔ Préfecture", "<b>{{Nom}}</b><br><i>préfecture ?</i>",
+                "<b>{{Préfecture}}</b><br><i>département ?</i>"),
     ],
 )
 for d in departements:                      # liste de dicts : numero, nom, prefecture, region
@@ -91,7 +104,7 @@ for d in departements:                      # liste de dicts : numero, nom, pref
 pkg.write("departements.apkg")
 ```
 
-Résultat : 3 cartes par note, dans un seul paquet : Carte → Nom toujours dans ce sens, Nom ↔ Numéro et Nom ↔ Préfecture posées tantôt dans un sens, tantôt dans l'autre. Le champ Région n'est demandé par aucune carte, il sert de contexte dans les réponses (et donne au type plus de 3 champs).
+Résultat : 3 cartes par note, dans un seul paquet : Carte → Nom toujours dans ce sens, Nom ↔ Numéro et Nom ↔ Préfecture posées tantôt dans un sens, tantôt dans l'autre (numéro et préfecture sont uniques : chaque face n'a qu'une réponse). Recto n'affiche ni le nom du modèle ni le nom du champ pendant la révision (seulement un badge « ↔ Sens inversé ») : c'est la face qui dit ce qu'on cherche. Convention : **valeur en gras, puis en italique l'attribut demandé de l'autre côté** (« Bas-Rhin / numéro ? », « 67 / département ? », « Strasbourg / département ? ») ; une face partagée par deux cartes d'une note (« Département : Bas-Rhin » pour Nom ↔ Numéro et Nom ↔ Préfecture) est signalée (charte R5). Le champ Région n'est demandé par aucune carte, il sert de contexte dans les réponses (et donne au type plus de 3 champs) ; pour l'apprendre, ajouter `one_way("Nom → Région", "{{Nom}} : région", "{{FrontSide}}<hr id=answer>{{Région}}")`, pas un `two_way` (plusieurs départements par région : le sens inverse serait ambigu, charte R9).
 
 ## Médias
 
@@ -107,4 +120,18 @@ Formats acceptés par Recto : images `png jpg jpeg webp gif svg`, sons `mp3 ogg 
 
 ## Rapport
 
-`write()` et `check` affichent : notes, cartes, médias, cartes par paquet, puis chaque type de note avec ce que Recto en fera et l'aperçu de sa première note, carte par carte. Ensuite viennent les avertissements regroupés (balises retirées, images sans `alt`, champs trop longs, images de plus de 1 280 px que Recto réduit, doublons probables) et les erreurs.
+`write()` et `check` affichent : notes, cartes, médias, cartes par paquet, puis chaque type de note avec ce que Recto en fera et l'aperçu de sa première note, carte par carte. Ensuite viennent les avertissements regroupés (balises retirées, images sans `alt`, champs trop longs, images de plus de 1 280 px que Recto réduit, doublons probables), puis la section **« Charte de rédaction »** et les erreurs. `report.charte` donne ces avertissements seuls (`{clé: [exemples]}`).
+
+Avertissements « charte » (`reference/format-cartes.md`) : ils n'empêchent pas l'écriture, mais chacun se corrige ou se justifie à la livraison.
+
+| Clé | Ce qui est détecté |
+|---|---|
+| charte R1 | réponse de plus de 25 mots |
+| charte R4 | question de reconnaissance (« est-ce que », vrai/faux, options a) b) c)), réponse oui/non, question ouverte (« décris », « parle-moi de », « résume ») |
+| charte R5 | la question contient la réponse (pour un `one_way`, la valeur du champ demandé) ; la réponse d'un trou se lit ailleurs dans le texte ; même question rendue pour plusieurs notes d'un modèle |
+| charte R6 | question « cite / quels sont les… » ; réponse ou trou qui est une liste de plus de 4 éléments |
+| charte R7 | trou de plus de 6 mots ; texte à trous presque sans contexte |
+| charte R8 | `alt` d'une image de la question qui contient un mot de la réponse |
+| charte R9 | face « … ? » dans une note basique ou un `two_way` ; verso ou face identique pour plusieurs notes (sens inverse ambigu) |
+
+Ce que la vérification ne voit pas (à relire soi-même sur l'aperçu) : un nom écrit sur une image, une carte qui n'est répondable qu'avec ses voisines, un fait non daté, l'absence de cartes « pourquoi / comment » dans un paquet de concepts.

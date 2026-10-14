@@ -252,3 +252,72 @@ refused(lambda: pkg.add_basic("P", "<img src='manque.png' alt='x'>", "v") or pkg
     expect(anki.out).toContain("occlusion d'image")
   })
 })
+
+describe('deck-builder plugin: the writing charter (reference/format-cartes.md)', () => {
+  it('charte.py applies every rule: no « charte » warning, and it imports', async () => {
+    const out = join(dir, 'charte.apkg')
+    const built = run([join(skill, 'examples/charte.py'), out])
+    expect(built.out).toContain('OK : importable dans Recto')
+    expect(built.out).not.toContain('charte R')
+    expect(built.status).toBe(0)
+
+    const plan = await planApkgImport(read('charte.apkg'), options, empty, now, newId)
+    expect(plan.report.errors).toEqual([])
+    expect(plan.report.missingMedia).toEqual([])
+    // add_sequence: 8 planets → 8 cloze notes of one card each, showing only the neighbours.
+    const sequence = plan.notes.filter(
+      (n) => n.modelType === 'cloze' && (n.fields[0] ?? '').startsWith('Planètes'),
+    )
+    expect(sequence).toHaveLength(8)
+    expect(sequence.map((n) => n.fields[0])).toContain(
+      "Planètes, du Soleil vers l'extérieur — 3/8 : …, Vénus, {{c1::Terre}}, Mars, …",
+    )
+    expect(plan.cards.filter((c) => sequence.some((n) => n.id === c.noteId))).toHaveLength(8)
+    // pendu(): the hint shows the digit count, not the answer.
+    const oscar = plan.notes.find((n) => (n.fields[0] ?? '').includes('Oscar'))
+    expect(oscar?.fields[0]).toContain('(2 _ _ _)')
+    expect(oscar?.fields[1]).toBe('2016')
+    // R12: a secondary card travels suspended.
+    expect(plan.cards.filter((c) => c.suspended)).toHaveLength(1)
+    // R9: région is asked one way only (several départements share « Grand Est »).
+    const dep = plan.noteTypes?.find((t) => t.name === 'Département (charte)')
+    expect(dep?.templates.map((t) => [t.name, t.twoWay ?? false])).toEqual([
+      ['Carte → Nom', false],
+      ['Nom ↔ Numéro', true],
+      ['Nom ↔ Préfecture', true],
+      ['Nom → Région', false],
+    ])
+  })
+
+  it('flags the cards that break the charter, without refusing the package', () => {
+    const r = build(
+      'charte-avertissements',
+      `
+pkg = Package()
+pkg.add_basic("P", "La photosynthèse absorbe-t-elle du CO2 ?", "Oui")
+pkg.add_basic("P", "Cite les planètes", "Mercure, Vénus, Terre, Mars, Jupiter")
+pkg.add_basic("P", "Bas-Rhin", "Grand Est")
+pkg.add_basic("P", "Haut-Rhin", "Grand Est")
+pkg.add_cloze("P", "{{c1::La mitochondrie est le siège de la respiration cellulaire}}")
+pkg.add_question("P", "Capitale de la France ? (Paris)", "Paris")
+print(pendu("1515"), "|", pendu("Rio de Janeiro", 2))
+report = pkg.write(sys.argv[2], quiet=True)
+print(sorted(k.split(" — ")[0] for k in report.charte))
+`,
+    )
+    expect(r.status).toBe(0)
+    expect(r.out).toContain('1 _ _ _ | Ri _ / _ _ / _ _ _ _ _ _ _')
+    // oui/non (R4), answer shown in the question (R5), « cite » and a list of 5 (R6), a hole that is
+    // the whole sentence and no context (R7), a face « … ? » and a shared verso (R9).
+    expect(r.out).toContain(
+      "['charte R4', 'charte R5', 'charte R6', 'charte R6', 'charte R7', 'charte R7', 'charte R9', 'charte R9']",
+    )
+    const check = run([
+      join(library, 'recto_apkg.py'),
+      'check',
+      join(dir, 'charte-avertissements.apkg'),
+    ])
+    expect(check.status).toBe(0)
+    expect(check.out).toContain('Charte de rédaction (reference/format-cartes.md) : 8 carte(s)')
+  })
+})

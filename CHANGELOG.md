@@ -4,6 +4,18 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 ## [Unreleased]
 
+### Outils — plugin Claude « recto-deck-builder » 2.2.0 : charte de rédaction
+
+#### Added
+
+- `reference/format-cartes.md` : la **charte de rédaction des cartes**, treize règles (R1-R13) tirées du dossier de recherche (Wozniak 1999, Olicard & Holynski 2018, Rowland 2014, Carpenter & Olson 2012, Kornell & Bjork 2008, Kornell 2009, Pan & Rickard 2018, Pyc & Rawson 2009, Dunlosky 2013) : une information par carte, rappel et non reconnaissance, une seule bonne réponse jamais montrée, pas de listes, trous courts, image-indice muette, deux sens seulement si la relation est symétrique, indices récupérateurs, mnémotechnie dans Extra, priorisation, faits datés. Formats recommandés par sujet (vocabulaire, dates, drapeaux et départements, constellations, LSF, plantes, maths, cours), tableau avant/après, grille de relecture, sources.
+- `recto_apkg.py` : `add_sequence()` (liste ordonnée en trous chevauchants : une note par élément qui ne montre que ses voisins et son rang), `pendu()` (indice « 1 _ _ _ ») ; la vérification relit chaque carte à l'aune de la charte et regroupe les manquements sous « Charte de rédaction » (`report.charte`) : réponse oui/non, QCM, « cite… », question ouverte, liste de plus de 4 éléments, réponse visible dans la question ou dans l'`alt`, réponse de plus de 25 mots, face « … ? » dans une carte à deux sens, verso ou face partagés par plusieurs notes (sens inverse ambigu), même question pour plusieurs notes, trou de plus de 6 mots, trou sans contexte. Non bloquant : le skill corrige ou justifie.
+- `examples/charte.py` : un paquet qui applique la charte sujet par sujet, sans avertissement ; `deck-builder-plugin.test.ts` vérifie qu'il s'importe (séquence, indice, carte suspendue, région à sens unique) et que des cartes fautives sont signalées.
+
+#### Changed
+
+- `SKILL.md` : la démarche rédige selon la charte (étape 4) et relit la section « Charte » du rapport (étape 7) ; tableau des types avec `add_sequence` ; message de livraison avec les choix de format et les avertissements gardés. Aucun changement dans l'application.
+
 ### M14 — Texte à trous et occlusion d'image deviennent des types de cartes
 
 #### Added
