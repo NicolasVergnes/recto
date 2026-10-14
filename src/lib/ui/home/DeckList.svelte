@@ -1,6 +1,5 @@
 <script lang="ts">
-  import type { DeckCount } from '$lib/db/repo'
-  import { deckTree } from '$lib/domain/decks'
+  import { deckTree, type DeckCount } from '$lib/domain/decks'
   import type { Deck } from '$lib/domain/types'
   import { t } from '$lib/i18n'
   import type { QueueCounts } from '$lib/queue/build'
@@ -11,10 +10,11 @@
     decks: readonly Deck[]
     /** Today's queue per deck (sub-decks counted in their parent); undefined until it is loaded. */
     queueCounts: ReadonlyMap<string, QueueCounts> | undefined
-    cardCounts: ReadonlyMap<string, DeckCount>
+    /** Notes and cards of each deck, sub-decks counted in their parent (`familyCounts`). */
+    contentCounts: ReadonlyMap<string, DeckCount>
     onnewdeck: () => void
   }
-  let { decks, queueCounts, cardCounts, onnewdeck }: Props = $props()
+  let { decks, queueCounts, contentCounts, onnewdeck }: Props = $props()
 
   const tree = $derived(deckTree(decks))
   const EMPTY: QueueCounts = { learning: 0, review: 0, new: 0 }
@@ -23,8 +23,8 @@
     return queueCounts?.get(deck.id) ?? EMPTY
   }
 
-  function cardCount(deck: Deck): number {
-    return cardCounts.get(deck.id)?.cards ?? 0
+  function contentOf(deck: Deck): DeckCount {
+    return contentCounts.get(deck.id) ?? { notes: 0, cards: 0 }
   }
 </script>
 
@@ -59,10 +59,18 @@
 
 {#snippet deckRow(deck: Deck)}
   {@const c = dueOf(deck)}
+  {@const content = contentOf(deck)}
   <div class="deck">
-    <a class="name" href={`#/decks/${deck.id}`}>{deck.name}</a>
-    <span class="row small tabular">
-      {#if c.learning + c.review + c.new > 0}
+    <div class="info">
+      <a class="name" href={`#/decks/${deck.id}`}>{deck.name}</a>
+      <span class="muted small tabular"
+        >{t('home.noteCount', { n: content.notes })} · {t('home.cardCount', {
+          n: content.cards,
+        })}</span
+      >
+    </div>
+    {#if c.learning + c.review + c.new > 0}
+      <span class="row small tabular">
         <span class="due" title={t('home.dueTitle')}>{c.learning + c.review}</span>
         <span class="new" title={t('home.newTitle')}>{c.new}</span>
         <a
@@ -70,10 +78,8 @@
           href={href('/review', { deck: deck.id })}
           aria-label={t('home.reviewDeckLabel', { name: deck.name })}>{t('home.reviewDeck')}</a
         >
-      {:else}
-        <span class="muted">{t('home.cardCount', { n: cardCount(deck) })}</span>
-      {/if}
-    </span>
+      </span>
+    {/if}
   </div>
 {/snippet}
 
@@ -113,8 +119,14 @@
     background: transparent;
   }
 
-  .name {
+  .info {
     flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: var(--space-1);
+  }
+
+  .name {
     display: flex;
     align-items: center;
     min-height: 2.75rem;

@@ -1,14 +1,16 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type { Card, Deck, Deletion, Media, Note, NoteType, Review, Setting } from '../domain/types'
+import { migrateDeckSettingsM13 } from '../domain/defaults'
 
 export const DB_NAME = 'recto'
 /**
  * Current data schema version, written in backups (02-DATA-MODEL §5). 2 (V1) adds the
  * `image_occlusion` note type: older versions refuse such backups instead of dropping notes.
  * 3 (M8) adds the `noteTypes` table and `custom` notes (Dexie version 2). 4 (M12) adds
- * `card.updatedAt`, the `deletions` table and `setting.updatedAt` (Dexie version 3).
+ * `card.updatedAt`, the `deletions` table and `setting.updatedAt` (Dexie version 3). 5 (M13) drops
+ * `settings.burySiblings` of decks and puts their new cards in random order (Dexie version 4).
  */
-export const SCHEMA_VERSION = 4
+export const SCHEMA_VERSION = 5
 
 /**
  * IndexedDB schema (02-DATA-MODEL §1). Never edit a published `version()` block: add a new one
@@ -55,6 +57,13 @@ export class RectoDB extends Dexie {
             card.updatedAt ??= card.lastReview ?? card.createdAt
           }),
       )
+    // M13: no more twin burying; new cards in random order, existing decks included.
+    this.version(4).upgrade((tx) =>
+      tx
+        .table<{ settings: Record<string, unknown> }>('decks')
+        .toCollection()
+        .modify((deck) => migrateDeckSettingsM13(deck.settings)),
+    )
   }
 }
 

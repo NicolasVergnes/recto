@@ -6,10 +6,9 @@ export function defaultDeckSettings(): DeckSettings {
   return {
     newPerDay: 20,
     reviewsPerDay: 200,
-    newOrder: 'added',
+    newOrder: 'random',
     typedAnswer: false,
     autoplayAudio: true,
-    burySiblings: true,
     alternateSides: true,
     fsrs: {
       requestRetention: 0.9,
@@ -26,6 +25,16 @@ export function defaultDeckSettings(): DeckSettings {
       failToBox: 1,
     },
   }
+}
+
+/**
+ * M13 migration of stored deck settings (Dexie version 4 and backups before schema 5): twin
+ * burying is gone and new cards come in random order, existing decks included. The deck's
+ * `updatedAt` is kept: every device and every backup migrates the same way.
+ */
+export function migrateDeckSettingsM13(settings: Record<string, unknown>): void {
+  delete settings.burySiblings
+  settings.newOrder = 'random'
 }
 
 export interface NewDeckInput {

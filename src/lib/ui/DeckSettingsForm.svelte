@@ -123,10 +123,6 @@
       ><input type="checkbox" bind:checked={settings.autoplayAudio} />
       {t('deckSettings.autoplay')}</label
     >
-    <label class="check"
-      ><input type="checkbox" bind:checked={settings.burySiblings} />
-      {t('deckSettings.bury')}</label
-    >
 
     {#if deck.scheduler === 'fsrs'}
       <FsrsFields

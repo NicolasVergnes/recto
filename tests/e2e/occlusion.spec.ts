@@ -94,10 +94,11 @@ test('image occlusion: draw and place masks, then review one card per mask', asy
   await expect(card.locator('figure.occlusion img')).toHaveAttribute('src', /^blob:/)
   await expect(card.locator('rect:not(.halo)')).toHaveCount(2)
   await expect(card.locator('rect.target:not(.halo)')).toHaveCount(1)
-  await expect(card.getByText('Émeraude')).toHaveCount(0)
+  // Either mask group may come first (random order, M13).
+  await expect(card.getByText(/Émeraude|Terre/)).toHaveCount(0)
   await page.getByRole('button', { name: 'Afficher la réponse' }).click()
   await expect(card.locator('rect.open')).toHaveCount(1)
-  const answer = card.getByText('Émeraude')
+  const answer = card.getByText(/Émeraude|Terre/)
   await expect(answer).toBeVisible()
   // …and it is readable: not under the rating buttons.
   const hit = await answer.evaluate((el) => {

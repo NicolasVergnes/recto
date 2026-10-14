@@ -6,13 +6,7 @@ import {
   type OcclusionMask,
   type OcclusionMode,
 } from './occlusion'
-import {
-  fieldValues,
-  referencedFields,
-  renderTemplate,
-  templateOrds,
-  typedField,
-} from './templates'
+import { fieldValues, renderTemplate, templateOrds, typedField } from './templates'
 import { escapeHtml, imageRefs, imageTag, removeImage, stripHtml } from './text'
 import type { Card, ModelType, Note, NoteType } from './types'
 
@@ -115,33 +109,6 @@ export function reconcileCards<C extends ReconcilableCard>(
     create: ords.filter((ord) => !stay.has(ord)),
     remove: cards.filter((card) => !kept.has(card)),
   }
-}
-
-/**
- * Twin cards of a note (03 §5.2): each one's question shows what the other one answers, as
- * front→back and back→front, so reviewing both the same day gives the second answer away.
- * Cloze and occlusion cards reveal each other's answers and stay twins. Custom: a template asks
- * the fields of its question and answers those its answer adds; numéro→nom and nom→numéro are
- * twins, carte→nom and numéro→nom are not.
- */
-export function areTwins(
-  modelType: ModelType,
-  a: number,
-  b: number,
-  noteType?: TypeShape,
-): boolean {
-  if (a === b) return false
-  if (modelType !== 'custom') return true
-  const sides = (ord: number) => {
-    const t = noteType?.templates[ord]
-    const asked = new Set(t ? referencedFields(t.front) : [])
-    const answered = new Set(t ? referencedFields(t.back).filter((f) => !asked.has(f)) : [])
-    return { asked, answered }
-  }
-  const x = sides(a)
-  const y = sides(b)
-  const reveals = (q: Set<string>, ans: Set<string>) => [...q].some((f) => ans.has(f))
-  return reveals(x.asked, y.answered) && reveals(y.asked, x.answered)
 }
 
 /** The duplicate/sort key of a note: its first field (front or cloze text). */

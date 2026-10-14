@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Card, Deck } from '$lib/domain/types'
-import {
-  buildQueue,
-  interleaveNew,
-  spaceSiblings,
-  type QueueInput,
-  type TodayReview,
-} from '$lib/queue/build'
+import { buildQueue, interleaveNew, type QueueInput, type TodayReview } from '$lib/queue/build'
 import { seededShuffle } from '$lib/queue/random'
 import { getScheduler } from '$lib/scheduler'
 import { card, deck, paris } from '../../helpers/fixtures'
@@ -26,7 +20,6 @@ function input(decks: Deck[], cards: Card[], extra: Partial<QueueInput> = {}): Q
     todayReviews: [],
     globalReviewsPerDay: 500,
     retrievability: (c) => fsrs.retrievability(c, now, byId.get(c.deckId) ?? decks[0] ?? deck('x')),
-    twins: () => true,
     ...extra,
   }
 }
@@ -47,6 +40,8 @@ const review = (id: string, patch: Partial<Card> = {}, deckId = 'd1') =>
   )
 const fresh = (id: string, createdAt: number, deckId = 'd1', noteId = `n-${id}`, ord = 0) =>
   card(id, { createdAt, due: createdAt, ord }, noteId, deckId)
+const pad = (i: number) => String(i).padStart(2, '0')
+const sorted = (ids: readonly string[]) => [...ids].sort()
 
 describe('buildQueue (03 §5)', () => {
   it('returns an empty queue for an empty deck', () => {
@@ -65,7 +60,8 @@ describe('buildQueue (03 §5)', () => {
       card('learnTomorrow', { state: 1, due: now + DAY }),
     ]
     const q = buildQueue(input([deck('d1')], cards))
-    expect(q.ids).toEqual(['learn1', 'learn2', 'rev1', 'new1'])
+    expect(sorted(q.ids.slice(0, 2))).toEqual(['learn1', 'learn2'])
+    expect(q.ids.slice(2)).toEqual(['rev1', 'new1'])
     expect(q.later).toEqual([{ id: 'learnLater', due: now + 10 * MIN }])
     expect(q.counts).toEqual({ learning: 2, review: 1, new: 1 })
   })
@@ -88,12 +84,10 @@ describe('buildQueue (03 §5)', () => {
   })
 
   it('P6: caps new cards per deck, minus those introduced today; 0 means none', () => {
-    const d = deck('d1', 'fsrs', { newPerDay: 3 })
+    const d = deck('d1', 'fsrs', { newPerDay: 3, newOrder: 'added' })
     const cards = Array.from({ length: 10 }, (_, i) => fresh(`n${i}`, now - (10 - i) * DAY))
     expect(buildQueue(input([d], cards)).ids).toEqual(['n0', 'n1', 'n2'])
-    const seen: TodayReview[] = [
-      { cardId: 'x', noteId: 'nx', ord: 0, deckId: 'd1', stateBefore: 0 },
-    ]
+    const seen: TodayReview[] = [{ cardId: 'x', deckId: 'd1', stateBefore: 0 }]
     expect(buildQueue(input([d], cards, { todayReviews: seen })).ids).toEqual(['n0', 'n1'])
     expect(buildQueue(input([deck('d1', 'fsrs', { newPerDay: 0 })], cards)).ids).toEqual([])
   })
@@ -102,9 +96,7 @@ describe('buildQueue (03 §5)', () => {
     const d = deck('d1', 'fsrs', { reviewsPerDay: 4 })
     const cards = Array.from({ length: 10 }, (_, i) => review(`r${i}`))
     expect(buildQueue(input([d], cards)).counts.review).toBe(4)
-    const done: TodayReview[] = [
-      { cardId: 'z', noteId: 'nz', ord: 0, deckId: 'd1', stateBefore: 2 },
-    ]
+    const done: TodayReview[] = [{ cardId: 'z', deckId: 'd1', stateBefore: 2 }]
     expect(buildQueue(input([d], cards, { todayReviews: done })).counts.review).toBe(3)
     expect(buildQueue(input([deck('d1')], cards, { globalReviewsPerDay: 2 })).counts.review).toBe(2)
     expect(
@@ -113,33 +105,53 @@ describe('buildQueue (03 §5)', () => {
     ).toBe(0)
   })
 
-  it('sorts overdue FSRS reviews by increasing retrievability (100 days late first)', () => {
+  it('P6: a capped deck keeps its overdue FSRS reviews of lowest retrievability', () => {
     const cards = [
       review('fresh', { due: now - DAY, lastReview: now - 11 * DAY, stability: 10 }),
       review('late100', { due: now - 100 * DAY, lastReview: now - 110 * DAY, stability: 10 }),
       review('weak', { due: now - 2 * DAY, lastReview: now - 12 * DAY, stability: 3 }),
+      review('today', { due: now - MIN }),
     ]
-    expect(buildQueue(input([deck('d1')], cards)).ids).toEqual(['late100', 'weak', 'fresh'])
+    const capped = buildQueue(input([deck('d1', 'fsrs', { reviewsPerDay: 2 })], cards)).ids
+    expect(sorted(capped)).toEqual(['late100', 'weak'])
+    const roomy = buildQueue(input([deck('d1', 'fsrs', { reviewsPerDay: 4 })], cards)).ids
+    expect(sorted(roomy.slice(0, 3))).toEqual(['fresh', 'late100', 'weak'])
+    expect(roomy[3]).toBe('today')
   })
 
-  it('sorts overdue Leitner reviews by box then due', () => {
-    const d = deck('d1', 'leitner')
+  it('P6: a capped deck keeps its overdue Leitner reviews of lowest box, then due', () => {
     const cards = [
       review('b3', { box: 3, due: now - 3 * DAY }),
       review('b1late', { box: 1, due: now - 2 * DAY }),
       review('b1early', { box: 1, due: now - 5 * DAY }),
     ]
-    expect(buildQueue(input([d], cards)).ids).toEqual(['b1early', 'b1late', 'b3'])
+    const capped = buildQueue(input([deck('d1', 'leitner', { reviewsPerDay: 2 })], cards)).ids
+    expect(sorted(capped)).toEqual(['b1early', 'b1late'])
+  })
+
+  it("M13: overdue reviews come first, then today's, each batch in a stable random order", () => {
+    const overdue = Array.from({ length: 20 }, (_, i) =>
+      review(`o${pad(i)}`, { due: now - (i + 1) * DAY, lastReview: now - (i + 30) * DAY, box: 1 }),
+    )
+    const today = Array.from({ length: 20 }, (_, i) => review(`t${pad(i)}`, { due: now - MIN }))
+    for (const d of [deck('d1'), deck('d1', 'leitner')]) {
+      const cards = [...today, ...overdue]
+      const ids = buildQueue(input([d], cards)).ids
+      expect(sorted(ids.slice(0, 20))).toEqual(overdue.map((c) => c.id))
+      expect(sorted(ids.slice(20))).toEqual(today.map((c) => c.id))
+      // Neither by retrievability, box nor due date: random, whatever the input order.
+      expect(ids.slice(0, 20)).not.toEqual(overdue.map((c) => c.id))
+      expect(ids.slice(0, 20)).not.toEqual(overdue.map((c) => c.id).reverse())
+      expect(buildQueue(input([d], [...cards].reverse())).ids).toEqual(ids)
+    }
   })
 
   it("shuffles today's reviews with a stable daily seed", () => {
-    const cards = Array.from({ length: 30 }, (_, i) =>
-      review(`r${String(i).padStart(2, '0')}`, { due: now - MIN }),
-    )
+    const cards = Array.from({ length: 30 }, (_, i) => review(`r${pad(i)}`, { due: now - MIN }))
     const a = buildQueue(input([deck('d1')], cards)).ids
     const b = buildQueue(input([deck('d1')], [...cards].reverse())).ids
     expect(a).toEqual(b)
-    expect(a).not.toEqual([...a].sort())
+    expect(a).not.toEqual(sorted(a))
     const tomorrow = buildQueue(
       input(
         [deck('d1')],
@@ -148,6 +160,16 @@ describe('buildQueue (03 §5)', () => {
       ),
     ).ids
     expect(tomorrow).not.toEqual(a)
+  })
+
+  it('M13: shuffles the learning cards due now with a stable daily seed', () => {
+    const cards = Array.from({ length: 20 }, (_, i) =>
+      card(`l${pad(i)}`, { state: 1, due: now - (i + 1) * MIN }),
+    )
+    const ids = buildQueue(input([deck('d1')], cards)).ids
+    expect(sorted(ids)).toEqual(cards.map((c) => c.id))
+    expect(ids).not.toEqual([...cards].sort((a, b) => a.due - b.due).map((c) => c.id))
+    expect(buildQueue(input([deck('d1')], [...cards].reverse())).ids).toEqual(ids)
   })
 
   it('P5: interleaves decks round-robin and spreads new cards every k reviews', () => {
@@ -162,69 +184,32 @@ describe('buildQueue (03 §5)', () => {
       fresh('nb', now - DAY, 'd2'),
     ]
     const q = buildQueue(input([d1, d2], cards))
-    expect(q.ids).toEqual(['a1', 'b1', 'na', 'a2', 'b2', 'nb'])
+    expect(q.ids.map((id) => id.replace(/\d/, ''))).toEqual(['a', 'b', 'na', 'a', 'b', 'nb'])
   })
 
-  it('buries siblings: one card per note per day, none if a sibling was answered today', () => {
-    const cards = [fresh('c0', now - DAY, 'd1', 'note', 0), fresh('c1', now - DAY, 'd1', 'note', 1)]
-    expect(buildQueue(input([deck('d1')], cards)).ids).toEqual(['c0'])
-    const answered: TodayReview[] = [
-      { cardId: 'c0', noteId: 'note', ord: 0, deckId: 'd1', stateBefore: 0 },
+  it('M13: cards of a note share the day, neither buried nor spaced', () => {
+    const cards = [
+      fresh('c0', now - DAY, 'd1', 'note', 0),
+      fresh('c1', now - DAY, 'd1', 'note', 1),
+      fresh('c2', now - DAY, 'd1', 'note', 2),
     ]
-    expect(
-      buildQueue(input([deck('d1')], [cards[1] as Card], { todayReviews: answered })).ids,
-    ).toEqual([])
-    // A learning card keeps its slot and buries its sibling review.
+    expect(sorted(buildQueue(input([deck('d1')], cards)).ids)).toEqual(['c0', 'c1', 'c2'])
+    const answered: TodayReview[] = [{ cardId: 'c0', deckId: 'd1', stateBefore: 0 }]
+    const rest = buildQueue(input([deck('d1')], cards.slice(1), { todayReviews: answered })).ids
+    expect(sorted(rest)).toEqual(['c1', 'c2'])
     const mixed = [card('l', { state: 1, due: now - MIN }, 'note2'), review('r', {}, 'd1')]
     mixed[1] = { ...mixed[1], noteId: 'note2' } as Card
-    expect(buildQueue(input([deck('d1')], mixed)).ids).toEqual(['l'])
+    expect(buildQueue(input([deck('d1')], mixed)).ids).toEqual(['l', 'r'])
   })
 
-  it('buries twins only: other siblings share the day, spaced apart', () => {
-    // ord 0 and 1 are twins (numéro → nom, nom → numéro); ord 2 is no twin (carte → nom).
-    const twins = (_: string, a: number, b: number) => a !== b && a + b === 1
-    const d = deck('d1', 'fsrs', { newPerDay: 20 })
-    const others = Array.from({ length: 12 }, (_, i) => fresh(`x${i}`, now - DAY))
-    const cards = [
-      fresh('c0', now - 2 * DAY, 'd1', 'note', 0),
-      fresh('c1', now - 2 * DAY, 'd1', 'note', 1),
-      fresh('c2', now - 2 * DAY, 'd1', 'note', 2),
-      ...others,
-    ]
-    const ids = buildQueue(input([d], cards, { twins })).ids
-    expect(ids).toContain('c0')
-    expect(ids).toContain('c2')
-    expect(ids).not.toContain('c1')
-    expect(Math.abs(ids.indexOf('c2') - ids.indexOf('c0'))).toBeGreaterThanOrEqual(10)
-    const answered: TodayReview[] = [
-      { cardId: 'c1', noteId: 'note', ord: 1, deckId: 'd1', stateBefore: 0 },
-    ]
-    const rest = [cards[0], cards[2]] as Card[]
-    const later = buildQueue(input([d], rest, { twins, todayReviews: answered })).ids
-    expect(later).toEqual(['c2'])
-  })
-
-  it('spaces siblings by at least 10 positions when burying is off', () => {
-    const d = deck('d1', 'fsrs', { burySiblings: false })
-    const cards = [
-      fresh('s0', now - 2 * DAY, 'd1', 'note', 0),
-      fresh('s1', now - 2 * DAY, 'd1', 'note', 1),
-      ...Array.from({ length: 12 }, (_, i) => fresh(`o${i}`, now - DAY + i)),
-    ]
-    const ids = buildQueue(input([d], cards)).ids
-    expect(ids).toHaveLength(14)
-    expect(ids.indexOf('s1') - ids.indexOf('s0')).toBeGreaterThanOrEqual(10)
-  })
-
-  it('orders new cards by creation or randomly (seeded)', () => {
-    const cards = Array.from({ length: 12 }, (_, i) =>
-      fresh(`n${String(i).padStart(2, '0')}`, now - (20 - i) * DAY),
-    )
-    const added = buildQueue(input([deck('d1')], cards)).ids
-    expect(added).toEqual([...added].sort())
-    const random = buildQueue(input([deck('d1', 'fsrs', { newOrder: 'random' })], cards)).ids
+  it('M13: picks new cards at random by default, or by creation (seeded)', () => {
+    const cards = Array.from({ length: 12 }, (_, i) => fresh(`n${pad(i)}`, now - (20 - i) * DAY))
+    const added = buildQueue(input([deck('d1', 'fsrs', { newOrder: 'added' })], cards)).ids
+    expect(added).toEqual(sorted(added))
+    const random = buildQueue(input([deck('d1')], cards)).ids
     expect(random).not.toEqual(added)
-    expect([...random].sort()).toEqual([...added].sort())
+    expect(sorted(random)).toEqual(sorted(added))
+    expect(buildQueue(input([deck('d1')], [...cards].reverse())).ids).toEqual(random)
   })
 
   it('changes day at 04:00 local time', () => {
@@ -296,12 +281,6 @@ describe('queue helpers', () => {
     expect(interleaveNew(['r1'], [])).toEqual(['r1'])
   })
 
-  it('keeps order when only siblings remain', () => {
-    const a = card('a', {}, 'n')
-    const b = card('b', {}, 'n')
-    expect(spaceSiblings([a, b]).map((c) => c.id)).toEqual(['a', 'b'])
-  })
-
   it('shuffles deterministically', () => {
     expect(seededShuffle([1, 2, 3, 4, 5], 'x')).toEqual(seededShuffle([1, 2, 3, 4, 5], 'x'))
     expect(seededShuffle([], 'x')).toEqual([])
@@ -309,18 +288,18 @@ describe('queue helpers', () => {
 })
 
 describe('buildQueue edge cases', () => {
-  it('counts several answers per deck and per note', () => {
+  it('counts several answers per deck', () => {
     const d = deck('d1', 'fsrs', { newPerDay: 3, reviewsPerDay: 5 })
     const cards = [
       ...Array.from({ length: 5 }, (_, i) => fresh(`n${i}`, now - (10 - i) * DAY)),
       ...Array.from({ length: 6 }, (_, i) => review(`r${i}`)),
     ]
     const todayReviews: TodayReview[] = [
-      { cardId: 'a', noteId: 'na', ord: 0, deckId: 'd1', stateBefore: 0 },
-      { cardId: 'b', noteId: 'nb', ord: 0, deckId: 'd1', stateBefore: 0 },
-      { cardId: 'a', noteId: 'na', ord: 0, deckId: 'd1', stateBefore: 1 },
-      { cardId: 'c', noteId: 'nc', ord: 0, deckId: 'd1', stateBefore: 2 },
-      { cardId: 'e', noteId: 'nc', ord: 0, deckId: 'd1', stateBefore: 2 },
+      { cardId: 'a', deckId: 'd1', stateBefore: 0 },
+      { cardId: 'b', deckId: 'd1', stateBefore: 0 },
+      { cardId: 'a', deckId: 'd1', stateBefore: 1 },
+      { cardId: 'c', deckId: 'd1', stateBefore: 2 },
+      { cardId: 'e', deckId: 'd1', stateBefore: 2 },
     ]
     const q = buildQueue(input([d], cards, { todayReviews }))
     expect(q.counts).toEqual({ learning: 0, review: 3, new: 1 })
@@ -335,9 +314,10 @@ describe('buildQueue edge cases', () => {
       review('noR', { lastReview: null, due: now - 3 * DAY }),
       review('withR', { due: now - 3 * DAY, lastReview: now - 4 * DAY, stability: 100 }),
     ]
-    const q = buildQueue(input([deck('d1')], cards))
+    const d = deck('d1', 'fsrs', { newOrder: 'added', reviewsPerDay: 1 })
+    const q = buildQueue(input([d], cards))
     expect(q.later.map((l) => l.id)).toEqual(['l1', 'l2'])
-    // Unknown R sorts first (as 0); equal creation dates fall back to id; k = 1.
-    expect(q.ids).toEqual(['noR', 'a', 'withR', 'b'])
+    // Unknown R counts as 0 under the cap; equal creation dates fall back to id; k = 1.
+    expect(q.ids).toEqual(['noR', 'a', 'b'])
   })
 })

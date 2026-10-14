@@ -32,8 +32,6 @@ export interface DeckSettings {
   newOrder: 'added' | 'random'
   typedAnswer: boolean
   autoplayAudio: boolean
-  /** Default true: no two twin cards of a note the same day (03 §5.2, notes.ts `areTwins`). */
-  burySiblings: boolean
   /** Default true: a success turns the card over, both schedulers (03 §1.1, scheduler/sides.ts). */
   alternateSides: boolean
   fsrs: FsrsSettings

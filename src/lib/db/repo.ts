@@ -3,7 +3,7 @@
  * write is a transaction; `reviews` is append-only except the explicit deletions listed below.
  */
 import { buildRow, type BrowserRow } from '../domain/browse'
-import { deckPath } from '../domain/decks'
+import { deckPath, type DeckCount } from '../domain/decks'
 import { makeCard, makeDeck, resetScheduling, type NewDeckInput } from '../domain/defaults'
 import {
   planNoteTypeEdit,
@@ -164,11 +164,6 @@ export async function deleteDeck(id: string, now: number): Promise<DeletionCount
     await recordDeletions('decks', ids, now)
     return { decks: ids.length, notes: noteIds.length, cards: cardIds.length }
   })
-}
-
-export interface DeckCount {
-  cards: number
-  notes: number
 }
 
 export async function deckCounts(): Promise<Map<string, DeckCount>> {

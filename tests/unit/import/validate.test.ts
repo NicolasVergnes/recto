@@ -155,12 +155,14 @@ describe('backup validators', () => {
       ...deck,
       settings: {
         newOrder: 'x',
+        burySiblings: true,
         fsrs: { learningSteps: 'no', params: 'no' },
         leitner: { intervals: [1, 2] },
       },
     })
+    expect(d?.settings).not.toHaveProperty('burySiblings')
     expect(d?.settings).toMatchObject({
-      newOrder: 'added',
+      newOrder: 'random',
       fsrs: { learningSteps: ['10m', '10m'], params: null, ratingMode: 4 },
       leitner: { intervals: [1, 2, 7, 30, 90, 180, 365] },
     })

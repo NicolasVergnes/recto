@@ -36,4 +36,4 @@ Pièges d'environnement (Windows) :
 - Toasts : `.toast` ; ils s'empilent (prendre `.last()`).
 - Texte sur plusieurs lignes dans le balisage : `toContainText`, pas une RegExp sur `getByText`.
 - Valeurs chargées par `liveQuery` (compteurs) : attendre avec `expect(...).toContainText` avant de lire.
-- `burySiblings` (défaut) ne montre pas le même jour deux cartes jumelles d'une note (M9) ; les autres cartes d'une note peuvent passer le même jour.
+- Toutes les cartes d'une note peuvent passer le même jour (M13, plus de `burySiblings`) ; chaque lot de la file (apprentissage, retards, du jour, nouvelles) est dans un ordre aléatoire stable dans la journée : ne pas attendre un ordre précis en révision.

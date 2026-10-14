@@ -42,7 +42,6 @@ function readSettings(x: unknown): DeckSettings | null {
     newOrder: oneOf(['added', 'random'] as const, x.newOrder) ? x.newOrder : d.newOrder,
     typedAnswer: isBool(x.typedAnswer) ? x.typedAnswer : d.typedAnswer,
     autoplayAudio: isBool(x.autoplayAudio) ? x.autoplayAudio : d.autoplayAudio,
-    burySiblings: isBool(x.burySiblings) ? x.burySiblings : d.burySiblings,
     alternateSides: isBool(x.alternateSides) ? x.alternateSides : d.alternateSides,
     fsrs: {
       requestRetention: isNum(f.requestRetention) ? f.requestRetention : d.fsrs.requestRetention,

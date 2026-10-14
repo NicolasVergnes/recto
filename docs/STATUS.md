@@ -1,17 +1,36 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-10-12 · Branche : m12-sync-ready-data (créée depuis `m11-two-way-cards`, non fusionnée ni poussée) · **V1 (M6) fusionnée sur `main` (PR #1)** · **M7 (vue mosaïque), M8 (types de notes multi-cartes) et M9 (jumelles, Memory Box sans calendrier) livrés**, en attente de relecture et de fusion par Nicolas · **M10, M11 et M12 (V2 : données prêtes pour plusieurs appareils) livrés**, en attente de relecture et de fusion (dans l'ordre M7 → M12)
+Dernière mise à jour : 2026-10-14 · Branche : m13-random-review (créée depuis `main`, non fusionnée) · **M7 à M12 fusionnés sur `main`** (2026-10-13) · **M13 (révision au hasard, compteurs de l'accueil, plus de jumelles) livré**, en attente de relecture et de fusion par Nicolas
 
 ## Jalon en cours
 
-Aucun : M12 est terminé. V2 décidée par Nicolas le 2026-10-11 (application Android avec Capacitor, publication possible sur le Play Store après un test avec quelques personnes). Plan validé :
+Aucun : M13 est terminé. Recto reste une PWA installable (décision du 2026-10-12). En attente, sans numéro ni date :
 
-- M12 (fait) : données prêtes pour plusieurs appareils et pour des testeurs.
-- **M13** : application Android avec Capacitor, la PWA inchangée ; couche plateforme (`saveFile` natif, flux destructifs qui attendent la réussite de la sauvegarde, `lastBackupAt` écrit après l'enregistrement), projet `android/`, bouton retour, micro, lecture automatique des sons, flux Maestro, APK de débogage en CI. **Bloqué par une décision de Nicolas : l'identifiant d'application (`appId`), définitif sur le Play Store** (proposition : `fr.nicolasvergnes.recto`).
-- M14 : préparation de la publication avec le compte Google Play de Nicolas (politique de confidentialité, signature, fiche, test fermé : 12 testeurs pendant 14 jours pour un compte personnel récent).
-- M15 : transport de la synchronisation (dossier, Drive ou Syncthing), à choisir.
+- Application Android avec Capacitor (couche plateforme, projet `android/`, bouton retour, micro, sons, flux Maestro, APK de débogage en CI) ; l'identifiant d'application (`appId`) sera à décider à ce moment (proposition : `fr.nicolasvergnes.recto`).
+- Publication sur le Play Store (politique de confidentialité, signature, fiche, test fermé : 12 testeurs pendant 14 jours).
+- Synchronisation automatique PC ↔ Android (dossier, Drive ou Syncthing).
 
 ## Terminé
+
+### M13 — Révision au hasard, compteurs de l'accueil, plus de jumelles (2026-10-14)
+
+Demande de Nicolas : en révision, les cartes tirées au hasard dans le paquet, par défaut (apprentissage, révisions, découverte des nouvelles) ; dans la liste des paquets de l'accueil, le nombre de notes et de cartes ; retirer l'option « Pas de cartes jumelles le même jour » (« il ne doit pas exister de cartes jumelles : soit une carte peut apparaître dans les deux sens, soit pas »). Précisions de Nicolas : garder « retards puis du jour », chaque lot au hasard ; pas d'espacement entre deux cartes d'une même note (« ça se régulera avec l'aléatoire ») ; paquets existants passés en aléatoire ; sous-paquets comptés dans le parent ; il revoit lui-même le modèle « Departements » (paires numéro → nom et nom → numéro).
+
+Plan suivi :
+
+1. File du jour (`src/lib/queue/build.ts`) : apprentissage, retards, cartes du jour mélangés chacun (graine = jour) ; sélection sous plafond inchangée (R / box) ; retrait de l'enterrement des jumelles et de `spaceSiblings` — `tests/unit/queue/build.test.ts`.
+2. Retrait de `areTwins` (`domain/notes.ts`), de `twinsOf` (`db/study.ts`), de `burySiblings` (types, défauts, formulaire, libellé, lecture des sauvegardes) ; `newOrder: 'random'` par défaut.
+3. Migration : Dexie version 4 (`upgrade()` des paquets), sauvegarde `schemaVersion` 5 (`migrate()`), fonction commune `migrateDeckSettingsM13` (`domain/defaults.ts`) — `tests/unit/db/migration.test.ts`, `tests/unit/import/backup.test.ts`.
+4. Accueil : `familyCounts` (`domain/decks.ts`), ligne « n notes · n cartes » dans `DeckList.svelte` — `tests/unit/domain/decks.test.ts`.
+5. E2E rendus indépendants de l'ordre de révision ; docs (01, 02, 03, 04, 06, 07, skills `srs-rules` et `verify`), CHANGELOG ; `npm run verify`.
+
+Critères (07-ROADMAP M13) :
+
+- ✔ Lots de la file au hasard, stables dans la journée, retards puis du jour ; plafond qui garde les retards les plus fragiles — `build.test.ts` › « M13: overdue reviews come first, then today's… », « M13: shuffles the learning cards… », « P6: a capped deck keeps its overdue FSRS reviews… » et « …Leitner… ».
+- ✔ Nouvelles au hasard par défaut, « Ordre d'ajout » au choix — `build.test.ts` › « M13: picks new cards at random by default… » ; migration des paquets existants — `migration.test.ts` › « opens a version 3 database… (M13) », `backup.test.ts` › « reads a version 4 backup… (M13) », `validate.test.ts`.
+- ✔ Cartes d'une note le même jour, ni enterrées ni espacées — `build.test.ts` › « M13: cards of a note share the day… », `tests/unit/db/study.test.ts` › « lets every card of a custom note share the day (M13) ».
+- ✔ Accueil « n notes · n cartes », sous-paquets compris — `decks.test.ts` › « M13: counts the notes and cards… » ; E2E `review.spec.ts` › « the home screen counts notes and cards, and new decks draw cards at random ».
+- ✔ E2E rendus indépendants de l'ordre (`review`, `note-types`, `occlusion`, `import-backup`, `offline-stats`) ; `npm run verify` vert : check 0 erreur 0 avertissement, lint, format, 531 tests unitaires (couverture 92,05 % des lignes), build, E2E 107 réussis et 1 ignoré (bureau et mobile). Vérifié dans l'application réelle : une base version 3 (paquet parent et sous-paquet en « ordre d'ajout » avec `burySiblings`) s'ouvre en version 4, paquets en « Aléatoire » sans `burySiblings`, `updatedAt` gardé ; accueil « 5 notes · 6 cartes » / « 4 notes · 5 cartes » lisible sur ordinateur et téléphone ; séance mélangée où les deux trous d'un même texte passent.
 
 ### M12 — Données prêtes pour plusieurs appareils et pour des testeurs (2026-10-12)
 
@@ -272,6 +291,10 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## Décisions prises en session
 
+- 2026-10-14 (M13) : retards mélangés, mais quand le plafond de révisions coupe, les retards gardés restent ceux de plus faible récupérabilité (FSRS) ou de plus petit compartiment (Leitner) : P6 tenu, seul l'ordre de présentation est tiré au hasard. Alternative écartée : tirer au hasard aussi la sélection (on pourrait laisser de côté la carte la plus fragile).
+- 2026-10-14 (M13) : plus d'enterrement ni d'espacement des cartes d'une note (choix de Nicolas, il revoit le modèle « Departements ») ; renverse M9 (jumelles) et l'espacement de 10 positions (03 §5.6). Les trous d'un texte à trous et les zones d'une occlusion peuvent donc passer le même jour.
+- 2026-10-14 (M13) : la migration passe tous les paquets en `newOrder: 'random'` sans changer leur `updatedAt` : chaque appareil et chaque sauvegarde migrent de même, une fusion ne voit pas de différence. Alternative écartée : dater le paquet à la migration (une ancienne sauvegarde ne pourrait plus faire gagner un réglage modifié après).
+- 2026-10-14 (M13) : les jalons Android, Play Store et synchronisation perdent leurs numéros M13–M15 (en attente sans date) ; M13 est ce jalon-ci.
 - 2026-10-12 : Nicolas garde **la PWA installable** pour l'instant ; la publication sur le Play Store viendra plus tard. M13 (Capacitor) et M14 (publication) sont suspendus, l'`appId` n'a pas à être décidé maintenant. M15 (synchronisation automatique PC ↔ Android) est également en attente : Nicolas teste la PWA telle quelle, fait des évolutions, et en reparlera plus tard. Entre appareils, la sauvegarde `.recto.zip` + « Fusionner » (M12) fait office de synchronisation manuelle.
 - 2026-10-12 (M12) : V2 = application Android avec **Capacitor** (choix de Nicolas, pour permettre plus tard une synchronisation automatique par dossier sur le téléphone, impossible depuis la PWA : pas de File System Access API dans Chrome Android) ; découpage M12 (données), M13 (application), M14 (publication), M15 (transport de la synchronisation).
 - 2026-10-12 (M12) : traces de suppression par ligne, jamais purgées pour l'instant (quelques dizaines d'octets par ligne ; une purge demandera une date au-delà de laquelle une sauvegarde plus ancienne n'est plus fusionnable). Règle : une suppression l'emporte sur une ligne dont la dernière modification est antérieure ou égale ; « Tout effacer » efface aussi les traces (l'appareil repart de zéro).
@@ -415,7 +438,8 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 ## À vérifier manuellement par Nicolas
 
 - M12 — Sur le PC et le téléphone (PWA) : faire une sauvegarde de chaque côté, supprimer une note sur l'un, puis fusionner la sauvegarde de l'autre : la note ne revient pas ; fusionner dans l'autre sens : elle disparaît aussi (le rapport l'indique). La première ouverture après la mise à jour migre la base (aucune action, rien ne doit changer à l'écran).
-- (Suspendu) M13 — décider l'identifiant d'application Android (`appId`) quand la publication sur le Play Store sera reprise.
+- M13 — Révision : sur le paquet des départements, les cartes du jour arrivent dans un ordre mélangé (plus dans l'ordre d'ajout) ; deux cartes d'une même note peuvent passer dans la même séance. Réglages d'un paquet : plus de case « Pas de cartes jumelles », « Ordre des nouvelles cartes » sur « Aléatoire » (aussi pour les paquets existants, après la mise à jour).
+- M13 — Accueil : « n notes · n cartes » sous chaque paquet, lisible sur téléphone ; un paquet parent compte ses sous-paquets.
 - M11 — Effacer les données de test (« Tout effacer ») avant d'essayer : les anciennes notes « Basique + inverse » ne sont plus lues. Réviser une note basique dans un paquet FSRS : après une réussite, elle revient retournée (« ↔ Sens inversé ») ; cocher « Ne jamais retourner cette note » sur une autre.
 - M11 — Réponse tapée sur une note nom ↔ photo : pas de saisie quand la réponse attendue est la photo, saisie du nom quand la photo est la question.
 - M11 — Types de notes : dans « Departements », tenter de retirer « Numero » (refus nommant les 4 cartes) ; retirer un champ rempli que les modèles n'utilisent plus (confirmation avec le nombre de notes).

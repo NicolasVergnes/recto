@@ -65,10 +65,9 @@ export interface Deck {
 export interface DeckSettings {
   newPerDay: number            // défaut 20
   reviewsPerDay: number        // défaut 200
-  newOrder: 'added' | 'random'
+  newOrder: 'added' | 'random' // défaut 'random' (M13 : tous les paquets migrés)
   typedAnswer: boolean         // réponse tapée
   autoplayAudio: boolean
-  burySiblings: boolean        // défaut true : pas deux cartes jumelles le même jour (03 §5.2)
   alternateSides: boolean      // défaut true : carte retournée après chaque réussite, FSRS et Leitner (03 §1.1, M11)
   fsrs: {
     requestRetention: number   // 0.80–0.97, défaut 0.90
@@ -243,14 +242,14 @@ export interface NoteType {
 ## 5. Sauvegarde `.recto.zip`
 
 ```
-manifest.json   { "format": "recto-backup", "schemaVersion": 4, "appVersion": "0.x", "exportedAt": ms, "device": "<navigator.userAgent tronqué à 120 car.>", "deviceId": "<uuid>", "counts": {...} }
+manifest.json   { "format": "recto-backup", "schemaVersion": 5, "appVersion": "0.x", "exportedAt": ms, "device": "<navigator.userAgent tronqué à 120 car.>", "deviceId": "<uuid>", "counts": {...} }
 data.json       { "decks": [...], "noteTypes": [...], "notes": [...], "cards": [...], "reviews": [...], "settings": [...],
                   "media": [{ "name", "mime", "size", "sha256", "createdAt" }],   // sans blobs
                   "deletions": [...] }
 media/<name>    fichiers binaires
 ```
 
-`schemaVersion` : 2 depuis la V1 (ajout du type `image_occlusion`), 3 depuis M8 (table `noteTypes`, notes `custom` ; une note `custom` sans son type est rejetée à la lecture). 4 depuis M12 (`card.updatedAt`, `deletions`, `setting.updatedAt`, `deviceId`) ; une carte d'une sauvegarde plus ancienne est datée comme à la migration Dexie (`lastReview ?? createdAt`), elle n'a pas de suppressions. Une sauvegarde de version 1 ou 2 se restaure telle quelle (pas de type personnalisé), une version plus récente que l'application est refusée. Les lignes sont lues dans une seule transaction en lecture : un instantané cohérent même si l'application écrit pendant l'export. Fusion : un type de note est identifié par `id`, le plus récemment modifié gagne.
+`schemaVersion` : 2 depuis la V1 (ajout du type `image_occlusion`), 3 depuis M8 (table `noteTypes`, notes `custom` ; une note `custom` sans son type est rejetée à la lecture). 4 depuis M12 (`card.updatedAt`, `deletions`, `setting.updatedAt`, `deviceId`) ; une carte d'une sauvegarde plus ancienne est datée comme à la migration Dexie (`lastReview ?? createdAt`), elle n'a pas de suppressions. 5 depuis M13 (Dexie version 4) : `burySiblings` retiré des réglages de paquet, `newOrder` passé à `'random'` pour tous les paquets ; une sauvegarde plus ancienne est migrée de même à la lecture, la date `updatedAt` du paquet est gardée. Une sauvegarde de version 1 ou 2 se restaure telle quelle (pas de type personnalisé), une version plus récente que l'application est refusée. Les lignes sont lues dans une seule transaction en lecture : un instantané cohérent même si l'application écrit pendant l'export. Fusion : un type de note est identifié par `id`, le plus récemment modifié gagne.
 
 Restauration « remplacer » : vide la base puis importe (suppressions comprises), sauf les réglages propres à l'appareil, gardés (M12) ; « fusionner » : les entités sont identifiées par `id` (et `sourceGuid` pour les notes) ; en cas de conflit, la version la plus récente (`updatedAt`) gagne, les journaux sont unionnés par `id`.
 

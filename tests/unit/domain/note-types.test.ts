@@ -8,7 +8,7 @@ import {
   unknownReference,
   validateNoteType,
 } from '$lib/domain/note-types'
-import { areTwins, renderCard } from '$lib/domain/notes'
+import { renderCard } from '$lib/domain/notes'
 import type { Card, Note, NoteType } from '$lib/domain/types'
 
 const TYPE: NoteType = {
@@ -249,7 +249,7 @@ describe('reordering fields and templates (M10)', () => {
     expect(plan.removed).toEqual([])
   })
 
-  it('whatever the order, every card asks and answers the same, and twins stay twins', () => {
+  it('whatever the order, every card asks and answers the same', () => {
     const noteOf = new Map([france, italie].map((n) => [n.id, n]))
     for (const fieldOrder of ORDERS) {
       for (const templateOrder of ORDERS) {
@@ -269,12 +269,6 @@ describe('reordering fields and templates (M10)', () => {
           const before = renderCard(note, card, false, TYPE)
           const after = renderCard(rewritten, moved, false, plan.type)
           expect([after.question, after.answer]).toEqual([before.question, before.answer])
-        }
-        for (const a of [0, 1, 2]) {
-          for (const b of [0, 1, 2]) {
-            const [x, y] = [templateOrder.indexOf(a), templateOrder.indexOf(b)]
-            expect(areTwins('custom', x, y, plan.type)).toBe(areTwins('custom', a, b, TYPE))
-          }
         }
       }
     }

@@ -138,3 +138,14 @@ Critères d'acceptation :
 - [x] Fusion : une ligne supprimée d'un côté ne revient pas, sauf modifiée après sa suppression ; un paquet ou un type encore utilisé reste ; les deux appareils convergent quel que soit l'ordre des fusions (test de propriété).
 - [x] Identifiant d'appareil dans les sauvegardes ; réglages partagés (début de journée, limite globale) fusionnés, réglages de l'appareil jamais importés.
 - [x] Une base version 2 et une sauvegarde au schéma 3 s'ouvrent et se lisent ; `npm run verify` vert.
+
+## M13 — Révision au hasard, compteurs de l'accueil, plus de jumelles (demande de Nicolas, 2026-10-14)
+
+Hors roadmap initiale. Les jalons Android, Play Store et synchronisation automatique sont en attente (`STATUS.md`). En révision, les cartes sont tirées au hasard dans le paquet, par défaut. L'accueil dit combien de notes et de cartes compte chaque paquet. L'option « Pas de cartes jumelles le même jour » disparaît : une carte posée dans les deux sens est une seule carte (M11), il n'y a plus de jumelles à séparer.
+
+Critères d'acceptation :
+- [x] File du jour : apprentissage, puis retards, puis cartes du jour (nouvelles insérées tous les *k*), chaque lot dans un ordre aléatoire stable dans la journée ; sous plafond, les retards gardés restent les plus fragiles (P6).
+- [x] Nouvelles cartes tirées au hasard par défaut (`newOrder: 'random'`), « Ordre d'ajout » toujours au choix ; paquets existants migrés (Dexie version 4, sauvegarde `schemaVersion` 5).
+- [x] Plus d'enterrement ni d'espacement des cartes d'une note ; réglage `burySiblings` retiré (écran, données, sauvegardes anciennes lisibles).
+- [x] Accueil : « n notes · n cartes » sous chaque paquet, sous-paquets compris dans le parent.
+- [x] Tests unitaires et E2E mis à jour ; `npm run verify` vert.

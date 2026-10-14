@@ -3,6 +3,7 @@
  * Writing it back is `db/restore.ts`.
  */
 import { strFromU8, unzipSync } from 'fflate'
+import { migrateDeckSettingsM13 } from '../domain/defaults'
 import type { Card, Deck, Deletion, Note, NoteType, Review, Setting } from '../domain/types'
 import type { BackupManifest } from '../export/backup'
 import {
@@ -64,9 +65,15 @@ function json(entries: Record<string, Uint8Array>, name: string): unknown {
  * Older schema versions are migrated here with the same steps as the Dexie `upgrade()` functions
  * (05 §3). 1 → 2 only adds a note type and 2 → 3 the `noteTypes` table (absent: none); 3 → 4
  * (M12) dates the cards like the Dexie version 3 upgrade (`readCard`) and has no deletions
- * (absent: none). Older data is valid as is.
+ * (absent: none); 4 → 5 (M13) puts the new cards of every deck in random order and drops
+ * `burySiblings`, like the Dexie version 4 upgrade.
  */
-function migrate(data: Record<string, unknown>, _fromVersion: number): Record<string, unknown> {
+function migrate(data: Record<string, unknown>, fromVersion: number): Record<string, unknown> {
+  if (fromVersion < 5 && Array.isArray(data.decks))
+    for (const deck of data.decks as unknown[]) {
+      const settings = readObject(readObject(deck)?.settings)
+      if (settings) migrateDeckSettingsM13(settings)
+    }
   return data
 }
 

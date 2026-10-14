@@ -45,13 +45,15 @@ test('the statistics screen reflects today’s reviews', async ({ page }) => {
   await expect(page.getByText('101 cartes')).toBeVisible()
   await page.goto('/#/review')
   const card = page.getByRole('article', { name: 'Carte' })
-  for (const [i, key] of ['3', '1', '4'].entries()) {
-    await expect(card).toContainText(`Département 0${i + 1}`)
+  const show = page.getByRole('button', { name: 'Afficher la réponse' })
+  // New cards come in random order (M13).
+  for (const key of ['3', '1', '4']) {
+    await expect(show).toBeVisible()
     await page.keyboard.press('Space')
     await expect(card).toContainText('Préfecture')
     await page.keyboard.press(key)
   }
-  await expect(card).toContainText('Département 04')
+  await expect(show).toBeVisible()
   await page.goto('/#/stats')
   await expect(page.getByRole('heading', { level: 1, name: 'Statistiques' })).toBeVisible()
   const done = page.locator('.tile', { hasText: 'Réponses aujourd’hui' })

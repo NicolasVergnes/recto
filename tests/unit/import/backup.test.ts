@@ -574,6 +574,24 @@ describe('parseBackup errors', () => {
     expect(parsed.manifest).toMatchObject({ device: 'pc', deviceId: '' })
   })
 
+  it('reads a version 4 backup: no twin burying, new cards in random order (M13)', () => {
+    const v4 = JSON.stringify({ format: 'recto-backup', schemaVersion: 4, deviceId: 'tel' })
+    const deck = makeDeck({ name: 'D' }, 'd1', 10)
+    const settings = { ...deck.settings, newOrder: 'added', burySiblings: false }
+    const data = JSON.stringify({ decks: [{ ...deck, settings }, 'not a deck'] })
+    const parsed = parseBackup(zip({ 'manifest.json': v4, 'data.json': data }), SCHEMA_VERSION)
+    // Like the Dexie version 4 upgrade: the settings of a deck created today, dates kept.
+    expect(parsed.data.decks).toEqual([deck])
+    expect(parsed.invalid).toBe(1)
+    // A current backup keeps the order it was given.
+    const v5 = JSON.stringify({ format: 'recto-backup', schemaVersion: SCHEMA_VERSION })
+    const added = { ...deck, settings: { ...deck.settings, newOrder: 'added' } }
+    const kept = JSON.stringify({ decks: [added] })
+    expect(
+      parseBackup(zip({ 'manifest.json': v5, 'data.json': kept }), SCHEMA_VERSION).data.decks,
+    ).toEqual([added])
+  })
+
   it('reads deletions and setting dates (version 4), dropping malformed ones', () => {
     const v4 = JSON.stringify({ format: 'recto-backup', schemaVersion: 4, deviceId: 'tel' })
     const data = JSON.stringify({

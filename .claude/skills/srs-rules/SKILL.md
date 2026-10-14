@@ -16,7 +16,7 @@ Ces règles viennent du dossier de recherche (`Dossier-Flashcards.html`) ; les r
 | P3 | Auto-évaluation simple | Analyses FSRS : 2 boutons ≈ 4 boutons | FSRS : 4 boutons ou 2 (Again/Good) ; Leitner : Oublié/Réussi/Sûr. Jamais de « note » chiffrée libre. |
 | P4 | Espacement par carte | Cepeda 2008 ; Latimier 2021 (g = 0,74) | `card.due` individuel ; aucune fonction « tout revoir maintenant » hors mode « cram » explicitement nommé (absent en V0). |
 | P5 | File unique mélangée | Kornell 2009 ; Rohrer 2015 (d = 0,79) | `queue.buildToday()` entrelace les paquets ; l'accueil met « Réviser aujourd'hui » avant les paquets. |
-| P6 | Plafonds, retards sans pénalité | Communautés Anki/SuperMemo ; Duolingo A/B 2016 | `newPerDay`, `reviewsPerDay`, global ; retards triés par R croissante ; pas de « dette » affichée en rouge. |
+| P6 | Plafonds, retards sans pénalité | Communautés Anki/SuperMemo ; Duolingo A/B 2016 | `newPerDay`, `reviewsPerDay`, global ; sous plafond, retards gardés par R croissante ; pas de « dette » affichée en rouge. |
 | P7 | Pas d'abandon prématuré | Kornell & Bjork 2008 ; Karpicke & Roediger 2008 | `canRetire(card, reviews)` : `state === Review` et ≥ 3 succès (`rating ≥ 3`) dont les intervalles précédents ≥ 7 j. Sinon bouton désactivé + `review.retireLocked`. |
 | P8 | Cartes atomiques | Wozniak 1999 ; Rowland 2014 | Éditeur : avertissements non bloquants > 200 caractères ou liste > 4 éléments ; suggérer cloze. |
 | P9 | Rétention cible visible | Manuel Anki ; simulations FSRS | Curseur 0,80–0,97, défaut 0,90, texte d'aide `scheduler.retentionHelp`. |
@@ -60,7 +60,7 @@ const { collections, reschedule_item } = f.reschedule(createEmptyCard(), history
 
 ## 4. File du jour — ordre canonique
 
-1. Apprentissage dû (par `due`) → 2. Révisions en retard (R croissante / box croissante) → 3. Révisions du jour (aléatoire stable) → 4. Nouvelles (plafond, ordre du paquet), insérées tous les *k* items. Round-robin entre paquets ; jumelles (`areTwins`) enterrées si `burySiblings`, autres sœurs (`noteId`) espacées de ≥ 10 positions ; cartes `suspended`/`retired` exclues ; jour à `dayStartHour` (04:00).
+1. Apprentissage dû → 2. Révisions en retard → 3. Révisions du jour → 4. Nouvelles (plafond, `newOrder` aléatoire par défaut), insérées tous les *k* items. Chaque lot dans un ordre aléatoire stable (graine = jour) ; quand le plafond coupe les retards, garder les plus fragiles (R croissante / box croissante), P6. Round-robin entre paquets ; cartes d'une note ni enterrées ni espacées (M13) ; cartes `suspended`/`retired` exclues ; jour à `dayStartHour` (04:00).
 
 ## 5. Anti-patterns à refuser
 

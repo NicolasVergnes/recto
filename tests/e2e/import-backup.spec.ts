@@ -14,8 +14,11 @@ test('the sample deck imports 101 cards and five can be reviewed', async ({ page
   await expect(page.getByText('20 nouvelles')).toBeVisible()
   await page.getByRole('link', { name: 'Réviser aujourd’hui' }).click()
   const card = page.getByRole('article', { name: 'Carte' })
+  const show = page.getByRole('button', { name: 'Afficher la réponse' })
+  // New cards come in random order (M13).
   for (let i = 1; i <= 5; i++) {
-    await expect(card).toContainText(`Département ${String(i).padStart(2, '0')}`)
+    await expect(show).toBeVisible()
+    await expect(card).toContainText('Département')
     await page.keyboard.press('Space')
     await expect(card).toContainText('Préfecture')
     await page.keyboard.press('3')

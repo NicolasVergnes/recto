@@ -4,6 +4,22 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 ## [Unreleased]
 
+### M13 — Révision au hasard, compteurs de l'accueil
+
+#### Added
+
+- Accueil : sous le nom de chaque paquet, son nombre de **notes** et de **cartes** (un paquet parent compte ses sous-paquets).
+
+#### Changed
+
+- **Révision au hasard** : les cartes en apprentissage, les retards et les cartes du jour sont chacun présentés dans un ordre aléatoire (le même toute la journée), jamais dans l'ordre d'ajout. Quand la limite de révisions coupe les retards, Recto garde toujours les cartes les plus fragiles.
+- Les nouvelles cartes sont tirées **au hasard** par défaut, y compris dans les paquets existants ; « Ordre d'ajout » reste disponible dans les réglages du paquet.
+- Sauvegarde au format 5 (les sauvegardes plus anciennes restent lisibles et sont mises au même réglage) ; base de données en version 4, migrée à l'ouverture.
+
+#### Removed
+
+- Réglage « Pas de cartes jumelles le même jour » : toutes les cartes d'une note peuvent passer le même jour, sans être espacées ; le hasard les répartit.
+
 ### M12 — Données prêtes pour plusieurs appareils
 
 #### Added

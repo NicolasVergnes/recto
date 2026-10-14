@@ -137,14 +137,14 @@ Comme dans le livret (« replacez la fiche dans le compartiment 1, derrière les
 Entrée : `now`, `dayStartHour`, paquets sélectionnés (défaut : tous), plafonds. Sortie : liste ordonnée d'`id` de cartes + compteurs.
 
 1. `todayStart = début de journée local (dayStartHour)` ; `dueLimit = fin de journée`.
-2. Exclure `suspended`, `retired`, et, si `deck.settings.burySiblings` (défaut `true`), les cartes dont une **jumelle** a déjà été répondue ou retenue aujourd'hui (enterrement des jumelles, M9). Deux cartes d'une note sont jumelles quand la question de chacune montre ce que l'autre demande (`areTwins`, `domain/notes.ts`) : tous les trous d'un texte à trous, toutes les zones d'une occlusion ; pour un type personnalisé, la question de l'une contient un champ que la réponse de l'autre ajoute, et réciproquement (« numéro → nom » et « nom → numéro » sont jumelles, « carte → nom » et « numéro → nom » ne le sont pas). Les sœurs non jumelles restent dans la file, espacées d'au moins 10 positions (étape 6) ; si l'option est désactivée, toutes les sœurs restent, espacées de même.
-3. **Apprentissage** : `state ∈ {Learning, Relearning}` et `due ≤ now` (intra-journée, ordre par `due`).
-4. **Révisions** : `state = Review` et `due < dueLimit`, limitées par `reviewsPerDay` du paquet puis `globalReviewsPerDay`. Ordre : retards (`due < todayStart`) d'abord, par récupérabilité croissante (FSRS) ou par `box` croissante puis `due` (Leitner) ; puis cartes du jour, ordre aléatoire stable (graine = date).
-5. **Nouvelles** : `state = New`, limitées par `newPerDay` moins les nouvelles déjà vues aujourd'hui, ordre `newOrder`.
-6. **Entrelacement** : les paquets sont tirés en round-robin ; les nouvelles cartes sont insérées tous les *k* items (`k = round(revisions / nouvelles)`) plutôt qu'en bloc ; les cartes sœurs d'une même note sont espacées d'au moins 10 positions.
+2. Exclure `suspended` et `retired`. Les cartes d'une même note ne sont ni enterrées ni espacées (M13, demande de Nicolas : l'option `burySiblings` et l'espacement de 10 positions sont retirés, l'ordre aléatoire suffit à les répartir ; une carte posée dans les deux sens est une seule carte, `alternateSides`).
+3. **Apprentissage** : `state ∈ {Learning, Relearning}` et `due ≤ now` (intra-journée), dans un ordre aléatoire stable (graine = date).
+4. **Révisions** : `state = Review` et `due < dueLimit`, limitées par `reviewsPerDay` du paquet puis `globalReviewsPerDay`. Retards (`due < todayStart`) d'abord, puis cartes du jour ; chaque lot dans un ordre aléatoire stable (graine = date et paquet), jamais dans l'ordre d'ajout. Quand le plafond du paquet coupe les retards, on garde les plus fragiles : récupérabilité croissante (FSRS) ou `box` croissante puis `due` (Leitner) (P6) ; seul l'ordre de présentation est tiré au hasard.
+5. **Nouvelles** : `state = New`, limitées par `newPerDay` moins les nouvelles déjà vues aujourd'hui, ordre `newOrder` (`random` par défaut depuis M13 : tirées au hasard dans le paquet ; `added` : ordre d'ajout).
+6. **Entrelacement** : les paquets sont tirés en round-robin ; les nouvelles cartes sont insérées tous les *k* items (`k = round(revisions / nouvelles)`) plutôt qu'en bloc.
 7. Les cartes en apprentissage dont `due` arrive pendant la séance sont réinsérées en tête à leur échéance (rafraîchissement de la file après chaque réponse, sans recalcul complet : opération O(1) sur une file en mémoire).
 
-Tests : cas limites (plafond 0, paquet vide, sœurs, changement de jour à 04:00, retard de 100 jours, tri par R).
+Tests : cas limites (plafond 0, paquet vide, cartes d'une note le même jour, ordre aléatoire stable de chaque lot, plafond qui garde les R les plus basses, changement de jour à 04:00).
 
 ## 6. Références rapides
 

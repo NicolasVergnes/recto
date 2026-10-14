@@ -23,6 +23,34 @@ export function deckTree(decks: readonly Deck[]): DeckNode[] {
   }))
 }
 
+/** Number of notes and cards of a deck. */
+export interface DeckCount {
+  notes: number
+  cards: number
+}
+
+/**
+ * Counts of each deck with its sub-decks added (home screen, M13), like the daily queue counts.
+ * `own` holds each deck's own notes and cards (`repo.deckCounts`).
+ */
+export function familyCounts(
+  decks: readonly Deck[],
+  own: ReadonlyMap<string, DeckCount>,
+): Map<string, DeckCount> {
+  const out = new Map<string, DeckCount>()
+  for (const node of deckTree(decks)) {
+    const total = { ...(own.get(node.deck.id) ?? { notes: 0, cards: 0 }) }
+    for (const child of node.children) {
+      const c = own.get(child.id) ?? { notes: 0, cards: 0 }
+      out.set(child.id, { ...c })
+      total.notes += c.notes
+      total.cards += c.cards
+    }
+    out.set(node.deck.id, total)
+  }
+  return out
+}
+
 export interface DeckOption {
   id: string
   label: string

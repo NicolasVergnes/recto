@@ -149,29 +149,29 @@ describe('daily queue from the database', () => {
       now - DAY,
     )
     const all = await loadTodayQueue(now)
-    // Cloze siblings are buried: one of the two cards today.
-    expect(all.result.ids).toHaveLength(3)
-    expect(all.result.ids).toContain(cards[0].id)
+    // Both cloze cards of a note are asked the same day (M13).
+    expect(all.result.ids).toHaveLength(4)
+    expect(all.result.ids).toEqual(expect.arrayContaining(cards.map((c) => c.id)))
     const one = await loadTodayQueue(now, deck.id)
-    expect(one.result.ids).toHaveLength(2)
+    expect(one.result.ids).toHaveLength(3)
     expect(one.decks.map((d) => d.name)).toEqual(['D', 'Sub'])
     const counts = countsByDeck(all)
-    expect(counts.get(deck.id)).toEqual({ learning: 0, review: 0, new: 2 })
+    expect(counts.get(deck.id)).toEqual({ learning: 0, review: 0, new: 3 })
     expect(counts.get(sub.id)).toEqual({ learning: 0, review: 0, new: 1 })
     expect(studyDecks(all.decks, 'nope')).toEqual([])
   })
 
-  it('buries the sibling of a card answered today and counts it as seen', async () => {
+  it('keeps the sibling of a card answered today (M13)', async () => {
     const { deck, cards } = await setup()
     const out = fsrs.answer(cards[0], 3, now - 3600_000, deck)
     await recordReview(out, 1000)
     const q = await loadTodayQueue(now)
-    // cards[0] is in learning (due 10 min after), cards[1] is buried.
-    expect(q.result.ids).toEqual([cards[0].id])
+    // cards[0] is in learning (due 10 min after), cards[1] is still new today.
+    expect(q.result.ids).toEqual([cards[0].id, cards[1].id])
     expect(q.cards.get(cards[0].id)?.state).toBe(1)
   })
 
-  it('lets non-twin cards of a custom note share the day (03 §5.2)', async () => {
+  it('lets every card of a custom note share the day (M13)', async () => {
     const deck = await repo.createDeck({ name: 'Départements' }, now)
     const type = await repo.createNoteType(
       {
@@ -196,10 +196,7 @@ describe('daily queue from the database', () => {
       now - DAY,
     )
     const ids = (await loadTodayQueue(now)).result.ids
-    const ord = (o: number) => cards.find((c) => c.ord === o)?.id
-    expect(ids).toHaveLength(2)
-    expect(ids).toContain(ord(0))
-    expect(ids).toContain(ord(2))
+    expect([...ids].sort()).toEqual(cards.map((c) => c.id).sort())
   })
 })
 

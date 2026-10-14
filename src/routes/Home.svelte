@@ -6,6 +6,7 @@
   import { toast } from '$lib/state/toast.svelte'
   import { errorMessage } from '$lib/ui/errors'
   import { importSampleDeck } from '$lib/ui/sample'
+  import { familyCounts } from '$lib/domain/decks'
   import { live } from '$lib/db/live.svelte'
   import * as repo from '$lib/db/repo'
   import { storageInfo, usageRatio } from '$lib/db/storage'
@@ -101,7 +102,7 @@
     <DeckList
       decks={decks.value}
       queueCounts={today.value?.perDeck}
-      cardCounts={counts.value}
+      contentCounts={familyCounts(decks.value, counts.value)}
       onnewdeck={() => (creating = true)}
     />
     <BackupFooter lastBackupAt={lastBackupAt.value} {busy} onbackup={backup} />

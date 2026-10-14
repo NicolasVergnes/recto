@@ -149,17 +149,17 @@ test('fields and cards move up and down; the notes, the cards and their schedule
   page,
 }) => {
   await capitales(page)
-  // Study « Carte 1 » (France → Paris): its schedule tells the two cards apart after the move.
+  // Study the card asked first (random order, M13): its schedule tells the two cards apart after
+  // the move. « Carte 1 » asks France → Paris, « Carte 2 » Paris → France.
   await page.goto('/#/review')
   const card = page.getByRole('article', { name: 'Carte' })
-  await expect(card).toContainText('France')
+  await expect(card).toContainText(/France|Paris/)
+  const askedCarte1 = !((await card.textContent()) ?? '').includes('capitale de')
   await page.keyboard.press('Space')
-  await expect(card).toContainText('Paris')
+  await expect(card).toContainText(askedCarte1 ? 'Paris' : 'France')
   await page.keyboard.press('3')
-  // « Carte 2 » asks what « Carte 1 » answers: buried today. Only the learning card is left.
-  await expect(
-    page.getByRole('heading', { name: 'Encore quelques cartes en apprentissage' }),
-  ).toBeVisible()
+  // The other card of the note is not buried (M13): it comes next.
+  await expect(page.getByText('1 en apprentissage')).toBeVisible()
 
   await page.goto('/#/note-types')
   await page.getByRole('link', { name: 'Capitales', exact: true }).click()
@@ -207,13 +207,15 @@ test('fields and cards move up and down; the notes, the cards and their schedule
   await expect(tiles).toHaveCount(2)
   const studied = tiles.filter({ hasText: 'Apprentissage' })
   await expect(studied).toHaveCount(1)
-  await expect(studied).toContainText('France')
-  await expect(studied).toContainText('Paris')
-  await expect(studied).not.toContainText('capitale de')
   const fresh = tiles.filter({ hasText: 'Nouvelle' })
   await expect(fresh).toHaveCount(1)
-  await expect(fresh).toContainText('Paris est la capitale de ?')
-  await expect(fresh).toContainText('France')
+  for (const tile of [studied, fresh]) {
+    await expect(tile).toContainText('France')
+    await expect(tile).toContainText('Paris')
+  }
+  const [carte1, carte2] = askedCarte1 ? [studied, fresh] : [fresh, studied]
+  await expect(carte1).not.toContainText('capitale de')
+  await expect(carte2).toContainText('Paris est la capitale de ?')
 })
 
 test('by keyboard, the focus stays on the moved row and its new place is announced', async ({
@@ -249,15 +251,20 @@ test('by keyboard, the focus stays on the moved row and its new place is announc
   await page.keyboard.press('Enter')
   await expect(page.getByLabel('Nom de la carte').first()).toHaveValue('Carte 2')
 
-  // Saved, the review asks the card that is now first.
+  // Saved, each card still asks its own template (in random order, M13).
   await page.getByRole('button', { name: 'Enregistrer' }).click()
   await expect(page.getByText('Type de note enregistré')).toBeVisible()
   await page.goto('/#/review')
   const card = page.getByRole('article', { name: 'Carte' })
-  await expect(card).toContainText('Paris est la capitale de ?')
-  await expect(page.getByText('France')).toHaveCount(0)
+  await expect(card).toContainText(/France|Paris/)
+  const askedCapital = ((await card.textContent()) ?? '').includes('capitale de')
+  const [question, answer] = askedCapital
+    ? ['Paris est la capitale de ?', 'France']
+    : ['France', 'Paris']
+  await expect(card).toContainText(question)
+  await expect(page.getByText(answer, { exact: true })).toHaveCount(0)
   await page.keyboard.press('Space')
-  await expect(card).toContainText('France')
+  await expect(card).toContainText(answer)
 })
 
 test('a field renamed and moved with no pause keeps its new name and the cards follow it', async ({
@@ -286,16 +293,18 @@ test('an answer given before the cards moved is undone under the new place of it
   page,
 }) => {
   await capitales(page)
-  // Answer « Carte 1 » (France → Paris), then leave the review: the session keeps its undo.
+  // Answer the card asked first (random order, M13), then leave the review: the session keeps
+  // its undo. « Carte 1 » asks France → Paris, « Carte 2 » Paris → France.
   await page.goto('/#/review')
   const card = page.getByRole('article', { name: 'Carte' })
-  await expect(card).toContainText('France')
+  await expect(card).toContainText(/France|Paris/)
+  const askedCarte1 = !((await card.textContent()) ?? '').includes('capitale de')
   await page.keyboard.press('Space')
   await page.keyboard.press('3')
-  const waiting = page.getByRole('heading', { name: 'Encore quelques cartes en apprentissage' })
-  await expect(waiting).toBeVisible()
+  const learning = page.getByText('1 en apprentissage')
+  await expect(learning).toBeVisible()
 
-  // « Carte 2 » goes first: the answered card is now the second of its note.
+  // « Carte 2 » goes first: the cards of the note swap their places.
   await page.goto('/#/note-types')
   await page.getByRole('link', { name: 'Capitales', exact: true }).click()
   await moveCard(page, 'Monter', 'Carte 2').click()
@@ -305,10 +314,15 @@ test('an answer given before the cards moved is undone under the new place of it
   // Undone, it comes back as « Carte 1 » (what its template asks), not as the other card, which
   // now holds the index it used to have.
   await page.goto('/#/review')
-  await expect(waiting).toBeVisible()
+  await expect(learning).toBeVisible()
   await page.keyboard.press('Control+z')
-  await expect(card).toContainText('France')
-  await expect(card).not.toContainText('capitale de')
+  await expect(page.getByText('0 en apprentissage')).toBeVisible()
+  if (askedCarte1) {
+    await expect(card).toContainText('France')
+    await expect(card).not.toContainText('capitale de')
+  } else {
+    await expect(card).toContainText('Paris est la capitale de ?')
+  }
   await page.goto('/#/cards')
   await page.getByRole('radio', { name: 'Mosaïque recto-verso' }).check()
   const tiles = page.getByRole('list', { name: 'Mosaïque des cartes' }).getByRole('listitem')

@@ -29,6 +29,18 @@ class RectoDBv2 extends RectoDBv1 {
   }
 }
 
+/** The published version 3 layout (M12), frozen here to open « old » databases. */
+class RectoDBv3 extends RectoDBv2 {
+  constructor(name: string) {
+    super(name)
+    this.version(3).stores({
+      cards:
+        'id, noteId, deckId, due, state, box, updatedAt, [deckId+due], [deckId+state], [noteId+ord]',
+      deletions: 'id, table, deletedAt',
+    })
+  }
+}
+
 /**
  * Fake next migration, defined ONLY in this test (07-ROADMAP M1): it indexes `cards.flag` and
  * backfills a missing flag with 0. `schema.ts` must never contain it.
@@ -81,7 +93,7 @@ describe('schema migrations', () => {
 
     const db = new RectoDB(name)
     await db.open()
-    expect(db.verno).toBe(3)
+    expect(db.verno).toBe(4)
     expect((await db.notes.get('n1'))?.fields).toEqual(['a', 'b', ''])
     expect(await db.noteTypes.count()).toBe(0)
     await db.noteTypes.add({
@@ -108,7 +120,7 @@ describe('schema migrations', () => {
     await current
       .table('cards')
       .add({ ...makeCard({ id: 'n1', deckId: 'd1' }, 1, 'c2', 1), flag: 3 })
-    expect(current.verno).toBe(3)
+    expect(current.verno).toBe(4)
     current.close()
 
     const next = new RectoDBNext(name)
@@ -139,7 +151,7 @@ describe('schema migrations', () => {
 
     const db = new RectoDB(name)
     await db.open()
-    expect(db.verno).toBe(3)
+    expect(db.verno).toBe(4)
     // Dated by their last review, else by their creation.
     expect((await db.cards.get('c1'))?.updatedAt).toBe(50)
     expect((await db.cards.get('c2'))?.updatedAt).toBe(20)
@@ -153,10 +165,36 @@ describe('schema migrations', () => {
     again.close()
   })
 
-  it('the published schema is version 3', async () => {
+  it('opens a version 3 database: no twin burying, new cards in random order (M13)', async () => {
+    const name = uniqueName('v3')
+    const v3 = new RectoDBv3(name)
+    const deck = makeDeck({ name: 'D' }, 'd1', 10)
+    const { newOrder: _o, ...current } = deck.settings
+    const stored = { ...deck, settings: { ...current, newOrder: 'added', burySiblings: true } }
+    const leitner = { ...stored, id: 'd2', scheduler: 'leitner', updatedAt: 30 }
+    await v3.table('decks').bulkAdd([stored, leitner])
+    await v3.table('cards').add(makeCard({ id: 'n1', deckId: 'd1' }, 0, 'c1', 10))
+    v3.close()
+
+    const db = new RectoDB(name)
+    await db.open()
+    expect(db.verno).toBe(4)
+    // Same settings as a deck created today; the change dates are kept.
+    expect(await db.decks.get('d1')).toEqual(deck)
+    expect(await db.decks.get('d2')).toEqual({
+      ...deck,
+      id: 'd2',
+      scheduler: 'leitner',
+      updatedAt: 30,
+    })
+    expect((await db.cards.get('c1'))?.updatedAt).toBe(10)
+    db.close()
+  })
+
+  it('the published schema is version 4', async () => {
     const db = new RectoDB(uniqueName('schema'))
     await db.open()
-    expect(db.verno).toBe(3)
+    expect(db.verno).toBe(4)
     expect(db.tables.map((t) => t.name).sort()).toEqual([
       'cards',
       'decks',

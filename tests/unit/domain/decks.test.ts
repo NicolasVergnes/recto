@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deckOptions, deckPath, deckTree } from '$lib/domain/decks'
+import { deckOptions, deckPath, deckTree, familyCounts } from '$lib/domain/decks'
 import { makeDeck } from '$lib/domain/defaults'
 
 const geo = makeDeck({ name: 'Géographie' }, 'g', 0)
@@ -19,6 +19,21 @@ describe('deck helpers', () => {
     const tree = deckTree([dep, geo, astro, cap, orphan])
     expect(tree.map((n) => n.deck.name)).toEqual(['Astronomie', 'Géographie', 'Orphelin'])
     expect(tree[1]?.children.map((d) => d.name)).toEqual(['capitales', 'Départements'])
+  })
+
+  it('M13: counts the notes and cards of a deck with its sub-decks', () => {
+    const own = new Map([
+      ['g', { notes: 1, cards: 2 }],
+      ['d', { notes: 101, cards: 404 }],
+      ['c', { notes: 3, cards: 6 }],
+      ['o', { notes: 5, cards: 5 }],
+    ])
+    const counts = familyCounts([dep, geo, astro, cap, orphan], own)
+    expect(counts.get('g')).toEqual({ notes: 105, cards: 412 })
+    expect(counts.get('d')).toEqual({ notes: 101, cards: 404 })
+    expect(counts.get('a')).toEqual({ notes: 0, cards: 0 })
+    expect(counts.get('o')).toEqual({ notes: 5, cards: 5 })
+    expect(own.get('g')).toEqual({ notes: 1, cards: 2 })
   })
 
   it('flattens options for selects', () => {

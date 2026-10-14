@@ -306,16 +306,15 @@ describe('moving fields and cards of a note type (M10)', () => {
     expect(await rendered()).toEqual(rendersBefore)
   })
 
-  it('the browser and the review queue use the template of each card, twins included', async () => {
+  it('the browser and the review queue use the template of each card', async () => {
     const { type, france } = await setup()
     const [capitale, pays, drapeau] = france.cards
     if (!capitale || !pays || !drapeau) throw new Error('cards')
     const rendersBefore = await rendered()
-    // « Capitale » and « Pays » are twins: the first by ord is asked, the other buried.
     const before = await loadTodayQueue(T0 + 1)
-    expect([...before.result.ids].sort()).toEqual([capitale.id, drapeau.id].sort())
+    expect([...before.result.ids].sort()).toEqual([capitale.id, pays.id, drapeau.id].sort())
 
-    // « Pays » to the top: it becomes the card asked, and « Capitale » the one buried.
+    // « Pays » to the top: every card still asks what it did.
     await repo.updateNoteType(type.id, await editing(type.id, (d) => d.moveTemplate(1, -1)), T0 + 1)
     const row = (await repo.loadBrowserRows()).find((r) => r.card.id === pays.id)
     expect([row?.card.ord, row?.question, row?.answer]).toEqual([
@@ -324,7 +323,7 @@ describe('moving fields and cards of a note type (M10)', () => {
       'France',
     ])
     const queue = await loadTodayQueue(T0 + 2)
-    expect([...queue.result.ids].sort()).toEqual([pays.id, drapeau.id].sort())
+    expect([...queue.result.ids].sort()).toEqual([capitale.id, pays.id, drapeau.id].sort())
     const types = await repo.noteTypesById()
     for (const id of queue.result.ids) {
       const card = queue.cards.get(id)

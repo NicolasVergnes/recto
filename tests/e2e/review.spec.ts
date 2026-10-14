@@ -27,30 +27,36 @@ test('review: reveal, rate, undo and rate again', async ({ page }) => {
   await page.getByRole('link', { name: 'Réviser aujourd’hui' }).click()
 
   const card = page.getByRole('article', { name: 'Carte' })
-  await expect(card).toContainText('Capitale de l’Italie')
+  await expect(card).toContainText('Capitale de l’')
+  // New cards come in random order (M13): follow the one asked first.
+  const italyFirst = ((await card.textContent()) ?? '').includes('Italie')
+  const [first, answer, second] = italyFirst
+    ? ['Capitale de l’Italie', 'Rome', 'Capitale de l’Espagne']
+    : ['Capitale de l’Espagne', 'Madrid', 'Capitale de l’Italie']
+  await expect(card).toContainText(first)
   // P1: the answer is not in the page before asking for it.
-  await expect(page.getByText('Rome')).toHaveCount(0)
+  await expect(page.getByText(answer)).toHaveCount(0)
   await expect(page.getByText('2 nouvelles')).toBeVisible()
 
   await page.keyboard.press('Space')
-  await expect(card).toContainText('Rome')
+  await expect(card).toContainText(answer)
   const good = page.getByRole('button', { name: /^Bien/ })
   await expect(good).toContainText('10 min')
   await expect(page.getByRole('button', { name: /^Encore/ })).toBeFocused()
   await page.keyboard.press('3')
 
-  await expect(card).toContainText('Capitale de l’Espagne')
+  await expect(card).toContainText(second)
   await expect(page.getByText('1 nouvelle', { exact: true })).toBeVisible()
   await expect(page.getByText('1 en apprentissage')).toBeVisible()
 
   await page.keyboard.press('Control+z')
-  await expect(card).toContainText('Capitale de l’Italie')
-  await expect(page.getByText('Rome')).toHaveCount(0)
+  await expect(card).toContainText(first)
+  await expect(page.getByText(answer)).toHaveCount(0)
   await expect(page.getByText('2 nouvelles')).toBeVisible()
 
   await page.getByRole('button', { name: 'Afficher la réponse' }).click()
   await page.getByRole('button', { name: /^Facile/ }).click()
-  await expect(card).toContainText('Capitale de l’Espagne')
+  await expect(card).toContainText(second)
   await expect(page.getByText('0 en apprentissage')).toBeVisible()
   await page.getByRole('button', { name: 'Afficher la réponse' }).click()
   await page.getByRole('button', { name: /^Encore/ }).click()
@@ -103,23 +109,28 @@ test('typed answers are compared and editing a card resumes the session', async 
 
   await page.getByRole('link', { name: 'Réviser ce paquet' }).click()
   const card = page.getByRole('article', { name: 'Carte' })
-  await expect(card).toContainText('Capitale de la France')
+  await expect(card).toContainText('Capitale d')
+  // New cards come in random order (M13): follow the one asked first.
+  const franceFirst = ((await card.textContent()) ?? '').includes('France')
+  const [typed, second] = franceFirst
+    ? ['  paris ', 'Capitale du Portugal']
+    : ['  lisbonne ', 'Capitale de la France']
   const input = page.getByLabel('Tapez votre réponse')
   await expect(input).toBeFocused()
-  await input.fill('  paris ')
+  await input.fill(typed)
   await input.press('Enter')
   await expect(page.getByText('Exact !')).toBeVisible()
   await page.getByRole('button', { name: /^Bien/ }).click()
 
   // Second card: edit it from the menu (the typed-answer field has the focus), save, and come
   // back to the same session.
-  await expect(card).toContainText('Capitale du Portugal')
+  await expect(card).toContainText(second)
   await page.getByRole('button', { name: 'Plus d’actions' }).click()
   await page.getByRole('button', { name: /^Modifier/ }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Modifier la note' })).toBeVisible()
-  await page.getByLabel('Recto').fill('Capitale du Portugal (Europe)')
+  await page.getByLabel('Recto').fill(`${second} (Europe)`)
   await page.getByRole('button', { name: 'Enregistrer', exact: true }).click()
-  await expect(card).toContainText('Capitale du Portugal (Europe)')
+  await expect(card).toContainText(`${second} (Europe)`)
   await expect(page.getByText('1 nouvelle', { exact: true })).toBeVisible()
 })
 
@@ -148,4 +159,19 @@ test('an FSRS deck asks a basic card both ways, without a second card', async ({
   await expect(page.getByText('Sens inversé')).toBeVisible()
   await page.getByRole('button', { name: 'Afficher la réponse' }).click()
   await expect(card).toContainText('Capitale de l’Italie')
+})
+
+// M13: the home screen counts notes and cards; new cards are random; no twin option any more.
+test('the home screen counts notes and cards, and new decks draw cards at random', async ({
+  page,
+}) => {
+  await deckWithNotes(page, 'Comptes', [
+    ['Un', 'One'],
+    ['Deux', 'Two'],
+  ])
+  await page.goto('/#/')
+  await expect(page.getByText('2 notes · 2 cartes')).toBeVisible()
+  await page.getByRole('link', { name: 'Comptes', exact: true }).click()
+  await expect(page.getByLabel('Ordre des nouvelles cartes')).toHaveValue('random')
+  await expect(page.getByText(/jumelles/)).toHaveCount(0)
 })
