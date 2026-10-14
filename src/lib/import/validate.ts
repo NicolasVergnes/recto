@@ -43,6 +43,8 @@ function readSettings(x: unknown): DeckSettings | null {
     typedAnswer: isBool(x.typedAnswer) ? x.typedAnswer : d.typedAnswer,
     autoplayAudio: isBool(x.autoplayAudio) ? x.autoplayAudio : d.autoplayAudio,
     alternateSides: isBool(x.alternateSides) ? x.alternateSides : d.alternateSides,
+    pausedFormats: isStrArray(x.pausedFormats) ? x.pausedFormats : d.pausedFormats,
+    newByFormat: isBool(x.newByFormat) ? x.newByFormat : d.newByFormat,
     fsrs: {
       requestRetention: isNum(f.requestRetention) ? f.requestRetention : d.fsrs.requestRetention,
       maximumInterval: isNum(f.maximumInterval) ? f.maximumInterval : d.fsrs.maximumInterval,

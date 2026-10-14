@@ -34,6 +34,13 @@ export interface DeckSettings {
   autoplayAudio: boolean
   /** Default true: a success turns the card over, both schedulers (03 §1.1, scheduler/sides.ts). */
   alternateSides: boolean
+  /**
+   * M17: card formats (domain/formats.ts) whose new cards wait; their started cards are still
+   * reviewed. Default [].
+   */
+  pausedFormats: string[]
+  /** M17: new cards come format after format (template order), then in `newOrder`. */
+  newByFormat: boolean
   fsrs: FsrsSettings
   leitner: LeitnerSettings
 }

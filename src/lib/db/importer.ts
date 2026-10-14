@@ -43,6 +43,7 @@ export async function applyImportPlan(
   }
   await db.transaction('rw', db.decks, db.media, db.noteTypes, async () => {
     await db.decks.bulkAdd(plan.decks)
+    await db.decks.bulkPut(plan.deckUpdates ?? [])
     await db.noteTypes.bulkAdd(plan.noteTypes ?? [])
     await db.media.bulkPut(media)
   })

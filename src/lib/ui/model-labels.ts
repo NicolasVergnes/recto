@@ -3,7 +3,7 @@ import type { MessageKey } from '$lib/i18n'
 
 /** Display name of each kind of note (imports): built-in ones are Basique notes (M14). */
 export const MODEL_LABEL: Record<ModelType, MessageKey> = {
-  basic: 'editor.basic',
+  basic: 'editor.basicClassic',
   cloze: 'editor.basicCloze',
   image_occlusion: 'editor.basicOcclusion',
   custom: 'editor.custom',

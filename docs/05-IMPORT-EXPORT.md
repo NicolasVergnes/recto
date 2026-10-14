@@ -56,6 +56,10 @@ SELECT id, cid, ease, ivl, lastIvl, factor, time, type FROM revlog ORDER BY id;
 -- id : epoch ms de la révision ; ease 1–4 ; type 0 learn, 1 review, 2 relearn, 3 filtered, 4 manual
 ```
 
+### 2.2 bis Formats à introduire (M17)
+
+L'analyse liste les formats du paquet (`packageFormats`) : chaque modèle d'un type conservé tel quel (clé `<id du modèle>:<indice>`), ou le type de carte d'un modèle converti en note Basique (clé `<id du modèle>`), pour les seuls modèles utilisés par une note. Les formats décochés (`ApkgImportOptions.pausedFormats`) deviennent, une fois le type Recto résolu, des clés Recto (04-UI §2.9) ajoutées aux `pausedFormats` des paquets que l'import crée ou remplit (`ImportPlan.deckUpdates` pour les paquets existants, écrits dans la transaction des paquets), comme `newByFormat` s'il est coché. Les clés s'ajoutent : un réimport ne réactive aucun format.
+
 ### 2.3 Conversion
 
 - **Paquets** : `decks` → paquets Recto (hiérarchie sur un niveau : `A::B::C` devient `A::B` → sous-paquet `C` ; au-delà, le nom est aplati). Option « tout importer dans un seul paquet ».

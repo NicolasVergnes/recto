@@ -76,6 +76,8 @@ export interface ImportPlan {
   removedCards?: Pick<Card, 'id' | 'noteId'>[]
   /** Custom note types to create (written before the notes). */
   noteTypes?: NoteType[]
+  /** Existing decks whose settings change (M17: formats paused by the import). */
+  deckUpdates?: Deck[]
   media: ImportMedia[]
   report: ImportReport
 }

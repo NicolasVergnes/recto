@@ -39,6 +39,13 @@ export interface ApkgImportOptions {
   /** Scheduler of the decks created by the import. */
   scheduler: SchedulerKind
   dayStartHour: number
+  /**
+   * Formats of the package (`describePackage().formats` keys) whose new cards wait in the decks
+   * the import fills (M17): added to their `pausedFormats`. Absent: none.
+   */
+  pausedFormats?: readonly string[]
+  /** M17: the decks the import fills bring their new cards in format after format. */
+  newByFormat?: boolean
 }
 
 export interface ApkgExisting {
@@ -344,6 +351,19 @@ export async function planApkgImport(
   const updated = new Set<string>()
   const noteTypes: NoteType[] = []
   const typeOfModel = new Map<string, NoteType>()
+  // M17: the decks the notes go to, and the Recto formats of the package's paused ones.
+  const filled = new Set<string>()
+  const ankiPaused = new Set(options.pausedFormats ?? [])
+  const paused = new Set<string>()
+  const pause = (model: ApkgModel, conversion: ModelConversion, noteType?: NoteType) => {
+    if (!noteType) {
+      if (ankiPaused.has(model.id)) paused.add(conversion.modelType)
+      return
+    }
+    noteType.templates.forEach((_, i) => {
+      if (ankiPaused.has(`${model.id}:${i}`)) paused.add(`${noteType.id}:${i}`)
+    })
+  }
   for (const an of pkg.notes) {
     const model = models.get(an.mid)
     const conversion = conversions.get(an.mid)
@@ -365,6 +385,7 @@ export async function planApkgImport(
         typeOfModel.set(model.id, noteType)
       }
     }
+    pause(model, conversion, noteType)
     // Occlusion shapes converted or left out, counted for the notes written (created or updated).
     const countShapes = () => {
       if (conversion.modelType !== 'image_occlusion') return
@@ -404,6 +425,7 @@ export async function planApkgImport(
       }
       const { create, remove } = reconcileCards(cardsOfNote.get(known.id) ?? [], wanted)
       updated.add(known.id)
+      filled.add(knownDeck.id)
       plan.updates.push({ ...known, fields, tags: an.tags, updatedAt })
       removedCards.push(...remove)
       addCards(known, knownDeck, create, an, ankiCards)
@@ -434,6 +456,7 @@ export async function planApkgImport(
       updatedAt,
     }
     if (noteType) note.noteTypeId = noteType.id
+    filled.add(deck.id)
     plan.notes.push(note)
     report.skipped += ankiCards.filter((c) => !ords.includes(c.ord)).length
     addCards(note, deck, ords, an, ankiCards)
@@ -487,6 +510,21 @@ export async function planApkgImport(
   }
 
   plan.decks = resolver.created
+  // M17: the formats left for later, and the format after format order, in the decks filled.
+  if (paused.size > 0 || options.newByFormat) {
+    const withFormats = (deck: Deck): Deck => ({
+      ...deck,
+      settings: {
+        ...deck.settings,
+        pausedFormats: [...new Set([...deck.settings.pausedFormats, ...paused])],
+        newByFormat: deck.settings.newByFormat || !!options.newByFormat,
+      },
+    })
+    plan.decks = plan.decks.map((d) => (filled.has(d.id) ? withFormats(d) : d))
+    plan.deckUpdates = existing.decks
+      .filter((d) => filled.has(d.id))
+      .map((d) => ({ ...withFormats(d), updatedAt: now }))
+  }
   // Only the types of the notes actually created.
   const used = new Set(plan.notes.map((n) => n.noteTypeId))
   plan.noteTypes = noteTypes.filter((t) => used.has(t.id))
@@ -503,6 +541,33 @@ export async function planApkgImport(
 }
 
 /** Summary shown before importing (04-UI §2.5 « analyse »). */
+/**
+ * The card formats of a package (M17), for choosing those to introduce at once: each card of a
+ * note type kept as is (key `<model id>:<template index>`), or the kind of card of a model that
+ * becomes Basique notes (key `<model id>`). Only models used by a note.
+ */
+export function packageFormats(pkg: ApkgPackage): {
+  key: string
+  model: string
+  card?: string
+  modelType: ModelType
+}[] {
+  const used = new Set(pkg.notes.map((n) => n.mid))
+  return pkg.models
+    .filter((m) => used.has(m.id))
+    .flatMap((m) => {
+      const conversion = convertModel(m)
+      const base = { model: m.name, modelType: conversion.modelType }
+      return conversion.noteType
+        ? conversion.noteType.templates.map((t, i) => ({
+            ...base,
+            key: `${m.id}:${i}`,
+            card: t.name,
+          }))
+        : [{ ...base, key: m.id }]
+    })
+}
+
 export function describePackage(pkg: ApkgPackage) {
   const cardsPerDeck = new Map<string, number>()
   for (const c of pkg.cards) cardsPerDeck.set(c.did, (cardsPerDeck.get(c.did) ?? 0) + 1)
@@ -512,6 +577,7 @@ export function describePackage(pkg: ApkgPackage) {
       .map((d) => ({ name: d.name, cards: cardsPerDeck.get(d.id) ?? 0 }))
       .sort((a, b) => a.name.localeCompare(b.name, 'fr')),
     models: pkg.models.map((m) => ({ name: m.name, ...convertModel(m) })),
+    formats: packageFormats(pkg),
     notes: pkg.notes.length,
     cards: pkg.cards.length,
     media: pkg.media.length,

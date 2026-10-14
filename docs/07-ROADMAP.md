@@ -173,3 +173,16 @@ Critères d'acceptation :
 - [x] Export et import `.apkg` : l'option voyage (aller-retour Recto sans perte) ; Anki reçoit une carte à sens unique.
 - [x] Plugin : `two_way()` dans la bibliothèque, vérificateur et skill à jour ; un paquet « Carte → Nom, Nom ↔ Numéro, Nom ↔ Préfecture » donne 3 cartes par note.
 - [x] Tests unitaires et E2E ; `npm run verify` vert.
+
+## M17 — Formats de cartes à introduire, par paquet (demande de Nicolas, 2026-10-14)
+
+Hors roadmap initiale. Apprendre un paquet par étapes sans le découper en notes ou en paquets : commencer les départements par « Carte → Nom », puis passer à « Nom ↔ Numéro ». Le choix se fait par paquet, et dès l'import, puisque la plupart des paquets sont importés. Un format en pause retient ses nouvelles cartes ; ses cartes déjà commencées restent révisées (P7).
+
+Critères d'acceptation :
+- [x] Format de carte : un modèle d'un type personnalisé, ou le type de carte d'une note Basique ; réglages de paquet `pausedFormats` et `newByFormat` (Dexie version 6, sauvegarde `schemaVersion` 7, paquets et sauvegardes plus anciens lus avec les défauts).
+- [x] File du jour : nouvelles cartes d'un format en pause écartées avant le plafond, cartes commencées toujours révisées ; « format par format » dans l'ordre des modèles, puis l'ordre du paquet ; l'accueil et les statistiques du jour suivent.
+- [x] Paramètres du paquet : une case par format présent (nouvelles et commencées) et « Nouvelles cartes format par format ».
+- [x] Import `.apkg` : formats à introduire tout de suite et « format par format », appliqués aux paquets créés ou remplis ; un réimport ne réactive rien.
+- [x] Éditeur de types : un modèle déplacé garde sa pause, un modèle retiré ou changé de type la perd ; supprimer un type retire ses clés.
+- [x] Navigateur : filtre « Format de carte ».
+- [x] Tests unitaires et E2E ; `npm run verify` vert.

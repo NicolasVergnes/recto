@@ -68,7 +68,8 @@ function json(entries: Record<string, Uint8Array>, name: string): unknown {
  * (absent: none); 4 → 5 (M13) puts the new cards of every deck in random order and drops
  * `burySiblings`, like the Dexie version 4 upgrade. 5 → 6 (M14, M16) only adds card kinds, two-way
  * templates, single notes and masks of custom notes (absent: classic cards asked one way, one card
- * per index or group, no masks).
+ * per index or group, no masks). 6 → 7 (M17) adds the decks' paused formats and `newByFormat`,
+ * filled with their defaults by `readSettings` like the Dexie version 6 upgrade.
  */
 function migrate(data: Record<string, unknown>, fromVersion: number): Record<string, unknown> {
   if (fromVersion < 5 && Array.isArray(data.decks))

@@ -1,16 +1,38 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-10-14 · Branche : `main` · **M13 (révision au hasard), M14 (texte à trous et occlusion : des types de cartes), M16 (cartes dans les deux sens) et le plugin Claude `recto-deck-builder` fusionnés sur `main`** (2026-10-14, à la demande de Nicolas)
+Dernière mise à jour : 2026-10-14 · Branche : `m17-card-formats` (créée depuis `main`, non fusionnée) · **M13, M14, M16 et le plugin `recto-deck-builder` fusionnés sur `main`** (2026-10-14) · **M17 (formats de cartes à introduire, par paquet) livré**, en attente de relecture et de fusion par Nicolas
 
 ## Jalon en cours
 
-Aucun : M13, M14 et M16 sont terminés et fusionnés. Recto reste une PWA installable (décision du 2026-10-12). En attente, sans numéro ni date :
+Aucun : M17 est terminé (M13, M14 et M16 fusionnés). Recto reste une PWA installable (décision du 2026-10-12). En attente, sans numéro ni date :
 
 - Application Android avec Capacitor (couche plateforme, projet `android/`, bouton retour, micro, sons, flux Maestro, APK de débogage en CI) ; l'identifiant d'application (`appId`) sera à décider à ce moment (proposition : `fr.nicolasvergnes.recto`).
 - Publication sur le Play Store (politique de confidentialité, signature, fiche, test fermé : 12 testeurs pendant 14 jours).
 - Synchronisation automatique PC ↔ Android (dossier, Drive ou Syncthing).
 
 ## Terminé
+
+### M17 — Formats de cartes à introduire, par paquet (2026-10-14)
+
+Demande de Nicolas : pouvoir activer ou désactiver des parties d'un paquet, par exemple commencer les départements par « Carte → Nom » avant « Nom ↔ Numéro », sans notes ni paquets distincts. Avis donné : pas de sous-paquet par format (une carte est dans le paquet de sa note, et un sous-paquet ne se désactive pas), mais une pause des nouvelles cartes par format. Choix de Nicolas : réglage **par paquet**, proposé **dès l'import** (« les utilisateurs importent la plupart de leurs paquets ») ; cartes commencées toujours révisées ; en plus le filtre « Format de carte » du navigateur et l'ordre « format par format ».
+
+Plan suivi :
+
+1. Domaine (tests d'abord) : `domain/formats.ts` (`cardFormat`, `formatName`, `parseFormat`, `remapFormats`, `byFormatOrder`), `queue/build.ts` (`formatOf` : pause avant le plafond, tri par rang stable), `planNoteTypeEdit` → `templateMoves` — `tests/unit/domain/formats.test.ts`, `tests/unit/queue/build.test.ts` › « card formats (M17) ».
+2. Chargement de la file : `db/study.ts` `newCardFormats` (notes lues seulement si un paquet de la séance s'en sert) — `tests/unit/db/study.test.ts`.
+3. Données : `DeckSettings.pausedFormats` / `newByFormat`, Dexie version 6 (`migrateDeckSettingsM17`), `SCHEMA_VERSION` 7, `readSettings` ; `repo.ts` `followTemplates` (édition et suppression d'un type), `deckFormats` — `migration.test.ts`, `backup.test.ts`, `tests/unit/db/formats.test.ts`.
+4. Paramètres du paquet : `src/lib/ui/deck/FormatFields.svelte`.
+5. Import `.apkg` : `packageFormats`, options `pausedFormats`/`newByFormat`, `ImportPlan.deckUpdates`, `src/lib/ui/import/ApkgFormats.svelte` — `tests/unit/import/apkg.test.ts`.
+6. Navigateur : `rowFormats`, `BrowserFilter.format`, `src/lib/ui/browser/BrowserFilters.svelte` (filtres sortis de `Cards.svelte`, 223 → 193 lignes) — `tests/unit/domain/browse.test.ts`.
+7. E2E `tests/e2e/card-formats.spec.ts` ; docs 02, 03, 04 (§2.9), 05, 07, skill `srs-rules`, CHANGELOG.
+
+Critères (07-ROADMAP M17) :
+
+- ✔ Formats et réglages, migration — `formats.test.ts`, `migration.test.ts` › « opens a version 5 database… (M17) », `backup.test.ts` › « card formats of decks (M17) ».
+- ✔ File : pause avant le plafond, cartes commencées révisées, format par format — `build.test.ts`, `study.test.ts` › « lets every card of a custom note share the day (M13) » (partie M17 : pause, ordre, compteurs de l'accueil).
+- ✔ Paramètres du paquet, import, navigateur — E2E `card-formats.spec.ts` (bureau et mobile : import de `multi-template.apkg` avec « Qcarte » seul → 2 nouvelles ; réglages : « QDept » réactivé et format par format → 3 nouvelles ; filtre « QCh-lieu » → 3 cartes, gardé au rechargement) ; `apkg.test.ts` › « lists its formats and leaves those unchecked for later… ».
+- ✔ Éditeur de types et suppression d'un type — `tests/unit/db/formats.test.ts`.
+- ✔ `npm run verify` vert : check 0 erreur 0 avertissement, lint, format, 588 tests unitaires (couverture 92,3 % des lignes), build, E2E 115 réussis et 1 ignoré. Vérifié dans l'application réelle avec `paquets/departements.apkg` (101 notes, 3 formats) : import avec « Carte → Nom » seul → séance « 20 nouvelles », toutes « Quel département ? » ; paramètres du paquet : trois formats, 101 nouvelles chacun, seul « Carte → Nom » coché ; lisible sur téléphone.
 
 ### Plugin `recto-deck-builder` 2.2.0 — charte de rédaction des cartes (2026-10-14)
 
@@ -331,6 +353,11 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## Décisions prises en session
 
+- 2026-10-14 (M17) : un format désigne un modèle par son **indice** (`<noteTypeId>:<i>`) ; l'éditeur de types réécrit les clés des paquets dans la même transaction (déplacé : suit ; retiré ou changé de type : perdu). Alternative écartée : un identifiant stable par modèle (migration de tous les types, identifiants différents d'un appareil à l'autre pour la fusion).
+- 2026-10-14 (M17) : la pause et l'ordre valent pour les cartes **du paquet lui-même** (un sous-paquet a ses réglages, comme `newPerDay`) ; à l'import, ils s'appliquent à tous les paquets créés ou remplis. Un réimport ajoute des pauses, n'en retire jamais.
+- 2026-10-14 (M17) : la section n'apparaît qu'à partir de deux formats (un seul : « Nouvelles cartes par jour » suffit) ; le libellé du type de carte classique d'une note Basique devient « Basique · classique » (aussi dans le rapport d'analyse d'un paquet Anki).
+- 2026-10-14 (M17) : `ApkgImport.svelte` passe de 249 à 264 lignes (dette déjà là : choix des formats sorti dans `ApkgFormats.svelte`, mais pas encore le reste).
+
 - 2026-10-14 (fusion M13 + M14 + M16 sur `main`, demandée par Nicolas) : `twoWay` réservé aux cartes classiques (une carte à trous ou d'occlusion n'a pas de faces) ; `twoWay` lu dans la sauvegarde au schéma 6 avec les types de cartes, le schéma 5 étant celui de M13 (le schéma 5 « M16 » n'a jamais été publié) ; le compte des jumelles de M16 disparaît avec `areTwins` (M13) ; l'E2E « a card asked both ways » rendu indépendant de l'ordre de révision (M13). `npm run verify` vert après fusion : 571 tests unitaires (couverture 92,2 % des lignes), E2E 113 réussis et 1 ignoré.
 - 2026-10-14 (M14) : les notes intégrées gardent leur `modelType` stocké (`basic`, `cloze`, `image_occlusion`), lu comme « Basique + type de carte » : aucune note des testeurs n'est réécrite. Alternative écartée : un champ `cardKind` sur des notes `basic` (migration de toutes les notes, des sauvegardes et de l'import pour un nom).
 - 2026-10-14 (M14) : `ord` d'une carte personnalisée = indice du modèle + 1000 × (trou ou groupe − 1) ; les cartes existantes ont un sous-indice nul et ne changent pas. Alternative écartée : un champ `Card.template` (migration de toutes les cartes personnalisées, de la fusion et de l'export).
@@ -490,6 +517,8 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 - Chromium ne passe pas la requête du favicon SVG par le service worker : hors ligne, la console signale l'échec de `logo.svg` (sans effet sur l'application, les icônes du manifeste sont précachées).
 
 ## À vérifier manuellement par Nicolas
+
+- M17 — Importer `paquets/departements.apkg` en ne gardant que « Carte → Nom » ; réviser quelques jours ; puis, dans les paramètres du paquet, cocher « Nom ↔ Numéro » : ses nouvelles cartes arrivent, les cartes de la carte continuent. Essayer « Nouvelles cartes format par format » et le filtre « Format de carte » du navigateur. Sur le paquet déjà importé, les trois formats sont cochés : décocher ceux à garder pour plus tard.
 
 - M14 — Éditeur de notes : « Type » propose Basique puis vos types ; avec Basique, « Type de carte » (Classique, Texte à trous, Occlusion d'image) ; cocher « Génère une seule carte » sur un texte à trous à deux trous (1 carte qui demande les deux), puis la décocher sur la note enregistrée.
 - M14 — Types de notes : créer un type qui mélange une occlusion, deux cartes classiques et un texte à trous ; ajouter une note (masques sur l'image, trous avec « Créer un trou »), la réviser sur le téléphone. Exporter ce paquet pour Anki : le rapport annonce les cartes restées dans Recto.

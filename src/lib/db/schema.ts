@@ -1,6 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type { Card, Deck, Deletion, Media, Note, NoteType, Review, Setting } from '../domain/types'
-import { migrateDeckSettingsM13 } from '../domain/defaults'
+import { migrateDeckSettingsM13, migrateDeckSettingsM17 } from '../domain/defaults'
 
 export const DB_NAME = 'recto'
 /**
@@ -12,9 +12,10 @@ export const DB_NAME = 'recto'
  * (M14, M16) adds the kinds of card of custom note types (`kind`, `field`, `single`), two-way
  * classic templates (`twoWay`), `note.single` and `note.masks` (Dexie version 5): older versions
  * refuse such backups instead of reading a cloze card as a classic one and deleting its cards, or
- * asking a two-way card one way only.
+ * asking a two-way card one way only. 7 (M17) adds
+ * `settings.pausedFormats` and `settings.newByFormat` to decks (Dexie version 6).
  */
-export const SCHEMA_VERSION = 6
+export const SCHEMA_VERSION = 7
 
 /**
  * IndexedDB schema (02-DATA-MODEL §1). Never edit a published `version()` block: add a new one
@@ -72,6 +73,13 @@ export class RectoDB extends Dexie {
     // version only keeps an older copy of the app (still cached) from opening this database and
     // reconciling the cards of a cloze or occlusion template as classic ones.
     this.version(5).stores({})
+    // M17: card formats paused per deck, or brought in format after format; none by default.
+    this.version(6).upgrade((tx) =>
+      tx
+        .table<{ settings: Record<string, unknown> }>('decks')
+        .toCollection()
+        .modify((deck) => migrateDeckSettingsM17(deck.settings)),
+    )
   }
 }
 

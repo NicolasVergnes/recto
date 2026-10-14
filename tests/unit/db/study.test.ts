@@ -197,6 +197,13 @@ describe('daily queue from the database', () => {
     )
     const ids = (await loadTodayQueue(now)).result.ids
     expect([...ids].sort()).toEqual(cards.map((c) => c.id).sort())
+
+    // M17: the deck pauses « QDept » (template 1) and asks the others format after format.
+    const settings = { ...deck.settings, pausedFormats: [`${type.id}:1`], newByFormat: true }
+    await repo.updateDeck(deck.id, { settings }, now)
+    const queue = await loadTodayQueue(now)
+    expect(queue.result.ids).toEqual([cards[0]?.id, cards[2]?.id])
+    expect(countsByDeck(queue).get(deck.id)).toMatchObject({ new: 2 })
   })
 })
 

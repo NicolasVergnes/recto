@@ -9,6 +9,7 @@ import { dayStart, nextDayStart } from '../scheduler/day'
 import { buildQueue, type QueueCounts, type QueueResult, type TodayReview } from '../queue/build'
 import type { Card, Deck, Review, SchedulerKind } from '../domain/types'
 import { deckTree } from '../domain/decks'
+import { cardFormat, type CardFormat } from '../domain/formats'
 import { recordDeletions } from './deletions'
 import { RepoError } from './errors'
 import { db, newId } from './schema'
@@ -83,6 +84,26 @@ export interface TodayQueue {
   dayStartHour: number
 }
 
+/**
+ * The formats of the new candidate cards (M17), read from their notes, only when a deck of the
+ * session pauses formats or brings them in format after format: otherwise no note is read.
+ */
+async function newCardFormats(
+  decks: readonly Deck[],
+  candidates: readonly Card[],
+): Promise<((card: Card) => CardFormat | undefined) | undefined> {
+  const used = decks.some((d) => d.settings.pausedFormats.length > 0 || d.settings.newByFormat)
+  if (!used) return undefined
+  const noteIds = [...new Set(candidates.filter((c) => c.state === 0).map((c) => c.noteId))]
+  const notes = new Map(
+    (await db.notes.bulkGet(noteIds)).flatMap((n) => (n ? [[n.id, n] as const] : [])),
+  )
+  return (card) => {
+    const note = notes.get(card.noteId)
+    return note ? cardFormat(note, card) : undefined
+  }
+}
+
 /** Loads candidates with indexed queries and builds the daily queue (03 §5). */
 export async function loadTodayQueue(now: number, deckId?: string): Promise<TodayQueue> {
   const [allDecks, dayStartHour, globalReviewsPerDay] = await Promise.all([
@@ -110,6 +131,7 @@ export async function loadTodayQueue(now: number, deckId?: string): Promise<Toda
     fsrs: getScheduler('fsrs', { dayStartHour }),
     leitner: getScheduler('leitner', { dayStartHour }),
   }
+  const formatOf = await newCardFormats(decks, candidates)
   const result = buildQueue({
     now,
     dayStartHour,
@@ -118,6 +140,7 @@ export async function loadTodayQueue(now: number, deckId?: string): Promise<Toda
     todayReviews,
     globalReviewsPerDay,
     retrievability: (card, deck) => schedulers[deck.scheduler].retrievability(card, now, deck),
+    ...(formatOf ? { formatOf } : {}),
   })
   // Cards the session may show: the queue and the later learning cards.
   const wanted = new Set([...result.ids, ...result.later.map((l) => l.id)])

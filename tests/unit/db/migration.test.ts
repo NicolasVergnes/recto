@@ -52,6 +52,14 @@ class RectoDBv4 extends RectoDBv3 {
   }
 }
 
+/** The published version 5 layout (M14), frozen here to open « old » databases. */
+class RectoDBv5 extends RectoDBv4 {
+  constructor(name: string) {
+    super(name)
+    this.version(5).stores({})
+  }
+}
+
 /**
  * Fake next migration, defined ONLY in this test (07-ROADMAP M1): it indexes `cards.flag` and
  * backfills a missing flag with 0. `schema.ts` must never contain it.
@@ -104,7 +112,7 @@ describe('schema migrations', () => {
 
     const db = new RectoDB(name)
     await db.open()
-    expect(db.verno).toBe(5)
+    expect(db.verno).toBe(6)
     expect((await db.notes.get('n1'))?.fields).toEqual(['a', 'b', ''])
     expect(await db.noteTypes.count()).toBe(0)
     await db.noteTypes.add({
@@ -131,7 +139,7 @@ describe('schema migrations', () => {
     await current
       .table('cards')
       .add({ ...makeCard({ id: 'n1', deckId: 'd1' }, 1, 'c2', 1), flag: 3 })
-    expect(current.verno).toBe(5)
+    expect(current.verno).toBe(6)
     current.close()
 
     const next = new RectoDBNext(name)
@@ -162,7 +170,7 @@ describe('schema migrations', () => {
 
     const db = new RectoDB(name)
     await db.open()
-    expect(db.verno).toBe(5)
+    expect(db.verno).toBe(6)
     // Dated by their last review, else by their creation.
     expect((await db.cards.get('c1'))?.updatedAt).toBe(50)
     expect((await db.cards.get('c2'))?.updatedAt).toBe(20)
@@ -189,7 +197,7 @@ describe('schema migrations', () => {
 
     const db = new RectoDB(name)
     await db.open()
-    expect(db.verno).toBe(5)
+    expect(db.verno).toBe(6)
     // Same settings as a deck created today; the change dates are kept.
     expect(await db.decks.get('d1')).toEqual(deck)
     expect(await db.decks.get('d2')).toEqual({
@@ -233,7 +241,7 @@ describe('schema migrations', () => {
 
     const db = new RectoDB(name)
     await db.open()
-    expect(db.verno).toBe(5)
+    expect(db.verno).toBe(6)
     expect(await db.noteTypes.get('t1')).toEqual(type)
     expect(await db.notes.toArray()).toEqual(notes)
     expect(await db.cards.toArray()).toEqual(cards)
@@ -278,10 +286,31 @@ describe('schema migrations', () => {
     again.close()
   })
 
-  it('the published schema is version 5', async () => {
+  it('opens a version 5 database: no format paused, the decks keep their date (M17)', async () => {
+    const name = uniqueName('v5')
+    const v5 = new RectoDBv5(name)
+    const deck = makeDeck({ name: 'D' }, 'd1', 10)
+    const { pausedFormats: _p, newByFormat: _n, ...stored } = deck.settings
+    await v5
+      .table('decks')
+      .add({ ...deck, settings: { ...stored, newOrder: 'added' }, updatedAt: 40 })
+    v5.close()
+
+    const db = new RectoDB(name)
+    await db.open()
+    expect(db.verno).toBe(6)
+    expect(await db.decks.get('d1')).toEqual({
+      ...deck,
+      settings: { ...deck.settings, newOrder: 'added' },
+      updatedAt: 40,
+    })
+    db.close()
+  })
+
+  it('the published schema is version 6', async () => {
     const db = new RectoDB(uniqueName('schema'))
     await db.open()
-    expect(db.verno).toBe(5)
+    expect(db.verno).toBe(6)
     expect(db.tables.map((t) => t.name).sort()).toEqual([
       'cards',
       'decks',

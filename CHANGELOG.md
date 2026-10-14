@@ -4,6 +4,20 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 ## [Unreleased]
 
+### M17 — Formats de cartes à introduire, par paquet
+
+#### Added
+
+- **Apprendre un paquet par étapes** : dans les paramètres d'un paquet, « Formats de cartes à introduire » liste ses formats (par exemple « Département · Carte → Nom », « Département · Nom ↔ Numéro ») avec leurs cartes nouvelles et commencées. Un format décoché ne fait plus entrer de nouvelles cartes ; ses cartes déjà commencées restent révisées.
+- « Nouvelles cartes format par format » : toutes les nouvelles cartes d'un format avant celles du suivant, dans l'ordre des cartes du type de note.
+- Import Anki : « Formats de cartes à introduire tout de suite » et « format par format », appliqués aux paquets que l'import crée ou remplit.
+- Navigateur de cartes : filtre « Format de carte ».
+
+#### Changed
+
+- Sauvegarde au format 7 (les sauvegardes plus anciennes restent lisibles) ; base de données en version 6, migrée à l'ouverture.
+- Le filtre du navigateur et ses champs sont dans leur propre composant (écran « Cartes » sous 200 lignes).
+
 ### Outils — plugin Claude « recto-deck-builder » 2.2.0 : charte de rédaction
 
 #### Added

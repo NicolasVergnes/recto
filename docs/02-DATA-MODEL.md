@@ -43,6 +43,8 @@ export class RectoDB extends Dexie {
     // M14 : types de cartes ; propriétés facultatives, rien à migrer : la version empêche une
     // ancienne copie de l'application de réconcilier les cartes à trous d'un type comme classiques
     this.version(5).stores({})
+    // M17 : upgrade des réglages de paquet (pausedFormats [], newByFormat false)
+    this.version(6).upgrade(…)
   }
 }
 ```
@@ -76,6 +78,10 @@ export interface DeckSettings {
   typedAnswer: boolean         // réponse tapée
   autoplayAudio: boolean
   alternateSides: boolean      // défaut true : carte retournée après chaque réussite, FSRS et Leitner (03 §1.1, M11)
+  pausedFormats: string[]      // M17, défaut [] : formats de cartes dont les nouvelles cartes attendent (03 §5) ;
+                               // clé `<noteTypeId>:<indice du modèle>` ou `basic` | `cloze` | `image_occlusion`
+                               // (domain/formats.ts) ; les cartes commencées restent révisées
+  newByFormat: boolean         // M17, défaut false : nouvelles cartes format après format (ordre des modèles)
   fsrs: {
     requestRetention: number   // 0.80–0.97, défaut 0.90
     maximumInterval: number    // jours, défaut 365 (écho au compartiment 7 « tous les ans » ; réglable)
@@ -267,14 +273,14 @@ export interface NoteType {
 ## 5. Sauvegarde `.recto.zip`
 
 ```
-manifest.json   { "format": "recto-backup", "schemaVersion": 6, "appVersion": "0.x", "exportedAt": ms, "device": "<navigator.userAgent tronqué à 120 car.>", "deviceId": "<uuid>", "counts": {...} }
+manifest.json   { "format": "recto-backup", "schemaVersion": 7, "appVersion": "0.x", "exportedAt": ms, "device": "<navigator.userAgent tronqué à 120 car.>", "deviceId": "<uuid>", "counts": {...} }
 data.json       { "decks": [...], "noteTypes": [...], "notes": [...], "cards": [...], "reviews": [...], "settings": [...],
                   "media": [{ "name", "mime", "size", "sha256", "createdAt" }],   // sans blobs
                   "deletions": [...] }
 media/<name>    fichiers binaires
 ```
 
-`schemaVersion` : 2 depuis la V1 (ajout du type `image_occlusion`), 3 depuis M8 (table `noteTypes`, notes `custom` ; une note `custom` sans son type est rejetée à la lecture). 4 depuis M12 (`card.updatedAt`, `deletions`, `setting.updatedAt`, `deviceId`) ; une carte d'une sauvegarde plus ancienne est datée comme à la migration Dexie (`lastReview ?? createdAt`), elle n'a pas de suppressions. 5 depuis M13 (Dexie version 4) : `burySiblings` retiré des réglages de paquet, `newOrder` passé à `'random'` pour tous les paquets ; une sauvegarde plus ancienne est migrée de même à la lecture, la date `updatedAt` du paquet est gardée. 6 depuis M14 et M16 (Dexie version 5) : types de cartes des modèles (`kind`, `field`, `single`), modèles classiques posés dans les deux sens (`twoWay`, M16 ; numéroté 5 sur sa branche avant la fusion avec M13, jamais publié), `note.single`, `note.masks` ; une sauvegarde plus ancienne se lit telle quelle (cartes classiques à sens unique, une carte par trou ou groupe, pas de masques) ; un type inconnu ou un modèle à trous ou d'occlusion sans champ est lu comme classique. Une sauvegarde de version 1 ou 2 se restaure telle quelle (pas de type personnalisé), une version plus récente que l'application est refusée. Les lignes sont lues dans une seule transaction en lecture : un instantané cohérent même si l'application écrit pendant l'export. Fusion : un type de note est identifié par `id`, le plus récemment modifié gagne.
+`schemaVersion` : 2 depuis la V1 (ajout du type `image_occlusion`), 3 depuis M8 (table `noteTypes`, notes `custom` ; une note `custom` sans son type est rejetée à la lecture). 4 depuis M12 (`card.updatedAt`, `deletions`, `setting.updatedAt`, `deviceId`) ; une carte d'une sauvegarde plus ancienne est datée comme à la migration Dexie (`lastReview ?? createdAt`), elle n'a pas de suppressions. 5 depuis M13 (Dexie version 4) : `burySiblings` retiré des réglages de paquet, `newOrder` passé à `'random'` pour tous les paquets ; une sauvegarde plus ancienne est migrée de même à la lecture, la date `updatedAt` du paquet est gardée. 6 depuis M14 et M16 (Dexie version 5) : types de cartes des modèles (`kind`, `field`, `single`), modèles classiques posés dans les deux sens (`twoWay`, M16 ; numéroté 5 sur sa branche avant la fusion avec M13, jamais publié), `note.single`, `note.masks` ; une sauvegarde plus ancienne se lit telle quelle (cartes classiques à sens unique, une carte par trou ou groupe, pas de masques) ; un type inconnu ou un modèle à trous ou d'occlusion sans champ est lu comme classique. 7 depuis M17 (Dexie version 6) : `pausedFormats` et `newByFormat` des réglages de paquet, remplis par leurs défauts à la lecture d'une sauvegarde plus ancienne comme à la migration Dexie. Une clé de format désigne un modèle par son indice : déplacer, retirer ou changer le type d'un modèle (`updateNoteType`, même transaction) réécrit ou retire les clés des paquets, datés ; supprimer un type retire ses clés. Une sauvegarde de version 1 ou 2 se restaure telle quelle (pas de type personnalisé), une version plus récente que l'application est refusée. Les lignes sont lues dans une seule transaction en lecture : un instantané cohérent même si l'application écrit pendant l'export. Fusion : un type de note est identifié par `id`, le plus récemment modifié gagne.
 
 Restauration « remplacer » : vide la base puis importe (suppressions comprises), sauf les réglages propres à l'appareil, gardés (M12) ; « fusionner » : les entités sont identifiées par `id` (et `sourceGuid` pour les notes) ; en cas de conflit, la version la plus récente (`updatedAt`) gagne, les journaux sont unionnés par `id`.
 

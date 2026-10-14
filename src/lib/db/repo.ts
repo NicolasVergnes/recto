@@ -6,6 +6,14 @@ import { buildRow, type BrowserRow } from '../domain/browse'
 import { deckPath, type DeckCount } from '../domain/decks'
 import { makeCard, makeDeck, resetScheduling, type NewDeckInput } from '../domain/defaults'
 import {
+  byFormatOrder,
+  cardFormat,
+  formatName,
+  remapFormats,
+  type CardFormat,
+  type FormatName,
+} from '../domain/formats'
+import {
   planNoteTypeEdit,
   storedTemplate,
   validateNoteType,
@@ -524,8 +532,10 @@ export async function updateNoteType(
   edit: NoteTypeEdit,
   now: number,
 ): Promise<NoteTypeEditPlan> {
-  return db.transaction('rw', [db.noteTypes, db.notes, db.cards, db.deletions], async () => {
+  const tables = [db.noteTypes, db.notes, db.cards, db.deletions, db.decks]
+  return db.transaction('rw', tables, async () => {
     const plan = await planEdit(id, edit, now)
+    await followTemplates(id, plan.templateMoves, now)
     await db.noteTypes.put(plan.type)
     await db.notes.bulkPut(plan.notes)
     await db.cards.bulkPut(plan.moved)
@@ -536,11 +546,66 @@ export async function updateNoteType(
   })
 }
 
-/** A note type is deleted only when no note uses it. */
+/**
+ * The decks' paused formats of note type `noteTypeId` follow its templates (M17, inside the
+ * caller's transaction): a moved template keeps its pause, a removed or replaced one loses it.
+ */
+async function followTemplates(
+  noteTypeId: string,
+  moves: ReadonlyMap<number, number>,
+  now: number,
+) {
+  for (const deck of await db.decks.toArray()) {
+    const before = deck.settings.pausedFormats
+    const after = remapFormats(before, noteTypeId, moves)
+    if (after.join('') === before.join('')) continue
+    await db.decks.put({
+      ...deck,
+      settings: { ...deck.settings, pausedFormats: after },
+      updatedAt: now,
+    })
+  }
+}
+
+/** A card format of a deck (M17): what it asks, how many new and started cards it has. */
+export interface DeckFormat extends FormatName, CardFormat {
+  fresh: number
+  started: number
+}
+
+/** The formats of a deck's own cards (its sub-decks have their own settings), in template order. */
+export async function deckFormats(deckId: string): Promise<DeckFormat[]> {
+  return db.transaction('r', db.cards, db.notes, db.noteTypes, async () => {
+    const cards = await db.cards.where('deckId').equals(deckId).toArray()
+    const noteIds = [...new Set(cards.map((c) => c.noteId))]
+    const notes = new Map(
+      (await db.notes.bulkGet(noteIds)).flatMap((n) => (n ? [[n.id, n] as const] : [])),
+    )
+    const types = await noteTypesById()
+    const formats = new Map<string, DeckFormat>()
+    for (const card of cards) {
+      const note = notes.get(card.noteId)
+      if (!note) continue
+      const { key } = cardFormat(note, card)
+      let format = formats.get(key)
+      if (!format) {
+        const type = note.noteTypeId ? types.get(note.noteTypeId) : undefined
+        format = { ...formatName(note, card, type), fresh: 0, started: 0 }
+        formats.set(key, format)
+      }
+      if (card.state === 0) format.fresh++
+      else format.started++
+    }
+    return [...formats.values()].sort(byFormatOrder)
+  })
+}
+
+/** A note type is deleted only when no note uses it; the decks forget its paused formats. */
 export async function deleteNoteType(id: string, now: number): Promise<void> {
-  await db.transaction('rw', db.noteTypes, db.notes, db.deletions, async () => {
+  await db.transaction('rw', db.noteTypes, db.notes, db.deletions, db.decks, async () => {
     if ((await db.notes.where('noteTypeId').equals(id).count()) > 0)
       throw new RepoError('noteTypeInUse')
+    await followTemplates(id, new Map(), now)
     await db.noteTypes.delete(id)
     await recordDeletions('noteTypes', [id], now)
   })

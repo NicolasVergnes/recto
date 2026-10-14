@@ -462,4 +462,40 @@ describe('multi-card note types (M8, data/samples/multi-template.apkg)', () => {
     expect(plan.report.cardsCreated).toBe(11)
     expect(plan.media.map((m) => m.name).sort()).toEqual(['carte-01.png', 'carte-02.png'])
   })
+
+  it('lists its formats and leaves those unchecked for later in the decks it fills (M17)', async () => {
+    const pkg = readApkg(sampleBytes('multi-template.apkg'), SQL)
+    const formats = describePackage(pkg).formats
+    expect(formats.map((f) => [f.key, f.card])).toEqual([
+      ['1342697561419:0', 'QNumero'],
+      ['1342697561419:1', 'QDept'],
+      ['1342697561419:2', 'QCh-lieu'],
+      ['1342697561419:3', 'Qcarte'],
+    ])
+    // Only « Qcarte » at once, format after format.
+    const later = formats.slice(0, 3).map((f) => f.key)
+    const plan = await planApkgImport(
+      pkg,
+      { ...options, pausedFormats: later, newByFormat: true },
+      empty,
+      now,
+      newId,
+    )
+    const type = plan.noteTypes?.[0]
+    const deck = plan.decks.find((d) => d.id === plan.notes[0]?.deckId)
+    expect(deck?.settings.pausedFormats).toEqual([0, 1, 2].map((i) => `${type?.id}:${i}`))
+    expect(deck?.settings.newByFormat).toBe(true)
+    expect(plan.deckUpdates).toEqual([])
+
+    // Imported again into its deck with every format checked: the pause stays.
+    const again = await planApkgImport(
+      pkg,
+      { ...options, target: { mode: 'single', deckId: deck?.id ?? '' }, pausedFormats: [] },
+      { ...empty, decks: plan.decks, noteTypes: plan.noteTypes ?? [] },
+      now,
+      newId,
+    )
+    expect(again.deckUpdates ?? []).toEqual([])
+    expect(again.decks).toEqual([])
+  })
 })

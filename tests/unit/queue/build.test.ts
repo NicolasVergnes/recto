@@ -321,3 +321,45 @@ describe('buildQueue edge cases', () => {
     expect(q.ids).toEqual(['noR', 'a', 'b'])
   })
 })
+
+describe('card formats (M17)', () => {
+  // Notes « n0 »… of a type with two templates: Carte → Nom (ord 0) and Nom ↔ Numéro (ord 1).
+  const cards = Array.from({ length: 6 }, (_, i) =>
+    fresh(`c${i}`, now - (10 - i) * DAY, 'd1', `n${Math.floor(i / 2)}`, i % 2),
+  )
+  const formatOf = (c: Card) => ({ key: `t:${c.ord}`, rank: c.ord })
+  const asked = (ids: readonly string[]) => ids.map((id) => Number(id.slice(1)) % 2)
+
+  it('leaves the new cards of a paused format out, and gives their places to the others', () => {
+    const paused = deck('d1', 'fsrs', { pausedFormats: ['t:1'], newPerDay: 2 })
+    const q = buildQueue(input([paused], cards, { formatOf }))
+    expect(q.counts.new).toBe(2)
+    expect(asked(q.ids)).toEqual([0, 0])
+    // Without the formats (not loaded), nothing is held back.
+    expect(buildQueue(input([paused], cards)).counts.new).toBe(2)
+    expect(sorted(buildQueue(input([paused], cards, { formatOf: () => undefined })).ids)).toEqual(
+      sorted(buildQueue(input([deck('d1', 'fsrs', { newPerDay: 2 })], cards)).ids),
+    )
+  })
+
+  it('keeps reviewing the started cards of a paused format (P7)', () => {
+    const started = review('r1', { ord: 1 })
+    const q = buildQueue(
+      input([deck('d1', 'fsrs', { pausedFormats: ['t:1'] })], [...cards, started], { formatOf }),
+    )
+    expect(q.ids).toContain('r1')
+    expect(q.counts).toMatchObject({ review: 1, new: 3 })
+  })
+
+  it('brings new cards in format after format, in the deck order within a format', () => {
+    const byFormat = (newOrder: 'random' | 'added') =>
+      buildQueue(input([deck('d1', 'fsrs', { newByFormat: true, newOrder })], cards, { formatOf }))
+        .ids
+    expect(asked(byFormat('random'))).toEqual([0, 0, 0, 1, 1, 1])
+    expect(byFormat('added')).toEqual(['c0', 'c2', 'c4', 'c1', 'c3', 'c5'])
+    const random = byFormat('random')
+    expect(random.slice(0, 3)).toEqual(
+      buildQueue(input([deck('d1')], cards)).ids.filter((id) => asked([id])[0] === 0),
+    )
+  })
+})

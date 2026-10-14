@@ -60,7 +60,7 @@ const { collections, reschedule_item } = f.reschedule(createEmptyCard(), history
 
 ## 4. File du jour — ordre canonique
 
-1. Apprentissage dû → 2. Révisions en retard → 3. Révisions du jour → 4. Nouvelles (plafond, `newOrder` aléatoire par défaut), insérées tous les *k* items. Chaque lot dans un ordre aléatoire stable (graine = jour) ; quand le plafond coupe les retards, garder les plus fragiles (R croissante / box croissante), P6. Round-robin entre paquets ; cartes d'une note ni enterrées ni espacées (M13) ; cartes `suspended`/`retired` exclues ; jour à `dayStartHour` (04:00).
+1. Apprentissage dû → 2. Révisions en retard → 3. Révisions du jour → 4. Nouvelles (plafond, `newOrder` aléatoire par défaut ; formats en pause écartés, `newByFormat` : format après format, M17), insérées tous les *k* items. Chaque lot dans un ordre aléatoire stable (graine = jour) ; quand le plafond coupe les retards, garder les plus fragiles (R croissante / box croissante), P6. Round-robin entre paquets ; cartes d'une note ni enterrées ni espacées (M13) ; cartes `suspended`/`retired` exclues ; jour à `dayStartHour` (04:00).
 
 ## 5. Anti-patterns à refuser
 

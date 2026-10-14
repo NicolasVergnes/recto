@@ -20,6 +20,7 @@
   import { formatBytes } from '../format'
   import { MODEL_LABEL } from '../model-labels'
   import { ApkgReadError, readApkgFile, shrinkImages } from './apkg-client'
+  import ApkgFormats from './ApkgFormats.svelte'
   import ImportReport from './ImportReport.svelte'
 
   const id = $props.id()
@@ -42,6 +43,9 @@
   let importHistory = $state(true)
   let scheduler = $state<SchedulerKind>('fsrs')
   let keepOriginals = $state(false)
+  /** M17: formats whose new cards wait, and the format after format order. */
+  let pausedFormats = $state<string[]>([])
+  let newByFormat = $state(false)
   let busy = $state(false)
   let progress = $state<{ done: number; total: number } | null>(null)
   let report = $state.raw<Report | null>(null)
@@ -54,6 +58,8 @@
     pkg = null
     report = null
     error = ''
+    pausedFormats = []
+    newByFormat = false
     if (!file) return
     fileName = file.name
     newDeckName = file.name.replace(/\.apkg$/i, '')
@@ -86,7 +92,14 @@
       ])
       const plan = await planApkgImport(
         pkg,
-        { target, importHistory, scheduler, dayStartHour },
+        {
+          target,
+          importHistory,
+          scheduler,
+          dayStartHour,
+          pausedFormats: [...pausedFormats],
+          newByFormat,
+        },
         existing,
         Date.now(),
         newId,
@@ -179,6 +192,8 @@
         </div>
       {/if}
     </fieldset>
+
+    <ApkgFormats formats={summary.formats} bind:paused={pausedFormats} bind:newByFormat />
 
     <div class="field">
       <label for={`${id}-scheduler`}>{t('apkg.scheduler')}</label>

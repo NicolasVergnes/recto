@@ -1,3 +1,4 @@
+import { byFormatOrder, cardFormat, formatName, type CardFormat, type FormatName } from './formats'
 import { stripHtml } from './text'
 import { renderCard } from './notes'
 import type { Card, Note, NoteType } from './types'
@@ -60,6 +61,8 @@ export interface BrowserFilter {
   q: string
   tag: string
   status: StatusFilter
+  /** M17: a card format key (formats.ts); empty or absent: every format. */
+  format?: string
 }
 
 export type SortKey = 'question' | 'answer' | 'deck' | 'status' | 'due' | 'created'
@@ -80,6 +83,7 @@ export function filterRows(rows: readonly BrowserRow[], f: BrowserFilter): Brows
   return rows.filter((row) => {
     if (decks && !decks.has(row.card.deckId)) return false
     if (f.tag && !row.note.tags.includes(f.tag)) return false
+    if (f.format && cardFormat(row.note, row.card).key !== f.format) return false
     if (f.status === 'flagged' ? row.card.flag === 0 : f.status && row.status !== f.status) {
       return false
     }
@@ -88,6 +92,16 @@ export function filterRows(rows: readonly BrowserRow[], f: BrowserFilter): Brows
     }
     return true
   })
+}
+
+/** The formats of the rows (M17), for the « Format de carte » filter. */
+export function rowFormats(rows: readonly BrowserRow[]): (FormatName & CardFormat)[] {
+  const formats = new Map<string, FormatName & CardFormat>()
+  for (const { note, card, noteType } of rows) {
+    const key = cardFormat(note, card).key
+    if (!formats.has(key)) formats.set(key, formatName(note, card, noteType))
+  }
+  return [...formats.values()].sort(byFormatOrder)
 }
 
 const collator = new Intl.Collator('fr', { sensitivity: 'base', numeric: true })

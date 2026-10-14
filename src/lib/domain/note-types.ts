@@ -131,6 +131,11 @@ export interface NoteTypeEditPlan {
   added: Card[]
   /** Removed fields that held something, with the number of notes losing that content. */
   lost: { field: string; notes: number }[]
+  /**
+   * Old template index → new one, for every template that keeps its cards (M17: the decks'
+   * paused formats follow it); a removed template, or one that changed kind or source, is absent.
+   */
+  templateMoves: Map<number, number>
 }
 
 /**
@@ -199,6 +204,7 @@ export function planNoteTypeEdit(
     removed: [],
     added: [],
     lost: [],
+    templateMoves: newTemplate,
   }
   const kept = new Set(edit.fields.map((f) => f.from))
   type.fields.forEach((field, i) => {

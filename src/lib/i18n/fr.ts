@@ -145,6 +145,8 @@ export const fr = {
     deck: 'Paquet',
     allDecks: 'Tous les paquets',
     allTags: 'Tous les tags',
+    format: 'Format de carte',
+    allFormats: 'Tous les formats',
     allStates: 'Tous les états',
     flagged: 'Avec drapeau',
     status: 'État',
@@ -208,6 +210,7 @@ export const fr = {
     basic: 'Basique',
     cardKind: 'Type de carte',
     classic: 'Classique',
+    basicClassic: 'Basique · classique',
     basicCloze: 'Basique · texte à trous',
     basicOcclusion: 'Basique · occlusion d’image',
     single: 'Génère une seule carte',
@@ -580,6 +583,14 @@ export const fr = {
     alternateSides: 'Interroger dans les deux sens (la carte est retournée après chaque réussite)',
     alternateHelp:
       'Une seule carte pour les deux sens. Après un échec, la carte est reposée dans le même sens : réessayer la même question est plus efficace. Les textes à trous, les masques et les types personnalisés gardent le sens de leurs modèles.',
+    formats: 'Formats de cartes à introduire',
+    formatsHelp:
+      'Décochez un format pour que ses nouvelles cartes attendent : par exemple « Carte → Nom » d’abord, « Nom ↔ Numéro » ensuite. Ses cartes déjà commencées restent révisées.',
+    formatFresh: '{n} nouvelle|{n} nouvelles',
+    formatStarted: '{n} commencée|{n} commencées',
+    newByFormat: 'Nouvelles cartes format par format',
+    newByFormatHelp:
+      'Toutes les nouvelles cartes d’un format avant celles du suivant, dans l’ordre des cartes du type de note.',
     allowSure: 'Bouton « Sûr » (+2 compartiments)',
     saved: 'Paramètres enregistrés',
     invalid: 'Paramètres invalides.',
@@ -744,6 +755,9 @@ export const fr = {
   },
   apkg: {
     cardsPerNote: '{n} carte par note|{n} cartes par note',
+    formats: 'Formats de cartes à introduire tout de suite',
+    formatsHelp:
+      'Décochez les formats à apprendre plus tard : leurs nouvelles cartes attendront, et vous les activerez dans les paramètres du paquet.',
     help: 'Paquets Anki au format « ancien » (collection.anki21 ou collection.anki2). Tout reste sur cet appareil.',
     reading: 'Lecture du paquet',
     notZip: 'Ce fichier n’est pas un paquet Anki (archive illisible).',

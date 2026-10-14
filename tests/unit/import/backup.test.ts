@@ -771,3 +771,29 @@ describe('card kinds (M14)', () => {
     }
   })
 })
+
+describe('card formats of decks (M17)', () => {
+  const zip = (files: Record<string, string>) =>
+    zipSync(Object.fromEntries(Object.entries(files).map(([k, v]) => [k, strToU8(v)])))
+  const manifest = (v: number) => JSON.stringify({ format: 'recto-backup', schemaVersion: v })
+
+  it('reads a version 6 backup with no format paused, and keeps the paused ones of a newer one', () => {
+    const deck = makeDeck({ name: 'D' }, 'd1', 10)
+    const { pausedFormats: _p, newByFormat: _n, ...old } = deck.settings
+    const v6 = JSON.stringify({ decks: [{ ...deck, settings: old }] })
+    expect(
+      parseBackup(zip({ 'manifest.json': manifest(6), 'data.json': v6 }), 7).data.decks,
+    ).toEqual([deck])
+    const paused = {
+      ...deck,
+      settings: { ...deck.settings, pausedFormats: ['t:1'], newByFormat: true },
+    }
+    const v7 = JSON.stringify({ decks: [paused] })
+    expect(
+      parseBackup(zip({ 'manifest.json': manifest(7), 'data.json': v7 }), 7).data.decks,
+    ).toEqual([paused])
+    expect(() => parseBackup(zip({ 'manifest.json': manifest(7), 'data.json': v7 }), 6)).toThrow(
+      BackupError,
+    )
+  })
+})

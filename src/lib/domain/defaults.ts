@@ -10,6 +10,8 @@ export function defaultDeckSettings(): DeckSettings {
     typedAnswer: false,
     autoplayAudio: true,
     alternateSides: true,
+    pausedFormats: [],
+    newByFormat: false,
     fsrs: {
       requestRetention: 0.9,
       maximumInterval: 365,
@@ -35,6 +37,15 @@ export function defaultDeckSettings(): DeckSettings {
 export function migrateDeckSettingsM13(settings: Record<string, unknown>): void {
   delete settings.burySiblings
   settings.newOrder = 'random'
+}
+
+/**
+ * M17 migration of stored deck settings (Dexie version 6): no format paused, new cards in the
+ * deck's order as before. Backups get the same defaults when read (`readSettings`).
+ */
+export function migrateDeckSettingsM17(settings: Record<string, unknown>): void {
+  if (!Array.isArray(settings.pausedFormats)) settings.pausedFormats = []
+  if (typeof settings.newByFormat !== 'boolean') settings.newByFormat = false
 }
 
 export interface NewDeckInput {

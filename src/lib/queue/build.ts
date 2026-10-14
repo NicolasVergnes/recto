@@ -4,7 +4,9 @@
  * each batch in a stable random order (seed = study day); decks interleaved round-robin (P5);
  * caps per deck and global (P6), which keep the weakest overdue cards (lowest R / box).
  * Cards of a note are neither buried nor spaced (M13): the random order spreads them.
+ * New cards of a paused format wait, and a deck may bring them in format after format (M17).
  */
+import type { CardFormat } from '../domain/formats'
 import type { Card, CardState, Deck } from '../domain/types'
 import { dayKey, dayStart, nextDayStart } from '../scheduler/day'
 import { seededShuffle } from './random'
@@ -27,6 +29,11 @@ export interface QueueInput {
   globalReviewsPerDay: number
   /** FSRS retrievability, null when not modelled. */
   retrievability: (card: Card, deck: Deck) => number | null
+  /**
+   * The format of a new card (M17), needed when a deck pauses formats or brings them in format
+   * after format; without it, every new card is introduced in the deck's order.
+   */
+  formatOf?: (card: Card) => CardFormat | undefined
 }
 
 export interface QueueCounts {
@@ -134,13 +141,23 @@ export function buildQueue(input: QueueInput): QueueResult {
   const reviews = roundRobin(reviewLists).slice(0, globalCap)
 
   // 3. New cards per deck, in the deck's order (random by default), capped by newPerDay minus
-  //    those seen today.
+  //    those seen today. Those of a paused format wait, leaving their places to the others; with
+  //    newByFormat, a format's cards come before those of the next one, in the deck's order (M17).
+  const formatOf = input.formatOf
   const newLists = decks.map((deck) => {
+    const paused = new Set(deck.settings.pausedFormats)
+    const waits = (c: Card) => {
+      const format = paused.size > 0 ? formatOf?.(c) : undefined
+      return !!format && paused.has(format.key)
+    }
     const fresh = eligible
-      .filter((c) => c.deckId === deck.id && c.state === 0)
+      .filter((c) => c.deckId === deck.id && c.state === 0 && !waits(c))
       .sort((a, b) => a.createdAt - b.createdAt || a.ord - b.ord || byId(a, b))
     const ordered =
       deck.settings.newOrder === 'random' ? seededShuffle(fresh, `${seed}:new:${deck.id}`) : fresh
+    // A stable sort: the deck's order stays within a format.
+    if (deck.settings.newByFormat && formatOf)
+      ordered.sort((a, b) => (formatOf(a)?.rank ?? 0) - (formatOf(b)?.rank ?? 0))
     const cap = Math.max(0, deck.settings.newPerDay - (newSeen.get(deck.id)?.size ?? 0))
     return ordered.slice(0, cap)
   })

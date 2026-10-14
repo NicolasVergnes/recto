@@ -5,6 +5,7 @@
   import { parseSteps, validateFsrsSettings } from '$lib/scheduler/fsrs'
   import { endSession } from '$lib/state/session.svelte'
   import { toast } from '$lib/state/toast.svelte'
+  import FormatFields from './deck/FormatFields.svelte'
   import FsrsFields from './deck/FsrsFields.svelte'
   import LeitnerFields from './deck/LeitnerFields.svelte'
   import SchedulerSwitch from './deck/SchedulerSwitch.svelte'
@@ -123,6 +124,11 @@
       ><input type="checkbox" bind:checked={settings.autoplayAudio} />
       {t('deckSettings.autoplay')}</label
     >
+    <FormatFields
+      deckId={deck.id}
+      bind:pausedFormats={settings.pausedFormats}
+      bind:newByFormat={settings.newByFormat}
+    />
 
     {#if deck.scheduler === 'fsrs'}
       <FsrsFields

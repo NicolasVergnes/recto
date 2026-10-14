@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { buildRow, cardStatus, filterRows, sortRows, type BrowserRow } from '$lib/domain/browse'
+import {
+  buildRow,
+  cardStatus,
+  filterRows,
+  rowFormats,
+  sortRows,
+  type BrowserRow,
+} from '$lib/domain/browse'
 import { makeCard } from '$lib/domain/defaults'
-import type { Note } from '$lib/domain/types'
+import type { Note, NoteType } from '$lib/domain/types'
 
 function note(
   id: string,
@@ -52,5 +59,41 @@ describe('card browser', () => {
     expect(ids(sortRows(rows, { key: 'created', dir: 1 }))).toEqual(['c3', 'c2', 'c1'])
     expect(ids(sortRows(rows, { key: 'answer', dir: 1 }))).toEqual(['c2', 'c1', 'c3'])
     expect(ids(sortRows(rows, { key: 'status', dir: 1 }))).toEqual(['c1', 'c2', 'c3'])
+  })
+})
+
+describe('card formats in the browser (M17)', () => {
+  const type: NoteType = {
+    id: 'dept',
+    name: 'Département',
+    fields: ['Nom', 'Numero'],
+    templates: [
+      { name: 'Nom → Numéro', front: '{{Nom}}', back: '{{Numero}}' },
+      { name: 'Numéro → Nom', front: '{{Numero}}', back: '{{Nom}}' },
+    ],
+    createdAt: 0,
+    updatedAt: 0,
+  }
+  const ain: Note = { ...note('n1', ['Ain', '01'], [], 'custom'), noteTypeId: 'dept' }
+  const lune = note('n2', ['La {{c1::Lune}}', ''], [], 'cloze')
+  const rows = [
+    buildRow(makeCard(ain, 1, 'a1', 0), ain, 'D', type),
+    buildRow(makeCard(ain, 0, 'a0', 0), ain, 'D', type),
+    buildRow(makeCard(lune, 0, 'l0', 0), lune, 'D'),
+  ]
+
+  it('lists the formats of the cards, by note type then template order', () => {
+    expect(rowFormats(rows)).toEqual([
+      { key: 'cloze', rank: 0, modelType: 'cloze' },
+      { key: 'dept:0', rank: 0, noteType: 'Département', template: 'Nom → Numéro' },
+      { key: 'dept:1', rank: 1, noteType: 'Département', template: 'Numéro → Nom' },
+    ])
+  })
+
+  it('filters the cards of a format', () => {
+    const f = { deckIds: null, q: '', tag: '', status: '' as const }
+    expect(filterRows(rows, { ...f, format: 'dept:1' }).map((r) => r.card.id)).toEqual(['a1'])
+    expect(filterRows(rows, { ...f, format: 'cloze' }).map((r) => r.card.id)).toEqual(['l0'])
+    expect(filterRows(rows, { ...f, format: '' })).toHaveLength(3)
   })
 })
