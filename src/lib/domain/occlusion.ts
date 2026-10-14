@@ -2,7 +2,7 @@
  * Image occlusion notes (V1): rectangular masks drawn on an image, one card per mask group.
  * Pure: no DOM. Fields of an `image_occlusion` note: [image, masks JSON, header, extra].
  */
-import { decodeEntities, escapeHtml } from './text'
+import { decodeEntities } from './text'
 
 export type OcclusionMode = 'hideAll' | 'hideOne'
 
@@ -107,27 +107,6 @@ export function maskLabels(o: Occlusion, n: number): string[] {
 }
 
 // ─── Anki (23.10+ « Image Occlusion » note type) ──────────────────────────────
-
-/** Anki writes normalised numbers without leading or trailing zeros: 0.25 → ".25", 0 → "0". */
-function ankiNumber(v: number): string {
-  const s = v.toFixed(4).replace(/0+$/, '').replace(/\.$/, '')
-  return s.replace(/^0(?=\.)/, '') || '0'
-}
-
-/**
- * Anki's occlusion field: one `{{cN::image-occlusion:rect:…}}` per mask joined with `<br>`;
- * `oi=1` ("occlude inactive") means hide all, guess one. Labels have no Anki equivalent.
- */
-export function occlusionToAnki(o: Occlusion): string {
-  const oi = o.mode === 'hideAll' ? ':oi=1' : ''
-  return o.masks
-    .map(
-      (m) =>
-        `{{c${m.n}::image-occlusion:rect:left=${ankiNumber(m.x)}:top=${ankiNumber(m.y)}` +
-        `:width=${ankiNumber(m.w)}:height=${ankiNumber(m.h)}${oi}}}`,
-    )
-    .join('<br>')
-}
 
 export interface AnkiOcclusionResult {
   occlusion: Occlusion
@@ -260,20 +239,8 @@ export function resizeMask(mask: OcclusionMask, dw: number, dh: number): Occlusi
 }
 
 /**
- * Mask answers written in Anki's Comments field by Recto's export, one line per group
- * (`2 : Lyon`, HTML-escaped, joined by `<br>`): Anki has no place for them.
- */
-export function labelsToAnkiComments(o: Occlusion): string {
-  return occlusionGroups(o)
-    .flatMap((n) => {
-      const labels = maskLabels(o, n)
-      return labels.length > 0 ? [`${n} : ${escapeHtml(labels.join(', '))}`] : []
-    })
-    .join('<br>')
-}
-
-/**
- * The answers written by `labelsToAnkiComments`, or null when the field holds anything else (a
+ * Mask answers in Anki's Comments field, one line per group (`2 : Lyon`, HTML-escaped, joined by
+ * `<br>`), as the deck-builder plugin and Recto's former export write them; or null when the field holds anything else (a
  * comment written in Anki stays a comment). Each answer goes to the first mask of its group.
  */
 export function labelsFromAnkiComments(o: Occlusion, comments: string): Occlusion | null {

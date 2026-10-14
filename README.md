@@ -4,7 +4,7 @@ Application de flashcards à répétition espacée : locale-first, hors ligne, s
 
 **Adresse : <https://nicolasvergnes.github.io/recto/>** — à activer une fois dans GitHub : _Settings → Pages → Source : GitHub Actions_ ; chaque fusion sur `main` republie ensuite l'application (`.github/workflows/pages.yml`).
 
-Statut : **V0 livrée** (jalons M0 à M5) ; **V1 (M6) en relecture** : occlusion d'image, export Anki, optimiseur FSRS, formules. Voir `docs/STATUS.md` et `CHANGELOG.md`.
+Statut : **V0 livrée** (jalons M0 à M5) ; **V1** : occlusion d'image, optimiseur FSRS, formules. Voir `docs/STATUS.md` et `CHANGELOG.md`.
 
 ## Installer sur Android
 
@@ -46,15 +46,11 @@ Toutes les données restent dans le navigateur de l'appareil : **la sauvegarde e
 
 Réimporter le même paquet met à jour les notes modifiées dans Anki au lieu de créer des doublons, et leurs cartes suivent : une carte est créée pour un trou ou un masque ajouté, supprimée (son historique de révisions est conservé) pour un trou ou un masque retiré, et les cartes qui restent gardent leur planification. Seule une note dont le type de note a changé dans Anki est laissée telle quelle et comptée parmi les doublons ignorés. Les notes « Image Occlusion » d'Anki (≥ 23.10) deviennent des occlusions d'image Recto.
 
-## Exporter vers Anki
-
-**Exporter (CSV, Anki)** sur la page d'un paquet (ou d'une sélection dans **Cartes**), format **Paquet Anki (.apkg)** ; toute la collection : **Paramètres › Sauvegarde › Exporter pour Anki (.apkg)**. Le fichier contient notes, cartes, planification, historique et médias ; dans Anki : _Fichier › Importer_. Vérifié avec le moteur d'Anki 26.9 ; les versions plus anciennes et AnkiDroid restent à essayer. Les cartes retirées arrivent suspendues ; les réponses des masques d'occlusion, qu'Anki ne sait pas afficher, sont gardées dans le champ « Comments » et reviennent si le paquet est réimporté dans Recto.
-
 ## Importer un tableur (CSV)
 
 **Importer → Fichier CSV ou TSV**. Séparateur détecté automatiquement (`,` `;` tabulation `|`), UTF-8. Colonnes par défaut : 1 → Recto, 2 → Verso, 3 → Extra ; une colonne `tags` et une colonne `deck` (`Parent::Enfant` pour un sous-paquet) sont reconnues. Un aperçu permet de changer le mappage et signale les doublons avant l'import. Des exemples sont dans `data/samples/`.
 
-L'export CSV (depuis un paquet, ou une sélection dans **Cartes**) produit `Recto;Verso;Extra;Tags;Paquet;Type`, lisible par Excel ; les médias n'y sont pas inclus et les occlusions d'image non plus (un message les compte) : pour tout garder, utiliser la sauvegarde ou l'export Anki.
+L'export CSV (depuis un paquet, ou une sélection dans **Cartes**) produit `Recto;Verso;Extra;Tags;Paquet;Type`, lisible par Excel ; les médias n'y sont pas inclus et les occlusions d'image non plus (un message les compte) : pour tout garder, utiliser la sauvegarde.
 
 ## Ce que Recto ne fait pas
 

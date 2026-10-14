@@ -119,8 +119,8 @@ OPEN_RE = re.compile(
     re.I,
 )
 
-# Types intégrés : identifiants, noms, champs et modèles de l'export .apkg de Recto
-# (src/lib/export/apkg.ts) ; le type « Question » est propre à ce plugin (4 champs : il reste un
+# Types intégrés : identifiants, noms, champs et modèles de l'ancien export .apkg de Recto
+# (retiré en M18) ; le type « Question » est propre à ce plugin (4 champs : il reste un
 # type personnalisé, une seule carte, jamais retournée).
 BASIC_ID = 1758758400001
 CLOZE_ID = 1758758400003
@@ -1046,7 +1046,7 @@ def _model_json(t: NoteType) -> dict:
         for i, f in enumerate(t.fields)
     ]
     # Deux sens (Recto M16) : Anki pose la face 1 et répond par la face 2 ; la marque rectoTwoWay
-    # rend l'option à Recto (src/lib/export/apkg.ts).
+    # rend l'option à Recto (src/lib/import/apkg-read.ts).
     tmpls = [
         {"name": n, "ord": i, "qfmt": q, "afmt": answer_of_face(a) if both else a, "bqfmt": "", "bafmt": "",
          "did": None, "bfont": "", "bsize": 0, **({"rectoTwoWay": True} if both else {})}

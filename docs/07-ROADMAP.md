@@ -186,3 +186,14 @@ Critères d'acceptation :
 - [x] Éditeur de types : un modèle déplacé garde sa pause, un modèle retiré ou changé de type la perd ; supprimer un type retire ses clés.
 - [x] Navigateur : filtre « Format de carte ».
 - [x] Tests unitaires et E2E ; `npm run verify` vert.
+
+## M18 — Plus simple : curseur en direct, moins de jargon, gestes réparés, Recto sans export Anki (demande de Nicolas, 2026-10-15)
+
+Hors roadmap initiale. Retours d'usage : l'utilisateur a besoin de quelque chose de simple, pas de codes techniques qu'il ne connaît pas ; il peut creuser dans les paramètres s'il le veut. Recto est un concurrent d'Anki, pas un complément : il en importe les paquets, il n'en écrit pas (ADR-012).
+
+Critères d'acceptation :
+- [x] Paramètres : le curseur « Taille du texte des cartes » s'applique pendant qu'on le déplace.
+- [x] Plus de codes de principes (« P6 ») ni de compartiments (« → C2 ») dans l'interface : l'aide des révisions par jour, les sources scientifiques et les boutons de révision Memory Box (l'échéance seule, comme en FSRS).
+- [x] Gestes en révision, réglage activé : toucher la carte affiche la réponse ; ensuite balayer à droite = Bien (Réussi), à gauche = Encore (Oublié) ; un geste trop court ou vertical ne note rien ; la carte suit le doigt ; un geste repris par le navigateur (défilement, bord d'écran) est abandonné proprement.
+- [x] Export `.apkg` retiré (dialogue d'export CSV seul, plus de bouton dans Paramètres) ; l'import des paquets Anki reste entier ; les mentions d'Anki se limitent à l'import.
+- [x] Tests unitaires et E2E (dont des gestes tactiles réels sur le profil mobile) ; `npm run verify` vert.

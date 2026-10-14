@@ -124,7 +124,7 @@ Comme dans le livret (« replacez la fiche dans le compartiment 1, derrière les
 
 ### 3.5 Prévisualisation
 
-`preview` renvoie pour chaque rating le compartiment cible et l'échéance, affichés sous le bouton au format `scheduler.boxTarget` : « → C1 · demain », « → C3 · dans 7 j », « → C4 · dans 30 j ».
+`preview` renvoie pour chaque rating le compartiment cible (`box`) et l'échéance ; seule l'échéance est affichée sous le bouton (« demain », « dans 7 j », « dans 30 j ») : le numéro du compartiment est du jargon (M18).
 
 ## 4. Changement de planificateur sur un paquet existant
 

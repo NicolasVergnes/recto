@@ -62,7 +62,7 @@ test('Anki formulas render in the preview, in review and in tiles, and the edito
   await page.keyboard.press('Enter')
   await expect(page.getByText(/^Dans le texte/)).toContainText('\\(x^2\\)')
   await expect(page.getByText(/^En bloc/)).toContainText('\\[\\frac{1}{2}\\]')
-  await expect(page.getByText(/^Syntaxes d’Anki/)).toContainText(
+  await expect(page.getByText(/^Autres syntaxes acceptées/)).toContainText(
     '[$]x^2[/$] et [$$]\\frac{1}{2}[/$$]',
   )
   await expect(page.getByText('L’aperçu affiche le résultat.')).toBeVisible()

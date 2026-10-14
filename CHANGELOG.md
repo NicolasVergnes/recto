@@ -4,6 +4,23 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 ## [Unreleased]
 
+### M18 — Plus simple
+
+#### Changed
+
+- Le curseur « Taille du texte des cartes » s'applique pendant qu'on le déplace.
+- Plus de codes techniques dans l'interface : « P6 » dans l'aide des révisions par jour, « P1… » dans les sources scientifiques, « → C2 » sous les boutons Memory Box (l'échéance seule, comme en FSRS).
+- Gestes en révision : toucher la carte affiche la réponse ; la carte suit le doigt ; balayer à droite = Bien, à gauche = Encore.
+- Les mentions d'Anki se limitent à l'import de ses paquets.
+
+#### Fixed
+
+- Balayage en révision sur téléphone : le geste n'est plus perdu quand le navigateur l'interrompt ou quand il commence sur la question.
+
+#### Removed
+
+- Export vers Anki (`.apkg`), depuis un paquet, une sélection ou Paramètres (ADR-012). L'import des paquets Anki reste ; pour tout garder, la sauvegarde `.recto.zip`.
+
 ### Suppression d'un paquet : sauvegarde proposée
 
 #### Changed

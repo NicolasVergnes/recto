@@ -111,7 +111,7 @@ export interface Note {
   masks?: string[]             // custom seulement (M14) : masques JSON (§2.1) de chaque champ image d'une carte
                                // d'occlusion, alignés sur `fields` (vides pour les autres) ; absents sans masque
   source?: string
-  sourceGuid?: string          // guid Anki à l'import (déduplication : `sourceGuid ?? id`, guid écrit par l'export .apkg, 05 §4)
+  sourceGuid?: string          // guid Anki à l'import (déduplication : `sourceGuid ?? id`, `id` étant le guid qu'écrivait l'export .apkg retiré en M18)
   createdAt: number
   updatedAt: number
 }
@@ -236,7 +236,7 @@ export interface NoteType {
   templates: CardTemplate[]  // au moins un ; ord d'une carte : indice de son modèle (+ 1000 × sous-indice, M14)
   sourceId?: number          // id du type Anki à l'import (réimport et réexport le réutilisent)
   anki?: { css?: string; latexPre?: string; latexPost?: string; sortField?: number }
-                             // M10 : style du type Anki, inutilisé par Recto, rendu par l'export .apkg
+                             // M10 : style du type Anki, inutilisé par Recto (rendu par l'export .apkg jusqu'à M18 ; gardé, aucune migration)
   createdAt: number
   updatedAt: number
 }

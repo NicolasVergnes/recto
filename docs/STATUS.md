@@ -1,16 +1,28 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-10-15 · Branche : `deck-delete-backup-optional` (à relire et fusionner) · **M13, M14, M16, M17 et le plugin `recto-deck-builder` 2.2.0 fusionnés sur `main` et publiés** (2026-10-14)
+Dernière mise à jour : 2026-10-15 · Branche : `m18-plus-simple` (à relire et fusionner) · M18 terminé · suppression de paquet avec sauvegarde proposée fusionnée sur `main` (2026-10-15) · M13, M14, M16, M17 et le plugin `recto-deck-builder` 2.2.0 publiés (2026-10-14)
 
 ## Jalon en cours
 
-Aucun : M13 à M17 sont terminés et fusionnés. Recto reste une PWA installable (décision du 2026-10-12). En attente, sans numéro ni date :
+Aucun : M18 est terminé, sur sa branche, à relire. Recto reste une PWA installable (décision du 2026-10-12). En attente, sans numéro ni date :
 
 - Application Android avec Capacitor (couche plateforme, projet `android/`, bouton retour, micro, sons, flux Maestro, APK de débogage en CI) ; l'identifiant d'application (`appId`) sera à décider à ce moment (proposition : `fr.nicolasvergnes.recto`).
 - Publication sur le Play Store (politique de confidentialité, signature, fiche, test fermé : 12 testeurs pendant 14 jours).
 - Synchronisation automatique PC ↔ Android (dossier, Drive ou Syncthing).
 
 ## Terminé
+
+### M18 — Plus simple : curseur en direct, moins de jargon, gestes réparés, Recto sans export Anki (2026-10-15)
+
+Retours de Nicolas : curseur de taille du texte appliqué au seul relâchement ; « P6 » et « → C2 » incompréhensibles pour un utilisateur ; balayage inopérant sur téléphone ; Recto concurrent d'Anki, pas complément (garder l'import, retirer l'export). Choix de Nicolas : retirer seulement les codes P et C (pas de pli « Réglages avancés ») ; toucher la carte affiche la réponse quand les gestes sont activés.
+
+Critères :
+- [x] Curseur en direct : `oninput` (`DisplaySection.svelte`), le réglage s'écrit à chaque pas.
+- [x] Codes retirés : « (P6) » de `settings.globalReviewsHelp`, « — P1… » de `ui/sources.ts`, `scheduler.boxTarget` supprimé (Memory Box : l'échéance seule sous les boutons, comme FSRS ; `PreviewItem.box` gardé) — `leitner.test.ts`, `review.spec.ts` › « Memory Box decks show the due date, not the box ».
+- [x] Gestes : action `ui/review/gestures.ts` (capture du pointeur, `pointercancel`, `isPrimary`, contrôles de la carte exclus, carte qui suit le doigt, retour sans glissement après une note) — `gestures.spec.ts` (profil mobile, vrais événements tactiles par CDP : toucher, geste vertical, trop court, gauche = Encore, diagonal, droite = Bien).
+- [x] Export `.apkg` retiré (ADR-012) : `export/apkg*.ts`, `db/export-apkg.ts`, `ui/export/`, leurs tests, `tests/interop/`, `occlusionToAnki` et `labelsToAnkiComments` ; dialogue d'export CSV seul (« Exporter (CSV) ») ; e2e CSV déplacé dans `export-csv.spec.ts`, qui vérifie aussi que Paramètres ne mentionne plus Anki. Couverture de `src/lib/import` toujours ≥ 90 % sans les tests de l'export.
+- [x] Mentions d'Anki : « comme Anki » (début de journée), « Syntaxes d'Anki » (formules, devenu « Autres syntaxes acceptées »), aides des types de notes ; restent celles de l'import.
+- [x] Docs : SPEC, 02, 03, 04, 05 §4, 07 (M18), 08 (ADR-012), README, plugin (commentaires seulement, format inchangé).
 
 ### Suppression d'un paquet : sauvegarde proposée (2026-10-15)
 
@@ -350,13 +362,16 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 - Composants de plus de 200 lignes restants : `Heatmap.svelte` (271), `ApkgImport.svelte` (264), `ColumnChart.svelte` (210), `CardMosaic.svelte` (203), `Editor.svelte` (202). `Cards.svelte` est repassé sous 200 lignes en M17 (193). Une copie de travail M10 a commencé l'extraction de la navigation clavier commune des deux graphiques : branche locale `wip/chart-keys` (`src/lib/ui/charts/keys.ts` et son test, non intégrés).
 - Optimiseur : évaluation sur les révisions mêmes de l'entraînement (pas de validation croisée, comme Anki) ; il fonctionne dans Firefox (M10) ; Safari non testé (le WebKit de Playwright refuse les `Blob` dans IndexedDB).
 - Les filtres avancés d'Anki (`furigana:`, `tts:`…) rendent la valeur brute ; `[latex]…[/latex]` reste en source (LaTeX en mode texte, que KaTeX ne rend pas).
-- Réimport Anki : un type dont on a réordonné ou modifié les champs dans Recto n'est plus reconnu (ses notes sont ignorées et comptées) ; un type dont Anki a changé les champs aussi. L'export rend le style d'un type importé, pas les options de ses champs (police, taille).
+- Réimport Anki : un type dont on a réordonné ou modifié les champs dans Recto n'est plus reconnu (ses notes sont ignorées et comptées) ; un type dont Anki a changé les champs aussi. Le style d'un type importé est gardé (`NoteType.anki`) sans plus servir depuis le retrait de l'export (M18).
 - CSV : l'export laisse de côté les notes des types personnalisés (pas de colonnes communes), alors que l'import sait désormais en créer.
-- E2E : Firefox et WebKit côte à côte se figent parfois quelques secondes (projets à 15 s d'attente) ; `export-apkg.spec.ts` (mobile) avait dépassé une fois son délai en M9, pas revu en M10.
+- E2E : Firefox et WebKit côte à côte se figent parfois quelques secondes (projets à 15 s d'attente) 
 - Couverture globale ≈ 92 % des lignes (seuils de 90 % appliqués au domaine : scheduler, queue, import) ; `db/`, `export/` et `domain/` couverts sans seuil.
 
 ## Décisions prises en session
 
+- 2026-10-15 (M18) : le balayage marchait dans l'émulation mobile de Chromium une fois la réponse affichée ; la panne sur téléphone vient le plus probablement d'un balayage tenté sur la question (sans effet), du réglage propre à chaque appareil (désactivé par défaut) ou d'un geste repris par le navigateur. D'où : sur la carte cachée, un toucher ou un geste horizontal affiche la réponse (jamais de note sans réponse vue, P1) ; capture du pointeur et `pointercancel`. Alternative écartée : `touch-action: none` (empêcherait de faire défiler une longue carte).
+- 2026-10-15 (M18) : le numéro de compartiment reste visible là où l'on creuse (réglages du paquet, statistiques, infos de la carte), plus sous les boutons de révision.
+- 2026-10-15 (M18) : retrait de l'export `.apkg` sans migration : `NoteType.anki` reste stocké ; l'import garde `sourceGuid ?? id` (les fichiers exportés autrefois par Recto se réimportent sans doublons). Les cas d'import que seuls les tests de l'export couvraient (formules, heure d'été, aller-retour) ne sont plus testés de bout en bout ; la couverture du dossier `import` reste au-dessus du seuil.
 - 2026-10-15 : la sauvegarde avant suppression d'un paquet est **proposée** (case décochée par défaut), plus imposée (demande de Nicolas) ; la case est remise à décochée à chaque ouverture. « Tout effacer » garde sa case cochée par défaut (tout disparaît, double confirmation) ; la fusion de paquets ne télécharge toujours rien.
 - 2026-10-14 (M17) : un format désigne un modèle par son **indice** (`<noteTypeId>:<i>`) ; l'éditeur de types réécrit les clés des paquets dans la même transaction (déplacé : suit ; retiré ou changé de type : perdu). Alternative écartée : un identifiant stable par modèle (migration de tous les types, identifiants différents d'un appareil à l'autre pour la fusion).
 - 2026-10-14 (M17) : la pause et l'ordre valent pour les cartes **du paquet lui-même** (un sous-paquet a ses réglages, comme `newPerDay`) ; à l'import, ils s'appliquent à tous les paquets créés ou remplis. Un réimport ajoute des pauses, n'en retire jamais.
@@ -522,6 +537,8 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 - Chromium ne passe pas la requête du favicon SVG par le service worker : hors ligne, la console signale l'échec de `logo.svg` (sans effet sur l'application, les icônes du manifeste sont précachées).
 
 ## À vérifier manuellement par Nicolas
+
+- M18 — Sur le téléphone : activer « Gestes en révision » **dans les Paramètres du téléphone** (réglage propre à chaque appareil), réviser : toucher la carte affiche la réponse, la carte suit le doigt, balayer à droite note Bien (Réussi), à gauche Encore (Oublié). Déplacer le curseur de taille du texte : le pourcentage et le texte changent pendant le geste. Les vérifications ci-dessous qui exportent vers Anki (M6, M10, M14, M16) sont caduques.
 
 - M17 — Importer `paquets/departements.apkg` en ne gardant que « Carte → Nom » ; réviser quelques jours ; puis, dans les paramètres du paquet, cocher « Nom ↔ Numéro » : ses nouvelles cartes arrivent, les cartes de la carte continuent. Essayer « Nouvelles cartes format par format » et le filtre « Format de carte » du navigateur. Sur le paquet déjà importé, les trois formats sont cochés : décocher ceux à garder pour plus tard.
 

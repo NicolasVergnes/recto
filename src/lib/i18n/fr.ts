@@ -251,7 +251,7 @@ export const fr = {
     mathHelp: 'Écrire une formule (LaTeX)',
     mathInline: 'Dans le texte : \\(x^2\\)',
     mathDisplay: 'En bloc, centrée : \\[\\frac{1}{2}\\]',
-    mathAnki: 'Syntaxes d’Anki acceptées : [$]x^2[/$] et [$$]\\frac{1}{2}[/$$]',
+    mathAlt: 'Autres syntaxes acceptées : [$]x^2[/$] et [$$]\\frac{1}{2}[/$$]',
     mathPreview: 'L’aperçu affiche le résultat.',
     preview: 'Aperçu ({n})',
     cardN: 'Carte {n}',
@@ -272,7 +272,7 @@ export const fr = {
   },
   noteTypes: {
     title: 'Types de notes',
-    help: 'Un type de note a des champs nommés et des modèles de cartes ; chaque carte a son type : classique, texte à trous ou occlusion d’image. Les types importés d’un paquet Anki apparaissent ici.',
+    help: 'Un type de note a des champs nommés et des modèles de cartes ; chaque carte a son type : classique, texte à trous ou occlusion d’image. Les types des paquets importés apparaissent ici.',
     builtIn: 'Intégré : une carte, au choix classique, texte à trous ou occlusion d’image.',
     empty: 'Aucun type personnalisé pour l’instant.',
     new: 'Nouveau type',
@@ -366,7 +366,6 @@ export const fr = {
     retentionHelp:
       '90 % : vous oublierez une carte sur dix à chaque révision. Au-dessus de 95 %, la charge explose.',
     box: 'Compartiment {n}',
-    boxTarget: '→ C{n} · {when}',
   },
   states: {
     new: 'Nouvelle',
@@ -425,7 +424,7 @@ export const fr = {
     title: 'Paramètres',
     noteTypes: 'Types de notes',
     noteTypesHelp:
-      'Champs et modèles de cartes des types personnalisés, dont ceux importés d’Anki.',
+      'Champs et modèles de cartes des types personnalisés, y compris ceux des paquets importés.',
     manageNoteTypes: 'Gérer les types de notes',
     display: 'Affichage',
     theme: 'Thème',
@@ -435,7 +434,7 @@ export const fr = {
     fontScale: 'Taille du texte des cartes : {pct} %',
     dayStart: 'Début de la journée',
     dayStartHelp:
-      'Les cartes du jour sont celles dues avant cette heure, le lendemain (04:00 par défaut, comme Anki).',
+      'Les cartes du jour sont celles dues avant cette heure, le lendemain (04:00 par défaut).',
     language: 'Langue : français.',
     backup: 'Sauvegarde',
     lastBackup: 'Dernière sauvegarde : {date}.',
@@ -476,8 +475,9 @@ export const fr = {
     sources: 'Sources scientifiques',
     globalReviews: 'Révisions par jour, tous paquets confondus',
     globalReviewsHelp:
-      'Plafond global, en plus du plafond de chaque paquet (P6). Les retards sont rattrapés sans pénalité.',
-    swipe: 'Gestes de balayage en révision (droite : Bien, gauche : Encore)',
+      'Plafond global, en plus du plafond de chaque paquet. Les retards sont rattrapés sans pénalité.',
+    swipe:
+      'Gestes en révision (toucher la carte : réponse ; balayer à droite : Bien, à gauche : Encore)',
     flipStyle: 'Retournement des cartes dans la mosaïque',
     flipStyleHelp:
       'Animation quand une tuile du navigateur de cartes passe de la question à la réponse.',
@@ -741,18 +741,18 @@ export const fr = {
     mediaConflicts:
       '{n} média de la sauvegarde ignoré : un fichier du même nom, au contenu différent, existe déjà ici.|{n} médias de la sauvegarde ignorés : des fichiers du même nom, au contenu différent, existent déjà ici.',
   },
-  // `button`, `title` and `export` belong to the export dialog of both formats (CSV and Anki).
   exportCsv: {
-    button: 'Exporter (CSV, Anki)',
+    button: 'Exporter (CSV)',
     title: 'Exporter',
     help: 'Colonnes : Recto, Verso, Extra, Tags, Paquet, Type. Les médias ne sont pas inclus (leurs noms de fichiers sont conservés) : pour tout garder, utilisez « Sauvegarder maintenant ».',
     delimiter: 'Séparateur',
     semicolon: 'Point-virgule (Excel en français)',
     tab: 'Tabulation',
     export: 'Exporter',
+    exporting: 'Export en cours…',
     done: '{n} note exportée|{n} notes exportées',
     leftOut:
-      '{n} note d’occlusion d’image ou de type personnalisé non exportée : le CSV ne peut pas la décrire (utilisez le format Anki ou la sauvegarde).|{n} notes d’occlusion d’image ou de type personnalisé non exportées : le CSV ne peut pas les décrire (utilisez le format Anki ou la sauvegarde).',
+      '{n} note d’occlusion d’image ou de type personnalisé non exportée : le CSV ne peut pas la décrire (utilisez la sauvegarde).|{n} notes d’occlusion d’image ou de type personnalisé non exportées : le CSV ne peut pas les décrire (utilisez la sauvegarde).',
   },
   apkg: {
     cardsPerNote: '{n} carte par note|{n} cartes par note',
@@ -780,30 +780,6 @@ export const fr = {
     missingMedia:
       '{n} média référencé est absent du paquet.|{n} médias référencés sont absents du paquet.',
     duration: 'Durée : {s} s',
-  },
-  exportApkg: {
-    format: 'Format',
-    csv: 'CSV (tableur)',
-    apkg: 'Paquet Anki (.apkg)',
-    help: 'Notes, cartes, planification, historique de révisions et médias, pour Anki (Fichier › Importer). Les réglages des paquets et les compartiments Memory Box ne sont pas transmis.',
-    collection: 'Exporter pour Anki (.apkg)',
-    collectionHelp:
-      'Toute la collection au format Anki. Ce n’est pas une sauvegarde : pour tout garder, utilisez « Sauvegarder maintenant ».',
-    exporting: 'Export en cours…',
-    done: 'Paquet Anki exporté',
-    notes: '{n} note|{n} notes',
-    cards: '{n} carte|{n} cartes',
-    reviews: '{n} révision|{n} révisions',
-    media: '{n} média|{n} médias',
-    retired:
-      '{n} carte retirée exportée comme suspendue (Anki n’a pas d’équivalent).|{n} cartes retirées exportées comme suspendues (Anki n’a pas d’équivalent).',
-    leftOut:
-      '{n} carte à trous ou d’occlusion d’un type personnalisé reste dans Recto : Anki ne mélange pas ces cartes avec les cartes classiques d’un même type.|{n} cartes à trous ou d’occlusion de types personnalisés restent dans Recto : Anki ne mélange pas ces cartes avec les cartes classiques d’un même type.',
-    missingMedia: '{n} média introuvable, non inclus :|{n} médias introuvables, non inclus :',
-    missingCount: '{n} média introuvable, non inclus.|{n} médias introuvables, non inclus.',
-    more: '… et {n} autre|… et {n} autres',
-    announce: 'Paquet Anki exporté : {notes}, {cards}, {reviews}, {media}.',
-    failed: 'L’export Anki a échoué.',
   },
   common: {
     cancel: 'Annuler',

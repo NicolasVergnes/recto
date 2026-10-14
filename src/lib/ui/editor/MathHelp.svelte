@@ -8,7 +8,7 @@
   <ul class="muted small">
     <li>{t('editor.mathInline')}</li>
     <li>{t('editor.mathDisplay')}</li>
-    <li>{t('editor.mathAnki')}</li>
+    <li>{t('editor.mathAlt')}</li>
   </ul>
   <p class="muted small">{t('editor.mathPreview')}</p>
 </details>

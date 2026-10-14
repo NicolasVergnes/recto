@@ -4,7 +4,6 @@
   import { t } from '$lib/i18n'
   import { toast } from '$lib/state/toast.svelte'
   import { errorMessage } from '../errors'
-  import ExportCollectionApkg from '../export/ExportCollectionApkg.svelte'
   import { formatDateTime } from '../format'
 
   interface Props {
@@ -45,5 +44,4 @@
     </button>
     <a class="btn" href="#/import">{t('settings.restore')}</a>
   </div>
-  <ExportCollectionApkg />
 </section>

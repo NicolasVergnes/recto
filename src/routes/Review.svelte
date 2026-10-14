@@ -11,6 +11,7 @@
   import CardInfo from '$lib/ui/review/CardInfo.svelte'
   import { ReviewController } from '$lib/ui/review/controller.svelte'
   import Flashcard from '$lib/ui/review/Flashcard.svelte'
+  import { reviewGestures } from '$lib/ui/review/gestures'
   import { preventsDefault, reviewKeyAction } from '$lib/ui/review/keys'
   import LearningWait from '$lib/ui/review/LearningWait.svelte'
   import ReviewMenu from '$lib/ui/review/ReviewMenu.svelte'
@@ -22,7 +23,6 @@
   const c = new ReviewController()
   let answerBar: AnswerBar | undefined = $state()
   let showButton: HTMLButtonElement | undefined = $state()
-  let pointerX: number | null = null
 
   // Session start / resume, once per screen.
   $effect(() => {
@@ -73,17 +73,6 @@
     else if (action.kind === 'edit') edit()
     else c.replay()
   }
-
-  // Optional swipe gestures (04-UI §2.2): right = Good, left = Again.
-  function onPointerDown(e: PointerEvent) {
-    pointerX = prefs.swipeGestures && c.revealed ? e.clientX : null
-  }
-  function onPointerUp(e: PointerEvent) {
-    if (pointerX === null) return
-    const dx = e.clientX - pointerX
-    pointerX = null
-    if (Math.abs(dx) > 80) void c.rate(dx > 0 ? 3 : 1)
-  }
 </script>
 
 <svelte:window onkeydown={onKeydown} />
@@ -114,7 +103,16 @@
   {#if c.loading}
     <p class="page muted">{t('review.loading')}</p>
   {:else if c.card && c.rendered && c.deck}
-    <div class="stage" role="presentation" onpointerdown={onPointerDown} onpointerup={onPointerUp}>
+    <div
+      class="stage"
+      role="presentation"
+      use:reviewGestures={{
+        enabled: prefs.swipeGestures,
+        revealed: c.revealed,
+        onreveal: () => void reveal(),
+        onrate: (rating) => void c.rate(rating),
+      }}
+    >
       <Flashcard
         rendered={c.rendered}
         revealed={c.revealed}
@@ -188,5 +186,11 @@
     flex-direction: column;
     padding: var(--space-3);
     touch-action: pan-y pinch-zoom;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .stage {
+      transition: transform 0.15s ease-out;
+    }
   }
 </style>

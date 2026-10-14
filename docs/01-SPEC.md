@@ -30,7 +30,7 @@ Le fondement scientifique et l'audit concurrentiel sont dans `Dossier-Flashcards
 - Comptes utilisateurs, synchronisation serveur, partage en ligne, multi-utilisateurs.
 - Application native (Play Store), notifications push, widgets. (Prévu : empaquetage TWA/Capacitor en V2 sans changer le code.)
 - Génération de cartes par IA, OCR.
-- Occlusion d'image (V1), export `.apkg` (V1), optimisation des paramètres FSRS dans le navigateur (V1, voir 03-SCHEDULING).
+- Occlusion d'image (V1), optimisation des paramètres FSRS dans le navigateur (V1, voir 03-SCHEDULING).
 - Jeux de groupe du livret (Record, Poker, Ying Yang), gamification (points, séries, ligues).
 - Format `collection.anki21b` (zstd) : détecté et refusé avec un message expliquant comment exporter en format legacy depuis Anki.
 
@@ -76,7 +76,7 @@ Une **note** porte le contenu ; une note génère une ou plusieurs **cartes** (c
 |---|---|---|
 | `basic` | Recto, Verso, Extra (optionnel) | 1, posée dans les deux sens : retournée après chaque réussite si le paquet interroge dans les deux sens (défaut), sauf note « Ne jamais retourner » (M11, 03 §1.1) |
 | `cloze` | Texte, Extra | 1 par index `{{cN::…}}` (syntaxe Anki, indice optionnel `{{c1::réponse::indice}}`) |
-| `image_occlusion` (V1) | Image, masques, En-tête, Extra | 1 par groupe de masques rectangulaires (02 §2.1) ; importé/exporté vers le type « Image Occlusion » d'Anki ≥ 23.10 |
+| `image_occlusion` (V1) | Image, masques, En-tête, Extra | 1 par groupe de masques rectangulaires (02 §2.1) ; importé depuis le type « Image Occlusion » d'Anki ≥ 23.10 |
 | `custom` (M8) | Champs nommés de son type de note | Par modèle de carte (02 §2.2) : classique, 1 si le recto n'est pas vide, comme Anki ; à trous, 1 par trou de son champ ; occlusion, 1 par groupe de masques de son champ image (M14) ; types créés dans « Types de notes » ou importés d'Anki tels quels |
 
 Le type « Basique + inversé » (deux cartes jumelles par note) a été retiré en M11 : une carte doit pouvoir être vue dans les deux sens sans en créer une seconde.
@@ -109,7 +109,7 @@ Le type « Basique + inversé » (deux cartes jumelles par note) a été retiré
 
 - CSV d'un paquet ou de la sélection (Recto, Verso, Extra, Tags, Paquet, type ; médias non inclus, noms de fichiers conservés).
 - Sauvegarde complète `.recto.zip` : `manifest.json` (version du schéma, date, appareil), `data.json` (toutes les tables), `media/` (fichiers). Bouton unique « Sauvegarder maintenant » sur l'accueil ; rappel visible si la dernière sauvegarde date de plus de 7 jours.
-- V1 : export `.apkg` legacy.
+- Export `.apkg` : livré en V1, retiré en M18 (ADR-012) ; Recto est un concurrent d'Anki, pas un complément : il en importe les paquets, il n'en écrit pas.
 
 ### 5.6 Statistiques
 
@@ -139,7 +139,7 @@ Le type « Basique + inversé » (deux cartes jumelles par note) a été retiré
 
 ## 7. Architecture cible (résumé)
 
-Svelte 5 (runes) + Vite 8 + TypeScript strict ; Dexie 4 (IndexedDB) ; `ts-fsrs` 5 (FSRS-6) ; `fsrs-browser` (WASM, optimiseur, V1) ; `vite-plugin-pwa` ; `sql.js` (lecture et, en V1, écriture `.apkg`, chargé à la demande dans un worker) ; `katex` (formules, V1, chargé à la demande, ADR-009) ; `fflate` (zip) ; `papaparse` (CSV) ; `dompurify` (rendu HTML des champs). Aucun backend. Déploiement statique (GitHub Pages ou Cloudflare Pages). Détails et justification : 08-DECISIONS.
+Svelte 5 (runes) + Vite 8 + TypeScript strict ; Dexie 4 (IndexedDB) ; `ts-fsrs` 5 (FSRS-6) ; `fsrs-browser` (WASM, optimiseur, V1) ; `vite-plugin-pwa` ; `sql.js` (lecture `.apkg`, chargée à la demande dans un worker) ; `katex` (formules, V1, chargé à la demande, ADR-009) ; `fflate` (zip) ; `papaparse` (CSV) ; `dompurify` (rendu HTML des champs). Aucun backend. Déploiement statique (GitHub Pages ou Cloudflare Pages). Détails et justification : 08-DECISIONS.
 
 ```
 src/
@@ -151,7 +151,7 @@ src/
     scheduler/               fsrs.ts (adaptateur ts-fsrs), leitner.ts, index.ts (interface commune)
     queue/                   construction de la file du jour
     import/ csv.ts apkg.ts backup.ts
-    export/ csv.ts backup.ts apkg.ts (V1)
+    export/ csv.ts backup.ts
     math/                    rendu KaTeX, chargé à la demande (V1)
     media/                   redimensionnement, stockage, URL objets
     stats/                   calculs
@@ -163,7 +163,7 @@ tests/ unit/ (vitest) e2e/ (playwright)
 
 ## 8. Livrables et critères d'acceptation
 
-Les jalons M0 à M6 sont définis dans 07-ROADMAP avec leurs critères d'acceptation vérifiables. La V0 est livrée quand M0–M5 sont acceptés ; M6 (optimiseur, occlusion, export apkg) ouvre la V1.
+Les jalons M0 à M6 sont définis dans 07-ROADMAP avec leurs critères d'acceptation vérifiables. La V0 est livrée quand M0–M5 sont acceptés ; M6 (optimiseur, occlusion, export apkg, retiré en M18) ouvre la V1.
 
 ## 9. Glossaire
 

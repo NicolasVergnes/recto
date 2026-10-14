@@ -1,14 +1,12 @@
 <script lang="ts">
   import * as repo from '$lib/db/repo'
-  import type { ApkgExportReport } from '$lib/export/apkg'
   import { csvExportable, notesToCsv, type CsvDelimiter } from '$lib/export/csv'
   import { shareOrDownload, timestampedName } from '$lib/export/download'
   import { slugify } from '$lib/media/mime'
   import { t } from '$lib/i18n'
   import { toast } from '$lib/state/toast.svelte'
   import Dialog from './Dialog.svelte'
-  import { exportApkg, exportErrorMessage } from './export/apkg-export-client'
-  import ApkgExportSummary from './export/ApkgExportSummary.svelte'
+  import { errorMessage } from './errors'
 
   interface Props {
     open: boolean
@@ -21,10 +19,8 @@
   let { open = $bindable(), deckId, noteIds, name }: Props = $props()
   const id = $props.id()
   const TAB: CsvDelimiter = '\t'
-  let format = $state<'csv' | 'apkg'>('csv')
   let delimiter = $state<CsvDelimiter>(';')
   let busy = $state(false)
-  let report = $state.raw<ApkgExportReport | null>(null)
   /** The export in progress: closing the dialog (Annuler, Escape) aborts it, nothing is saved. */
   let running: AbortController | null = null
 
@@ -35,14 +31,13 @@
     running = null
     busy = false
     open = false
-    report = null
   }
 
   async function exportCsv(signal: AbortSignal) {
     const rows = await repo.exportRows(scope)
     signal.throwIfAborted()
     // Occlusion notes have no CSV form: say so rather than drop them silently, and never save
-    // a file with nothing in it (the Anki format keeps them).
+    // a file with nothing in it (the backup keeps them).
     const left = rows.filter((r) => !csvExportable(r.note)).length
     if (left > 0 && left === rows.length) {
       toast(t('exportCsv.leftOut', { n: left }), 'error')
@@ -66,14 +61,9 @@
     running = controller
     busy = true
     try {
-      if (format === 'csv') await exportCsv(controller.signal)
-      else {
-        const result = await exportApkg(scope, slugify(name), Date.now(), controller.signal)
-        // The dialog stays open on the report (missing media, retired cards).
-        if (!controller.signal.aborted) report = result
-      }
+      await exportCsv(controller.signal)
     } catch (e) {
-      if (!controller.signal.aborted) toast(exportErrorMessage(e), 'error')
+      if (!controller.signal.aborted) toast(errorMessage(e), 'error')
     } finally {
       if (running === controller) {
         running = null
@@ -84,49 +74,23 @@
 </script>
 
 <Dialog {open} title={t('exportCsv.title')} onclose={close}>
-  {#if !report}
-    <fieldset>
-      <legend>{t('exportApkg.format')}</legend>
-      <label class="check">
-        <input type="radio" name={`${id}-format`} value="csv" bind:group={format} />
-        {t('exportApkg.csv')}
-      </label>
-      <label class="check">
-        <input type="radio" name={`${id}-format`} value="apkg" bind:group={format} />
-        {t('exportApkg.apkg')}
-      </label>
-    </fieldset>
-    {#if format === 'csv'}
-      <p class="muted small">{t('exportCsv.help')}</p>
-      <fieldset>
-        <legend>{t('exportCsv.delimiter')}</legend>
-        <label class="check">
-          <input type="radio" name={`${id}-sep`} value=";" bind:group={delimiter} />
-          {t('exportCsv.semicolon')}
-        </label>
-        <label class="check">
-          <input type="radio" name={`${id}-sep`} value={TAB} bind:group={delimiter} />
-          {t('exportCsv.tab')}
-        </label>
-      </fieldset>
-    {:else}
-      <p class="muted small">{t('exportApkg.help')}</p>
-    {/if}
-    {#if busy}<progress aria-label={t('exportApkg.exporting')}></progress>{/if}
-  {/if}
-  <ApkgExportSummary {report} {busy} />
+  <p class="muted small">{t('exportCsv.help')}</p>
+  <fieldset>
+    <legend>{t('exportCsv.delimiter')}</legend>
+    <label class="check">
+      <input type="radio" name={`${id}-sep`} value=";" bind:group={delimiter} />
+      {t('exportCsv.semicolon')}
+    </label>
+    <label class="check">
+      <input type="radio" name={`${id}-sep`} value={TAB} bind:group={delimiter} />
+      {t('exportCsv.tab')}
+    </label>
+  </fieldset>
+  {#if busy}<progress aria-label={t('exportCsv.exporting')}></progress>{/if}
   {#snippet actions()}
-    {#if !report}
-      <button class="btn" type="button" onclick={close}>{t('common.cancel')}</button>
-    {/if}
-    <!-- Same element before and after the export: keyboard focus stays on it. -->
-    <button
-      class="btn btn-primary"
-      type="button"
-      aria-disabled={busy}
-      onclick={report ? close : run}
-    >
-      {t(report ? 'common.close' : busy ? 'exportApkg.exporting' : 'exportCsv.export')}
+    <button class="btn" type="button" onclick={close}>{t('common.cancel')}</button>
+    <button class="btn btn-primary" type="button" aria-disabled={busy} onclick={run}>
+      {t(busy ? 'exportCsv.exporting' : 'exportCsv.export')}
     </button>
   {/snippet}
 </Dialog>

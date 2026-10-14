@@ -8,7 +8,7 @@ export interface SchedulerOutcome {
 
 export interface PreviewItem {
   due: number
-  /** Human label under the rating button ("4 j", "→ C3 · dans 7 j"). */
+  /** Human label under the rating button ("4 j", "dans 7 j"). */
   label: string
   /** Leitner target box. */
   box?: number

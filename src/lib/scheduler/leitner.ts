@@ -101,7 +101,7 @@ export function createLeitnerScheduler(options: Pick<SchedulerOptions, 'dayStart
         out[rating] = {
           due: next.due,
           box: next.box,
-          label: t('scheduler.boxTarget', { n: next.box, when: when(next.due, now) }),
+          label: when(next.due, now),
         }
       }
       return out

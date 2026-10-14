@@ -10,7 +10,9 @@ describe('t()', () => {
     expect(t('home.due', { n: 1234 })).toBe(
       `${new Intl.NumberFormat('fr-FR').format(1234)} à revoir`,
     )
-    expect(t('scheduler.boxTarget', { n: 3, when: 'dans 7 j' })).toBe('→ C3 · dans 7 j')
+    expect(t('noteTypes.deleteConfirm', { name: 'Pays' })).toBe(
+      frenchSpacing('Supprimer le type « Pays » ? Aucune note ne l’utilise.'),
+    )
   })
 
   it('keeps unknown placeholders untouched', () => {

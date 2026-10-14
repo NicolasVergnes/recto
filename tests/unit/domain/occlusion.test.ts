@@ -9,7 +9,6 @@ import {
   occlusionFromAnki,
   occlusionGroups,
   occlusionOrds,
-  occlusionToAnki,
   parseOcclusion,
   rectFromPoints,
   removeMask,
@@ -99,28 +98,23 @@ describe('occlusion masks', () => {
 })
 
 describe('Anki image occlusion field', () => {
-  it('writes the syntax of Anki 23.10+ (checked with the Anki backend)', () => {
-    expect(occlusionToAnki(sample)).toBe(
-      '{{c1::image-occlusion:rect:left=.1:top=.2:width=.3:height=.4:oi=1}}<br>' +
-        '{{c3::image-occlusion:rect:left=.5:top=.5:width=.25:height=.125:oi=1}}<br>' +
-        '{{c3::image-occlusion:rect:left=0:top=0:width=.05:height=.05:oi=1}}',
-    )
-    expect(occlusionToAnki({ mode: 'hideOne', masks: [{ n: 2, x: 1, y: 0, w: 0, h: 1 }] })).toBe(
-      '{{c2::image-occlusion:rect:left=1:top=0:width=0:height=1}}',
-    )
-  })
+  // The syntax of Anki 23.10+ (normalised numbers without leading or trailing zeros).
+  const ankiField =
+    '{{c1::image-occlusion:rect:left=.1:top=.2:width=.3:height=.4:oi=1}}<br>' +
+    '{{c3::image-occlusion:rect:left=.5:top=.5:width=.25:height=.125:oi=1}}<br>' +
+    '{{c3::image-occlusion:rect:left=0:top=0:width=.05:height=.05:oi=1}}'
 
-  it('reads back what it writes (labels excepted)', () => {
-    const back = occlusionFromAnki(occlusionToAnki(sample))
+  it('reads the rectangles of Anki 23.10+ (labels excepted)', () => {
+    const back = occlusionFromAnki(ankiField)
     expect(back.converted).toBe(0)
     expect(back.skipped).toBe(0)
     expect(back.occlusion).toEqual({
       mode: 'hideAll',
       masks: sample.masks.map(({ n, x, y, w, h }) => ({ n, x, y, w, h })),
     })
-    expect(occlusionFromAnki(occlusionToAnki({ ...sample, mode: 'hideOne' })).occlusion.mode).toBe(
-      'hideOne',
-    )
+    expect(
+      occlusionFromAnki('{{c2::image-occlusion:rect:left=.5:top=0:width=.25:height=1}}').occlusion,
+    ).toEqual({ mode: 'hideOne', masks: [{ n: 2, x: 0.5, y: 0, w: 0.25, h: 1 }] })
   })
 
   it('converts ellipses and polygons to rectangles, skips rotated shapes and the rest', () => {
@@ -155,28 +149,25 @@ describe('Anki image occlusion field', () => {
 })
 
 describe('mask answers in Anki Comments', () => {
-  it('writes one line per labelled group and reads it back', async () => {
-    const { labelsFromAnkiComments, labelsToAnkiComments } = await import('$lib/domain/occlusion')
-    const labelled: Occlusion = {
+  it('reads one line per labelled group', async () => {
+    const { labelsFromAnkiComments } = await import('$lib/domain/occlusion')
+    const bare: Occlusion = {
       mode: 'hideAll',
       masks: [
-        { n: 1, x: 0.1, y: 0.1, w: 0.1, h: 0.1, label: 'a < b' },
+        { n: 1, x: 0.1, y: 0.1, w: 0.1, h: 0.1 },
         { n: 2, x: 0.3, y: 0.1, w: 0.1, h: 0.1 },
-        { n: 2, x: 0.5, y: 0.1, w: 0.1, h: 0.1, label: 'Lyon' },
+        { n: 2, x: 0.5, y: 0.1, w: 0.1, h: 0.1 },
         { n: 3, x: 0.7, y: 0.1, w: 0.1, h: 0.1 },
       ],
     }
-    const comments = labelsToAnkiComments(labelled)
-    expect(comments).toBe('1 : a &lt; b<br>2 : Lyon')
-    const bare: Occlusion = { ...labelled, masks: labelled.masks.map(({ label: _, ...m }) => m) }
-    // Each answer goes back to the first mask of its group.
+    const comments = '1 : a &lt; b<br>2 : Lyon'
+    // Each answer goes to the first mask of its group.
     expect(labelsFromAnkiComments(bare, comments)?.masks.map((m) => m.label)).toEqual([
       'a < b',
       'Lyon',
       undefined,
       undefined,
     ])
-    expect(labelsToAnkiComments(bare)).toBe('')
     // Anything else in Comments is a comment written in Anki: not answers.
     expect(labelsFromAnkiComments(bare, 'Voir le manuel')).toBeNull()
     expect(labelsFromAnkiComments(bare, '1 : Paris<br>une remarque')).toBeNull()

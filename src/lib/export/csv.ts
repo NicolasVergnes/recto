@@ -13,7 +13,7 @@ export const CSV_HEADER = ['Recto', 'Verso', 'Extra', 'Tags', 'Paquet', 'Type']
 
 /**
  * Image occlusion notes (masks are not text) and custom notes (their fields are not Recto, Verso,
- * Extra) have no CSV form: the Anki export and the backup keep them.
+ * Extra) have no CSV form: the backup keeps them.
  */
 export function csvExportable(note: Pick<Note, 'modelType'>): boolean {
   return note.modelType !== 'image_occlusion' && note.modelType !== 'custom'

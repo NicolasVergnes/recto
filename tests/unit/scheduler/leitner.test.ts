@@ -106,9 +106,9 @@ describe('Leitner transitions (03 §3.3)', () => {
 
   it('previews each rating with the target box', () => {
     const p = leitner.preview(card('c', { box: 2, state: 2 }), now, interval)
-    expect(p[1]).toMatchObject({ box: 1, due: now, label: '→ C1 · maintenant' })
-    expect(p[3]).toMatchObject({ box: 3, label: '→ C3 · dans 7 j' })
-    expect(p[4]).toMatchObject({ box: 4, label: '→ C4 · dans 30 j' })
+    expect(p[1]).toMatchObject({ box: 1, due: now, label: 'maintenant' })
+    expect(p[3]).toMatchObject({ box: 3, label: 'dans 7 j' })
+    expect(p[4]).toMatchObject({ box: 4, label: 'dans 30 j' })
     expect(
       leitner.preview(
         card('c', { box: 1, state: 2 }),
@@ -116,14 +116,14 @@ describe('Leitner transitions (03 §3.3)', () => {
         deck('d1', 'leitner', { leitner: { allowSure: false } }),
       )[3],
     ).toMatchObject({
-      label: '→ C2 · dans 2 j',
+      label: 'dans 2 j',
     })
     const tomorrow = leitner.preview(
       card('c'),
       now,
       deck('d1', 'leitner', { leitner: { intervals: [1, 1, 7, 30, 90, 180, 365] } }),
     )
-    expect(tomorrow[3]?.label).toBe('→ C2 · demain')
+    expect(tomorrow[3]?.label).toBe('demain')
   })
 })
 

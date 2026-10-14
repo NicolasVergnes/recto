@@ -61,7 +61,7 @@
       max="1.6"
       step="0.05"
       value={prefs.fontScale}
-      onchange={(e) => setFontScale(Number(e.currentTarget.value))}
+      oninput={(e) => setFontScale(Number(e.currentTarget.value))}
     />
   </div>
   <div class="field">

@@ -70,7 +70,9 @@ test('review: reveal, rate, undo and rate again', async ({ page }) => {
   await expect(page.getByText('0 nouvelle', { exact: true })).toBeVisible()
 })
 
-test('Memory Box decks show boxes under the rating buttons', async ({ page }) => {
+test('Memory Box decks show the due date, not the box, under the rating buttons', async ({
+  page,
+}) => {
   await deckWithNotes(page, 'Boîte', [['Soleil', 'Sun']])
   await page.goto('/#/')
   await page.getByRole('link', { name: 'Boîte', exact: true }).click()
@@ -88,8 +90,9 @@ test('Memory Box decks show boxes under the rating buttons', async ({ page }) =>
 
   await page.getByRole('link', { name: 'Réviser ce paquet' }).click()
   await page.getByRole('button', { name: 'Afficher la réponse' }).click()
-  await expect(page.getByRole('button', { name: /^Oublié/ })).toContainText('→ C1 · maintenant')
-  await expect(page.getByRole('button', { name: /^Réussi/ })).toContainText('→ C2 · dans 2 j')
+  await expect(page.getByRole('button', { name: /^Oublié/ })).toContainText('maintenant')
+  await expect(page.getByRole('button', { name: /^Réussi/ })).toContainText('dans 2 j')
+  await expect(page.getByRole('button', { name: /^Réussi/ })).not.toContainText('→')
   await expect(page.getByRole('button', { name: /^Sûr/ })).toBeVisible()
   await page.keyboard.press('2')
   await expect(page.getByRole('heading', { name: 'Séance terminée' })).toBeVisible()
