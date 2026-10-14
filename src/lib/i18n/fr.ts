@@ -133,10 +133,11 @@ export const fr = {
     merged: 'Paquets fusionnés',
     deleteTitle: 'Supprimer le paquet',
     deleteConfirm:
-      'Supprimer « {name} », ses sous-paquets, ses notes et leur historique (paquets : {decks}, notes : {notes}, cartes : {cards}) ? Une sauvegarde complète sera téléchargée juste avant.',
-    deleteHelp:
-      'Avant toute suppression, Recto télécharge une sauvegarde complète : rien n’est perdu définitivement.',
-    deleted: 'Paquet supprimé (sauvegarde téléchargée)',
+      'Supprimer « {name} », ses sous-paquets, ses notes et leur historique (paquets : {decks}, notes : {notes}, cartes : {cards}) ?',
+    deleteHelp: 'Avant de supprimer, Recto propose de télécharger une sauvegarde complète.',
+    backupFirst: 'Télécharger une sauvegarde avant de supprimer',
+    deleted: 'Paquet supprimé',
+    deletedWithBackup: 'Paquet supprimé (sauvegarde téléchargée)',
     review: 'Réviser ce paquet',
   },
   browser: {

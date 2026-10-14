@@ -66,7 +66,7 @@ Ces règles s'appliquent à tout le produit ; le skill `srs-rules` les détaille
 - Arborescence à un niveau (paquet → sous-paquet) suffisante en V0 ; nom et description facultative (l'emoji, prévu à l'origine, a été retiré en M11 : il faisait doublon avec le nom).
 - Paramètres par paquet : planificateur (`fsrs` | `leitner`), nouvelles cartes/jour (défaut 20), révisions/jour (défaut 200), ordre des nouvelles cartes (aléatoire par défaut depuis M13 | ordre d'ajout), rétention cible (FSRS), pas d'apprentissage (FSRS), intervalles des compartiments (Leitner), interrogation dans les deux sens (les deux planificateurs, défaut activé, M11), bouton « Sûr » (Leitner, défaut activé).
 - Changer de planificateur sur un paquet existant convertit l'état des cartes (règles en 03-SCHEDULING §4).
-- Actions : créer, renommer, déplacer, fusionner, exporter, supprimer (avec confirmation et compte de cartes ; le journal de révisions est conservé dans la sauvegarde exportée automatiquement avant suppression).
+- Actions : créer, renommer, déplacer, fusionner, exporter, supprimer (avec confirmation et compte de cartes ; une sauvegarde complète, qui conserve le journal de révisions, est proposée avant suppression : case à cocher, décochée par défaut).
 
 ### 5.2 Notes, cartes et types
 

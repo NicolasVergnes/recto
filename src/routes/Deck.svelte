@@ -11,6 +11,7 @@
   import DeckActions from '$lib/ui/deck/DeckActions.svelte'
   import DeckDetailsForm from '$lib/ui/deck/DeckDetailsForm.svelte'
   import DeckHeader from '$lib/ui/deck/DeckHeader.svelte'
+  import DeleteDeckDialog from '$lib/ui/deck/DeleteDeckDialog.svelte'
   import MergeDeckDialog from '$lib/ui/deck/MergeDeckDialog.svelte'
   import MoveDeckDialog from '$lib/ui/deck/MoveDeckDialog.svelte'
   import SubDeckList from '$lib/ui/deck/SubDeckList.svelte'
@@ -36,6 +37,9 @@
   let merging = $state(false)
   let moveTarget = $state('')
   let mergeTarget = $state('')
+  let deleting = $state(false)
+  let deleteMessage = $state('')
+  let backupFirst = $state(false)
 
   function count(d: Deck | undefined) {
     return d ? (counts.value.get(d.id)?.cards ?? 0) : 0
@@ -80,30 +84,32 @@
     }
   }
 
-  /** SPEC §5.1: a full backup is downloaded automatically before any deletion. */
-  async function remove() {
+  async function openRemove() {
     if (!deck) return
     const c = await repo.countDeckContents(deckId)
-    const ok = await confirmAction({
-      title: t('deck.deleteTitle'),
-      message: t('deck.deleteConfirm', {
-        name: deck.name,
-        decks: c.decks,
-        notes: c.notes,
-        cards: c.cards,
-      }),
-      confirmLabel: t('common.delete'),
-      danger: true,
+    deleteMessage = t('deck.deleteConfirm', {
+      name: deck.name,
+      decks: c.decks,
+      notes: c.notes,
+      cards: c.cards,
     })
-    if (!ok) return
+    backupFirst = false
+    deleting = true
+  }
+
+  /** SPEC §5.1: a full backup is offered, not forced, before the deletion. */
+  async function remove() {
+    deleting = false
     try {
-      const now = Date.now()
-      downloadBlob(
-        await createBackup(now),
-        timestampedName('recto-avant-suppression', BACKUP_EXTENSION, now),
-      )
+      if (backupFirst) {
+        const now = Date.now()
+        downloadBlob(
+          await createBackup(now),
+          timestampedName('recto-avant-suppression', BACKUP_EXTENSION, now),
+        )
+      }
       await repo.deleteDeck(deckId, Date.now())
-      toast(t('deck.deleted'))
+      toast(t(backupFirst ? 'deck.deletedWithBackup' : 'deck.deleted'))
       navigate('/')
     } catch (err) {
       toast(errorMessage(err), 'error')
@@ -134,7 +140,7 @@
       onmove={openMove}
       onmerge={openMerge}
       onexport={() => (exporting = true)}
-      onremove={remove}
+      onremove={openRemove}
     />
   </section>
 
@@ -164,5 +170,13 @@
     bind:target={mergeTarget}
     onmerge={merge}
     onclose={() => (merging = false)}
+  />
+
+  <DeleteDeckDialog
+    open={deleting}
+    message={deleteMessage}
+    bind:backupFirst
+    ondelete={remove}
+    onclose={() => (deleting = false)}
   />
 {/if}

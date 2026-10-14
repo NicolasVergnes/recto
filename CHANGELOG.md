@@ -4,6 +4,12 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 ## [Unreleased]
 
+### Suppression d'un paquet : sauvegarde proposée
+
+#### Changed
+
+- Supprimer un paquet ne télécharge plus d'office une sauvegarde `.recto.zip` : la fenêtre de confirmation propose « Télécharger une sauvegarde avant de supprimer » (décoché par défaut).
+
 ### M17 — Formats de cartes à introduire, par paquet
 
 #### Added

@@ -1,6 +1,6 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-10-14 · Branche : `main` · **M13, M14, M16, M17 et le plugin `recto-deck-builder` 2.2.0 fusionnés sur `main` et publiés** (2026-10-14)
+Dernière mise à jour : 2026-10-15 · Branche : `deck-delete-backup-optional` (à relire et fusionner) · **M13, M14, M16, M17 et le plugin `recto-deck-builder` 2.2.0 fusionnés sur `main` et publiés** (2026-10-14)
 
 ## Jalon en cours
 
@@ -11,6 +11,10 @@ Aucun : M13 à M17 sont terminés et fusionnés. Recto reste une PWA installable
 - Synchronisation automatique PC ↔ Android (dossier, Drive ou Syncthing).
 
 ## Terminé
+
+### Suppression d'un paquet : sauvegarde proposée (2026-10-15)
+
+Demande de Nicolas : ne plus forcer le téléchargement de l'archive `.recto.zip` avant de supprimer un paquet, mais le proposer. La fenêtre de suppression (`DeleteDeckDialog`, qui remplace la confirmation générique) montre les comptes et une case « Télécharger une sauvegarde avant de supprimer », décochée par défaut ; cochée, la sauvegarde est téléchargée avant la suppression, comme avant. SPEC §5.1 mise à jour. E2E `deck-delete.spec.ts` (sans puis avec sauvegarde).
 
 ### M17 — Formats de cartes à introduire, par paquet (2026-10-14)
 
@@ -305,7 +309,7 @@ Plan suivi :
 3. Médias : `src/lib/media/{mime,hash,resize,store,url,audio}.ts`, `src/lib/sanitize.ts` + tests (`tests/unit/media.test.ts`, `tests/unit/sanitize.test.ts`).
 4. Infrastructure UI : dialogue natif, confirmations, notifications, `CardContent` (HTML assaini + médias IndexedDB), liste virtualisée.
 5. Écrans : Accueil (paquets), Paquet, Éditeur, Navigateur de cartes, Paramètres.
-6. Sauvegarde complète `.recto.zip` (export) utilisée avant toute suppression de paquet et avant « Tout effacer ».
+6. Sauvegarde complète `.recto.zip` (export) utilisée avant toute suppression de paquet et avant « Tout effacer » (proposée seulement, depuis le 2026-10-15, pour un paquet).
 7. E2E 1 + e2e médias, assainissement, virtualisation, stockage.
 
 Critères :
@@ -353,6 +357,7 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## Décisions prises en session
 
+- 2026-10-15 : la sauvegarde avant suppression d'un paquet est **proposée** (case décochée par défaut), plus imposée (demande de Nicolas) ; la case est remise à décochée à chaque ouverture. « Tout effacer » garde sa case cochée par défaut (tout disparaît, double confirmation) ; la fusion de paquets ne télécharge toujours rien.
 - 2026-10-14 (M17) : un format désigne un modèle par son **indice** (`<noteTypeId>:<i>`) ; l'éditeur de types réécrit les clés des paquets dans la même transaction (déplacé : suit ; retiré ou changé de type : perdu). Alternative écartée : un identifiant stable par modèle (migration de tous les types, identifiants différents d'un appareil à l'autre pour la fusion).
 - 2026-10-14 (M17) : la pause et l'ordre valent pour les cartes **du paquet lui-même** (un sous-paquet a ses réglages, comme `newPerDay`) ; à l'import, ils s'appliquent à tous les paquets créés ou remplis. Un réimport ajoute des pauses, n'en retire jamais.
 - 2026-10-14 (M17) : la section n'apparaît qu'à partir de deux formats (un seul : « Nouvelles cartes par jour » suffit) ; le libellé du type de carte classique d'une note Basique devient « Basique · classique » (aussi dans le rapport d'analyse d'un paquet Anki).
@@ -561,7 +566,7 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 - M2 : une vraie séance sur téléphone (sons en lecture automatique, gestes de balayage activés dans Paramètres), passage d'un paquet en Memory Box mode calendrier, rappel « une nuit de sommeil » en fin de première séance.
 
-- M1 : créer un paquet, un sous-paquet, des notes des trois types ; coller une image (Ctrl+V) et glisser-déposer un fichier dans un champ ; enregistrer un son au micro (autorisation du navigateur) ; fusionner/supprimer un paquet (une sauvegarde `.recto.zip` doit se télécharger avant la suppression) ; thème sombre et taille de texte dans Paramètres.
+- M1 : créer un paquet, un sous-paquet, des notes des trois types ; coller une image (Ctrl+V) et glisser-déposer un fichier dans un champ ; enregistrer un son au micro (autorisation du navigateur) ; fusionner/supprimer un paquet (case « Télécharger une sauvegarde avant de supprimer » décochée : rien n'est téléchargé ; cochée : une sauvegarde `.recto.zip` se télécharge avant la suppression) ; thème sombre et taille de texte dans Paramètres.
 
 - `npm install && npm run dev` puis ouvrir http://localhost:5173 : navigation entre les écrans (vides pour l'instant), thème sombre du système respecté.
 - `npm run build && npm run preview -- --host` : installer la PWA depuis Chrome Android (HTTPS requis hors `localhost` : déployer sur Pages ou utiliser `mkcert`), couper le réseau, rouvrir l'app.
