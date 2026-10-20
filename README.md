@@ -1,6 +1,6 @@
 # Recto
 
-Application de flashcards à répétition espacée : locale-first, hors ligne, sans compte ni serveur. Deux planificateurs : FSRS-6 et la boîte à sept compartiments de la « Memory Box ». Import CSV et Anki (`.apkg`), sauvegarde complète en un clic.
+Application de flashcards à répétition espacée : locale-first, hors ligne, sans compte ni serveur. Deux planificateurs : FSRS-6 et la boîte de Leitner (sept compartiments comme la « Memory Box », cinq, ou votre propre boîte). Import CSV et Anki (`.apkg`), sauvegarde complète en un clic.
 
 **Adresse : <https://nicolasvergnes.github.io/recto/>** — à activer une fois dans GitHub : _Settings → Pages → Source : GitHub Actions_ ; chaque fusion sur `main` republie ensuite l'application (`.github/workflows/pages.yml`).
 
@@ -21,11 +21,12 @@ Sur ordinateur, Chrome et Edge proposent aussi l'installation (icône dans la ba
 
 - **Essayer avec un paquet d'exemple** (accueil) : 101 départements français, pour voir une session sans rien saisir.
 - **Créer un paquet**, puis **Ajouter** des notes : recto/verso, recto/verso + inverse, ou texte à trous (`{{c1::réponse}}`). Images (fichier, appareil photo sur Android, coller ou glisser) et sons (fichier ou micro) sont stockés sur l'appareil.
-- **Réviser aujourd'hui** : cherchez la réponse, affichez-la, puis notez honnêtement **Encore / Difficile / Bien / Facile** (FSRS) ou **Oublié / Réussi / Sûr** (Memory Box). Chaque bouton annonce le prochain intervalle.
+- **Réviser aujourd'hui** : cherchez la réponse, affichez-la, puis notez honnêtement **Encore / Difficile / Bien / Facile** (FSRS) ou **Oublié / Réussi / Sûr** (boîte de Leitner). Chaque bouton annonce le prochain intervalle.
 - Clavier : `Espace` ou `Entrée` affiche la réponse, `1` à `4` notent, `Ctrl+Z` annule la dernière note, `E` modifie la carte, `R` réécoute le son.
 - **Cartes** : recherche, filtres, modification et actions groupées ; « Affichage » passe de la liste à une **mosaïque** de tuiles (une face, retournée d'un clic ou avec « Retourner », ou recto et verso côte à côte) pour parcourir un paquet en vérifiant le rendu ; le style de retournement se choisit dans **Paramètres → Affichage** ; **Statistiques** : charge prévue sur 30 jours, rétention réelle, calendrier de l'année.
 - **Occlusion d'image** (type « Occlusion d'image » dans l'éditeur) : choisissez une image, tracez un rectangle sur chaque zone à cacher (ou « Ajouter un masque » puis les flèches du clavier), donnez éventuellement la réponse de chaque masque. Chaque masque — ou groupe de masques portant le même « Carte n° » — devient une carte : la zone demandée est cachée, puis s'ouvre quand vous affichez la réponse.
 - **Formules** : écrivez `\( x^2 \)` dans un champ pour une formule en ligne, `\[ … \]` pour une formule centrée (rendu KaTeX, aussi hors ligne). Les écritures d'Anki `[$]x^2[/$]` (en ligne) et `[$$]…[/$$]` (centrée) sont rendues de la même façon ; `[latex]…[/latex]`, du LaTeX en mode texte compilé par Anki, reste affiché tel quel. L'éditeur rappelle la syntaxe (« Écrire une formule (LaTeX) »).
+- **Boîte de Leitner** : à 7 compartiments (comme la Memory Box), à 5, ou **Ma boîte**, dont vous choisissez le nombre de compartiments et les jours (Paramètres → Planification). Le même écran choisit le planificateur des nouveaux paquets ; chaque paquet peut en changer dans ses paramètres.
 - **Paramètres de mémoire FSRS** : dans les paramètres d'un paquet FSRS, à partir de 1 000 révisions, « Optimiser » calcule des paramètres adaptés à votre historique et les compare aux actuels avant que vous les appliquiez.
 
 ## Sauvegarder
@@ -41,7 +42,7 @@ Toutes les données restent dans le navigateur de l'appareil : **la sauvegarde e
 
 1. Dans Anki (ordinateur) : _Fichier → Exporter_, format **Paquet de cartes Anki (`.apkg`)**, cocher **« Inclure les informations de planification »** et **« Inclure les médias »**, et **« Prise en charge des anciennes versions d'Anki »** (le nouveau format compressé n'est pas lu).
 2. Dans Recto : **Importer → Paquet Anki (.apkg)**, choisir le fichier. Un résumé s'affiche (paquets, types de notes, médias, révisions).
-3. Choisir : garder les paquets Anki ou tout mettre dans un seul paquet, le planificateur (FSRS ou Memory Box), la reprise de l'historique des révisions.
+3. Choisir : garder les paquets Anki ou tout mettre dans un seul paquet, le planificateur (FSRS ou une boîte de Leitner ; par défaut celui des Paramètres), la reprise de l'historique des révisions.
 4. Le rapport final liste les notes créées, les types de notes convertis et les médias manquants.
 
 Réimporter le même paquet met à jour les notes modifiées dans Anki au lieu de créer des doublons, et leurs cartes suivent : une carte est créée pour un trou ou un masque ajouté, supprimée (son historique de révisions est conservé) pour un trou ou un masque retiré, et les cartes qui restent gardent leur planification. Seule une note dont le type de note a changé dans Anki est laissée telle quelle et comptée parmi les doublons ignorés. Les notes « Image Occlusion » d'Anki (≥ 23.10) deviennent des occlusions d'image Recto.

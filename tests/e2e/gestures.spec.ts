@@ -42,8 +42,8 @@ test('on a phone, touch the card to show the answer, swipe left for Again, right
   await page.getByRole('button', { name: 'Créer un paquet' }).click()
   await page.getByRole('dialog').getByLabel('Nom').fill('Gestes')
   await page.getByRole('dialog').getByRole('button', { name: 'Créer' }).click()
-  // Memory Box: Again brings the card back at once, Good sends it two days away.
-  await page.getByLabel('Memory Box (7 compartiments)').check()
+  // Boîte de Leitner: Again brings the card back at once, Good sends it two days away.
+  await page.getByLabel('Boîte de Leitner (7 compartiments)', { exact: true }).check()
   await page.getByRole('button', { name: 'Changer de planificateur' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Changer de planificateur' }).click()
   await expect(page.getByText(/Planificateur changé/)).toBeVisible()

@@ -64,7 +64,7 @@ export default defineConfig({
 ## 4. Stratégie de tests
 
 ### Unitaires (Vitest)
-- `scheduler/leitner` : toutes les transitions de 03-SCHEDULING §3.3, intervalles par compartiment, alternance des faces, C7.
+- `scheduler/leitner` : toutes les transitions de 03-SCHEDULING §3.3, intervalles par compartiment, alternance des faces, dernier compartiment ; boîtes à 5 et à 3 compartiments (M19). `domain/leitner` : modèles, validation de Ma boîte, compartiment déduit de la stabilité, changement de boîte (M19).
 - `scheduler/fsrs` : conversions aller-retour Card ↔ ts-fsrs, `preview` cohérent avec `answer`, rollback restaure l'état, paramètres invalides rejetés.
 - `queue` : cas de 03-SCHEDULING §5 (plafonds, entrelacement, ordre aléatoire stable de chaque lot, plafond qui garde les R les plus basses, changement de jour à 04:00, fuseau Europe/Paris et heure d'été).
 - `import/csv` : séparateurs, BOM, en-tête, doublons, cloze auto, rapport.

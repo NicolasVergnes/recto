@@ -9,6 +9,7 @@
   import DangerSection from '$lib/ui/settings/DangerSection.svelte'
   import DisplaySection from '$lib/ui/settings/DisplaySection.svelte'
   import NoteTypesSection from '$lib/ui/settings/NoteTypesSection.svelte'
+  import SchedulingSection from '$lib/ui/settings/SchedulingSection.svelte'
   import StorageSection from '$lib/ui/settings/StorageSection.svelte'
   import WipeDialog from '$lib/ui/settings/WipeDialog.svelte'
 
@@ -49,6 +50,7 @@
 <section class="page stack settings">
   <h1 tabindex="-1">{t('settings.title')}</h1>
   <DisplaySection {globalReviews} onsaveglobalreviews={saveGlobalReviews} />
+  <SchedulingSection />
   <NoteTypesSection />
   <BackupSection {lastBackupAt} onrefresh={refresh} />
   <StorageSection {info} onrefresh={refresh} />

@@ -185,7 +185,7 @@ export function roundParams(raw: ArrayLike<number>): number[] | null {
 
 /** Intervals (days) of a new card always answered Good; sub-day learning steps are skipped. */
 export function sampleIntervals(settings: FsrsSettings, now: number, count = 4): number[] {
-  const deck = makeDeck({ name: 'sample', scheduler: 'fsrs' }, 'sample', now)
+  const deck = makeDeck({ name: 'sample' }, 'sample', now)
   deck.settings.fsrs = settings
   // dayStartHour only feeds the log's elapsedDays, not the intervals.
   const scheduler = createFsrsScheduler({ dayStartHour: 4, fuzz: false })

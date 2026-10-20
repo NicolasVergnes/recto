@@ -1,16 +1,41 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-10-20 · Branche : `fix-ci-e2e` (à relire et fusionner) · CI de nouveau verte, mosaïque réparée sur petit téléphone · M18 et la suppression de paquet avec sauvegarde proposée fusionnés et publiés (2026-10-15) · M13, M14, M16, M17 et le plugin `recto-deck-builder` 2.2.0 publiés (2026-10-14)
+Dernière mise à jour : 2026-10-21 · Branche : `m19-boite-de-leitner` (à relire et fusionner ; créée depuis `fix-ci-e2e`, elle la contient) · M19 terminé · `fix-ci-e2e` à relire et fusionner (ou fusionner directement `m19-boite-de-leitner`) · M18 fusionné et publié (2026-10-15)
 
 ## Jalon en cours
 
-Aucun : M18 est fusionné sur `main` et publié ; le correctif de la CI est sur sa branche, à relire. Recto reste une PWA installable (décision du 2026-10-12). En attente, sans numéro ni date :
+Aucun : M19 est terminé, sur sa branche, à relire. Recto reste une PWA installable (décision du 2026-10-12). En attente, sans numéro ni date :
 
 - Application Android avec Capacitor (couche plateforme, projet `android/`, bouton retour, micro, sons, flux Maestro, APK de débogage en CI) ; l'identifiant d'application (`appId`) sera à décider à ce moment (proposition : `fr.nicolasvergnes.recto`).
 - Publication sur le Play Store (politique de confidentialité, signature, fiche, test fermé : 12 testeurs pendant 14 jours).
 - Synchronisation automatique PC ↔ Android (dossier, Drive ou Syncthing).
 
 ## Terminé
+
+### M19 — Boîte de Leitner : trois modèles, un défaut pour les nouveaux paquets (2026-10-21)
+
+Demande de Nicolas : renommer « Memory Box » en « Boîte de Leitner » (la Memory Box reste dans les sources) ; boîtes à 7 compartiments (défaut, 1, 2, 7, 30, 90, 180, 365 j), à 5 ou personnelle ; dans les Paramètres, le planificateur des nouveaux paquets ; chaque paquet peut changer de modèle ensuite. Choix de Nicolas : **une seule** boîte personnelle (« Ma boîte », dans les Paramètres) ; le choix par défaut inclut FSRS et vaut aussi pour les imports ; boîte à 5 compartiments : 1, 3, 7, 14, 30 j. ADR-013.
+
+Plan suivi :
+
+1. Domaine (tests d'abord) : `src/lib/domain/leitner.ts` (modèles, `intervalsOf`, `boxError`/`isBox`, `boxFromStability(stability, intervals)` déplacée depuis le planificateur, `capBox`, `customBoxOf`) ; `scheduler/leitner.ts` plafonné à `intervals.length` (`MAX_BOX` retiré) ; `LeitnerSettings.model` ; `makeDeck` reçoit le modèle (`ModelChoice`) au lieu du planificateur.
+2. Données : Dexie version 7 (`migrateDeckSettingsM19`, Ma boîte initialisée par `customBoxOf`), `SCHEMA_VERSION` 8 (`readLeitner` dans `validate.ts`, Ma boîte dans `parseBackup`), réglages partagés `newDeckModel` et `leitnerCustom`.
+3. Base : `switchDeckModel` (remplace `switchScheduler`), `saveCustomBox`, `newDeckModel()` lu par `createDeck`.
+4. Imports et statistiques : `DeckResolver` et options `model` (CSV, paquet d'exemple, `.apkg`), composant `ModelSelect` (import `.apkg`, Paramètres), `boxDistribution` à N compartiments.
+5. Écran du paquet : `SchedulerSwitch` (quatre choix, message de confirmation par passage), `LeitnerFields` (jours en lecture seule, lien « Régler Ma boîte »), clé `{#key}` de `Deck.svelte` avec le modèle.
+6. Paramètres : `src/lib/ui/settings/SchedulingSection.svelte` (146 lignes).
+7. Renommage (`fr.ts`, commentaires), source Memory Box (`ui/sources.ts`), plugin 2.2.1.
+8. E2E : `review.spec.ts`, `gestures.spec.ts`, nouveau `tests/e2e/leitner-models.spec.ts`.
+9. Docs : SPEC, 00, 02, 03, 04 (§2.10), 05, 06, 07 (M19), 08 (ADR-013), README, skill `srs-rules`.
+
+Critères (07-ROADMAP M19) :
+
+- [x] Plus de « Memory Box » dans l'interface, sauf la source — E2E `leitner-models.spec.ts` › « the scientific sources still cite the Memory Box » ; `grep` de `src/` : seule `ui/sources.ts` et un commentaire.
+- [x] Trois boîtes, les deux premières fixes, Ma boîte suivie par ses paquets — `tests/unit/domain/leitner.test.ts`, `tests/unit/scheduler/leitner.test.ts` › « boxes of another size (M19) », `tests/unit/db/leitner-models.test.ts` › « saveCustomBox », E2E `leitner-models.spec.ts` › « new decks in five compartments, then « Ma boîte », followed by its decks » (bureau et mobile : 5 compartiments, « Réussi » dans 3 j, erreur d'ordre, Ma boîte à 3 compartiments, paquet qui suit sa modification).
+- [x] Planificateur des nouveaux paquets, imports compris — `settings.test.ts` › « schedules new decks with FSRS until another model is chosen (M19) », `leitner-models.test.ts` › « new decks », `csv.test.ts` › « creates the new deck only when a row has no deck », `apkg.test.ts` › « replays with the Leitner scheduler for Leitner decks ».
+- [x] Changer de boîte : compartiment gardé, au plus le dernier, échéance gardée ; FSRS → boîte — `leitner-models.test.ts` › « switchDeckModel », `misc.test.ts`, `study.test.ts`.
+- [x] Données — `migration.test.ts` › « opens a version 6 database: decks name their box, changed intervals become « Ma boîte » (M19) », « keeps an existing « Ma boîte » when it migrates (M19) » ; `backup.test.ts` › « Leitner models (M19) » ; `validate.test.ts` › « reads the box of a deck, named or not (M19) » ; `sync-merge.test.ts` › « shares the collection settings… » ; vérifié dans un vrai Chromium : une base IndexedDB en version 6 (paquet aux jours modifiés) s'ouvre en version 7, paquet en « Ma boîte de Leitner (7 compartiments) », `updatedAt` gardé, `leitnerCustom` créé.
+- [x] `npm run verify` vert : check 0 erreur 0 avertissement, lint, format, 580 tests unitaires (couverture 91,7 % des lignes), build, E2E 123 réussis et 3 ignorés (bureau et mobile). Paramètres › Planification et paramètres d'un paquet lisibles sur ordinateur et téléphone (captures).
 
 ### CI rouge depuis M18 : deux E2E réparés, mosaïque sur petit téléphone (2026-10-20)
 
@@ -370,7 +395,7 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 ## Reste à faire / dettes
 
 - V2, en attente (« Jalon en cours ») : synchronisation automatique PC ↔ Android et application Android (Capacitor). Les suppressions sont déjà enregistrées et suivies par la fusion de sauvegardes (M12) : seul le transport automatique manque.
-- Composants de plus de 200 lignes restants : `Heatmap.svelte` (271), `ApkgImport.svelte` (264), `ColumnChart.svelte` (210), `CardMosaic.svelte` (203), `Editor.svelte` (202). `Cards.svelte` est repassé sous 200 lignes en M17 (193). Une copie de travail M10 a commencé l'extraction de la navigation clavier commune des deux graphiques : branche locale `wip/chart-keys` (`src/lib/ui/charts/keys.ts` et son test, non intégrés).
+- Composants de plus de 200 lignes restants : `Heatmap.svelte` (271), `ApkgImport.svelte` (265, +1 en M19), `ColumnChart.svelte` (210), `CardMosaic.svelte` (203), `Editor.svelte` (202). `Cards.svelte` est repassé sous 200 lignes en M17 (193). Une copie de travail M10 a commencé l'extraction de la navigation clavier commune des deux graphiques : branche locale `wip/chart-keys` (`src/lib/ui/charts/keys.ts` et son test, non intégrés).
 - Optimiseur : évaluation sur les révisions mêmes de l'entraînement (pas de validation croisée, comme Anki) ; il fonctionne dans Firefox (M10) ; Safari non testé (le WebKit de Playwright refuse les `Blob` dans IndexedDB).
 - Les filtres avancés d'Anki (`furigana:`, `tts:`…) rendent la valeur brute ; `[latex]…[/latex]` reste en source (LaTeX en mode texte, que KaTeX ne rend pas).
 - Réimport Anki : un type dont on a réordonné ou modifié les champs dans Recto n'est plus reconnu (ses notes sont ignorées et comptées) ; un type dont Anki a changé les champs aussi. Le style d'un type importé est gardé (`NoteType.anki`) sans plus servir depuis le retrait de l'export (M18).
@@ -379,6 +404,13 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 - Couverture globale ≈ 92 % des lignes (seuils de 90 % appliqués au domaine : scheduler, queue, import) ; `db/`, `export/` et `domain/` couverts sans seuil.
 
 ## Décisions prises en session
+
+- 2026-10-21 (M19) : un paquet garde une copie des jours de sa boîte (`settings.leitner.intervals`) en plus de son nom (`model`) : planificateur, conversions et statistiques ne lisent que le paquet ; enregistrer Ma boîte recopie ses jours dans ses paquets, en une transaction. Alternative écartée : paquets qui ne référencent que leur modèle (un réglage global à passer à chaque planificateur, conversion et import). Cas rare accepté : après deux modifications de Ma boîte sur deux appareils à la fois, un paquet peut garder les jours de l'autre version jusqu'au prochain enregistrement.
+- 2026-10-21 (M19) : d'une boîte à l'autre (ou Ma boîte raccourcie), une carte garde le numéro de son compartiment, au plus le dernier, et son échéance — règle simple et prévisible. FSRS → boîte : compartiment de l'intervalle le plus proche de la stabilité (échelle logarithmique), une seule règle pour toutes les boîtes ; pour la boîte à 7, les seuils bougent un peu (1,41 / 3,74 / 14,5 / 52 / 127 / 256 j au lieu de 1,5 / 4 / 15 / 50 / 120 / 250).
+- 2026-10-21 (M19) : Ma boîte : 2 à 10 compartiments, jours entiers de 1 à 36 500, jamais plus courts que le précédent (espacement croissant, P4) ; un compartiment ajouté dure deux fois le précédent ; par défaut une copie de la boîte à 7. Une copie de paquet plus souple (2 à 10 nombres positifs) est acceptée à la lecture d'une sauvegarde, pour garder les jours réglés à la main avant M19.
+- 2026-10-21 (M19) : migration des jours réglés à la main (M9) : le paquet suit Ma boîte et garde ses jours ; Ma boîte reçoit ceux du paquet modifié le plus récemment (`updatedAt: 0`, une vraie Ma boîte d'un autre appareil l'emporte à la fusion) ; les autres paquets gardent les leurs jusqu'au prochain enregistrement de Ma boîte.
+- 2026-10-21 (M19) : les deux nouveaux réglages (`newDeckModel`, `leitnerCustom`) sont partagés entre appareils comme `dayStartHour` : la boîte suivie par des paquets doit être la même partout.
+- 2026-10-21 (M19) : plugin `recto-deck-builder` passé en 2.2.1 et zip reconstruit (le plan prévoyait de ne pas changer de version) : sa skill nommait encore « Memory Box » à l'import ; le zip contient aussi les commentaires de M18.
 
 - 2026-10-20 : quand la place manque sous les filtres de l'écran Cartes, la page défile et la liste garde ses 12rem ; alternative écartée : laisser la liste rétrécir (`min-height: 0`), qui ne montre plus qu'une tranche de tuile sur un petit téléphone, voire rien.
 - 2026-10-15 (M18) : le balayage marchait dans l'émulation mobile de Chromium une fois la réponse affichée ; la panne sur téléphone vient le plus probablement d'un balayage tenté sur la question (sans effet), du réglage propre à chaque appareil (désactivé par défaut) ou d'un geste repris par le navigateur. D'où : sur la carte cachée, un toucher ou un geste horizontal affiche la réponse (jamais de note sans réponse vue, P1) ; capture du pointeur et `pointercancel`. Alternative écartée : `touch-action: none` (empêcherait de faire défiler une longue carte).
@@ -549,6 +581,8 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 - Chromium ne passe pas la requête du favicon SVG par le service worker : hors ligne, la console signale l'échec de `logo.svg` (sans effet sur l'application, les icônes du manifeste sont précachées).
 
 ## À vérifier manuellement par Nicolas
+
+- M19 — Paramètres › Planification : choisir « Boîte de Leitner (5 compartiments) », créer un paquet (il est en 5 compartiments), importer un petit CSV (son paquet aussi) ; régler Ma boîte (par exemple 3 compartiments : 1, 4, 10 jours), passer un paquet sur « Ma boîte » (ses cartes gardent leur compartiment), modifier Ma boîte (confirmation avec le nombre de paquets). Un paquet Memory Box dont les intervalles avaient été changés à la main doit apparaître en « Ma boîte de Leitner » avec les mêmes jours. Paramètres › À propos › Sources : la Memory Box est citée. Sur le téléphone, la section Planification reste lisible. Téléverser le nouveau `tools/deck-builder/recto-deck-builder.zip` (2.2.1) dans l'application Claude.
 
 - Correctif du 2026-10-20 — Sur le téléphone, Cartes › Mosaïque puis Liste : faire défiler jusqu'en bas ; la dernière tuile (« Retourner », « Modifier ») et la dernière ligne restent au-dessus de la barre de navigation. Sur le PC, rien ne doit changer.
 

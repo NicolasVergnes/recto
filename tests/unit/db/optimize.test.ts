@@ -31,7 +31,7 @@ async function answerCard(deck: Deck, answers: number, spacing = DAY, imported =
 }
 
 async function deckWithAnswers(name: string, parentId: string | null, answers: number) {
-  const deck = await repo.createDeck({ name, parentId, scheduler: 'fsrs' }, now)
+  const deck = await repo.createDeck({ name, parentId }, now)
   await answerCard(deck, answers)
   return deck
 }
@@ -64,7 +64,7 @@ describe('deck review log for the optimizer', () => {
   })
 
   it('returns nothing for an empty deck', async () => {
-    const deck = await repo.createDeck({ name: 'Vide', scheduler: 'fsrs' }, now)
+    const deck = await repo.createDeck({ name: 'Vide' }, now)
     expect(await deckReviewCounts(deck.id)).toEqual({ total: 0, usable: 0 })
     expect((await loadDeckReviews(deck.id)).reviews).toEqual([])
   })

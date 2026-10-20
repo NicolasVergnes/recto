@@ -31,7 +31,7 @@ const empty: ApkgExisting = { decks: [], notes: [], cards: [], media: new Map() 
 const options: ApkgImportOptions = {
   target: { mode: 'anki' },
   importHistory: false,
-  scheduler: 'fsrs',
+  model: { model: 'fsrs', custom: [] },
   dayStartHour: 4,
 }
 
@@ -249,10 +249,10 @@ describe('planApkgImport', () => {
     expect(plan.report.reviewsImported).toBe(3)
   })
 
-  it('replays with the Leitner scheduler for Memory Box decks', async () => {
+  it('replays with the Leitner scheduler for Leitner decks', async () => {
     const plan = await planApkgImport(
       sample(),
-      { ...options, importHistory: true, scheduler: 'leitner' },
+      { ...options, importHistory: true, model: { model: 'seven', custom: [] } },
       empty,
       now,
       newId,
@@ -262,12 +262,24 @@ describe('planApkgImport', () => {
     expect(plan.reviews.every((r) => r.scheduler === 'leitner')).toBe(true)
     const noHistory = await planApkgImport(
       sample(),
-      { ...options, scheduler: 'leitner' },
+      { ...options, model: { model: 'seven', custom: [] } },
       empty,
       now,
       newId,
     )
     expect(noHistory.cards.find((c) => c.state === 2)?.box).toBe(3)
+    // M19: the box chosen for the created decks, its compartments too.
+    const three = await planApkgImport(
+      sample(),
+      { ...options, importHistory: true, model: { model: 'custom', custom: [1, 4, 10] } },
+      empty,
+      now,
+      newId,
+    )
+    expect(three.decks.map((d) => d.settings.leitner.model)).toEqual(
+      three.decks.map(() => 'custom'),
+    )
+    expect(three.cards.find((c) => c.id === three.reviews[0]?.cardId)?.box).toBe(3)
   })
 
   it('imports everything into a single new or existing deck', async () => {

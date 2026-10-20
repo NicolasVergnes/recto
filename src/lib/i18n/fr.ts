@@ -361,7 +361,9 @@ export const fr = {
   },
   scheduler: {
     fsrs: 'FSRS (recommandé)',
-    leitner: 'Memory Box (7 compartiments)',
+    seven: 'Boîte de Leitner (7 compartiments)',
+    five: 'Boîte de Leitner (5 compartiments)',
+    custom: 'Ma boîte de Leitner ({n} compartiments)',
     retention: 'Rétention cible',
     retentionHelp:
       '90 % : vous oublierez une carte sur dix à chaque révision. Au-dessus de 95 %, la charge explose.',
@@ -418,7 +420,7 @@ export const fr = {
     month: 'Mois',
     reviews: 'Révisions',
     states: 'Cartes par état',
-    boxes: 'Cartes par compartiment (Memory Box)',
+    boxes: 'Cartes par compartiment (boîte de Leitner)',
   },
   settings: {
     title: 'Paramètres',
@@ -426,6 +428,22 @@ export const fr = {
     noteTypesHelp:
       'Champs et modèles de cartes des types personnalisés, y compris ceux des paquets importés.',
     manageNoteTypes: 'Gérer les types de notes',
+    scheduling: 'Planification',
+    newDeckModel: 'Planificateur des nouveaux paquets',
+    newDeckModelHelp:
+      'Pour les paquets que vous créez et ceux qu’un import crée. Chaque paquet peut en changer ensuite, dans ses paramètres.',
+    customBox: 'Ma boîte de Leitner',
+    customBoxHelp:
+      'Votre propre boîte de Leitner : de 2 à 10 compartiments, et pour chacun le nombre de jours avant de revoir une carte qui y arrive.',
+    boxCount: 'Nombre de compartiments',
+    boxDays: 'Compartiment {n} (jours)',
+    boxDaysInvalid: 'Chaque compartiment dure un nombre entier de jours, de 1 à 36 500.',
+    boxOrder: 'Chaque compartiment dure au moins autant que le précédent.',
+    saveBox: 'Enregistrer Ma boîte',
+    boxSaved: 'Ma boîte enregistrée',
+    boxFollowersTitle: 'Modifier Ma boîte',
+    boxFollowers:
+      'Le paquet qui suit Ma boîte prendra ces jours. Une carte au-delà du dernier compartiment y descend ; les échéances ne changent pas.|Les {n} paquets qui suivent Ma boîte prendront ces jours. Une carte au-delà du dernier compartiment y descend ; les échéances ne changent pas.',
     display: 'Affichage',
     theme: 'Thème',
     themeSystem: 'Système',
@@ -520,6 +538,8 @@ export const fr = {
     mediaType: 'Type de fichier non pris en charge.',
     mediaTooLarge: 'Fichier trop volumineux (600 Ko par image, 3 Mo par son).',
     mediaUnreadable: 'Image illisible.',
+    leitnerBox:
+      'Ma boîte compte de 2 à 10 compartiments, en jours entiers de 1 à 36 500, chacun au moins aussi long que le précédent.',
   },
   storage: {
     persistAsk: 'Autoriser Recto à conserver vos cartes même si l’espace est faible',
@@ -555,6 +575,9 @@ export const fr = {
     switchTitle: 'Changer de planificateur',
     toFsrs:
       'L’historique de chaque carte sera rejoué avec FSRS pour estimer sa mémoire ; ses échéances seront recalculées.',
+    toOtherBox:
+      'Chaque carte garde son compartiment (au plus le dernier de la nouvelle boîte) et son échéance.',
+    boxSwitched: 'Boîte de Leitner changée',
     toLeitner:
       'Chaque carte sera placée dans un compartiment déduit de sa stabilité FSRS (approximation) ; ses échéances sont conservées.',
     switched:
@@ -577,10 +600,14 @@ export const fr = {
     ratingMode: 'Boutons de notation',
     fourButtons: '4 boutons (Encore, Difficile, Bien, Facile)',
     twoButtons: '2 boutons (Encore, Bien)',
-    leitnerTitle: 'Memory Box',
+    leitnerTitle: 'Boîte de Leitner',
     intervals: 'Intervalles des compartiments',
     intervalsHelp:
       'Jours avant la prochaine révision pour une carte arrivant dans chaque compartiment.',
+    boxDays: '{n} jour|{n} jours',
+    customHelp:
+      'Ces jours sont ceux de la boîte choisie ci-dessus. Pour choisir vous-même le nombre de compartiments et leurs jours, réglez Ma boîte de Leitner dans les Paramètres, puis choisissez-la ici.',
+    customLink: 'Régler Ma boîte',
     alternateSides: 'Interroger dans les deux sens (la carte est retournée après chaque réussite)',
     alternateHelp:
       'Une seule carte pour les deux sens. Après un échec, la carte est reposée dans le même sens : réessayer la même question est plus efficace. Les textes à trous, les masques et les types personnalisés gardent le sens de leurs modèles.',
@@ -774,7 +801,7 @@ export const fr = {
     scheduler: 'Planificateur des paquets créés',
     history: 'Importer l’historique de révisions',
     historyHelp:
-      'L’historique est rejoué pour reconstruire l’état de chaque carte (FSRS ou Memory Box) et conservé dans votre journal.',
+      'L’historique est rejoué pour reconstruire l’état de chaque carte (FSRS ou boîte de Leitner) et conservé dans votre journal.',
     keepOriginals: 'Conserver les images originales (sinon réduites à 1 280 px)',
     import: 'Importer {n} note|Importer {n} notes',
     missingMedia:

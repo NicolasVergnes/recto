@@ -197,3 +197,15 @@ Critères d'acceptation :
 - [x] Gestes en révision, réglage activé : toucher la carte affiche la réponse ; ensuite balayer à droite = Bien (Réussi), à gauche = Encore (Oublié) ; un geste trop court ou vertical ne note rien ; la carte suit le doigt ; un geste repris par le navigateur (défilement, bord d'écran) est abandonné proprement.
 - [x] Export `.apkg` retiré (dialogue d'export CSV seul, plus de bouton dans Paramètres) ; l'import des paquets Anki reste entier ; les mentions d'Anki se limitent à l'import.
 - [x] Tests unitaires et E2E (dont des gestes tactiles réels sur le profil mobile) ; `npm run verify` vert.
+
+## M19 — Boîte de Leitner : trois modèles, un défaut pour les nouveaux paquets (demande de Nicolas, 2026-10-21)
+
+Hors roadmap initiale. « Memory Box » est le nom d'un produit (le coffret Larousse) : le planificateur prend le nom générique de la méthode, « Boîte de Leitner », et la Memory Box reste citée dans les sources. L'utilisateur choisit sa boîte et le planificateur de ses nouveaux paquets (ADR-013).
+
+Critères d'acceptation :
+- [x] Plus aucun « Memory Box » dans l'interface, sauf la source scientifique (livret de Fabien Olicard et Céline Holynski, Larousse 2018).
+- [x] Trois boîtes : 7 compartiments (1, 2, 7, 30, 90, 180, 365 j ; défaut), 5 compartiments (1, 3, 7, 14, 30 j), « Ma boîte » (une seule, 2 à 10 compartiments, jours choisis dans les Paramètres). Les deux premières sont fixes ; enregistrer Ma boîte change les paquets qui la suivent.
+- [x] Paramètres › « Planificateur des nouveaux paquets » : FSRS (défaut), Leitner 7, Leitner 5 ou Ma boîte ; vaut pour les paquets créés à la main et par un import (CSV, paquet d'exemple, `.apkg` où il reste modifiable).
+- [x] Chaque paquet peut changer de planificateur ou de boîte ensuite : d'une boîte à l'autre, une carte garde son compartiment (au plus le dernier) et son échéance.
+- [x] Données : migration Dexie (paquets nommant leur boîte ; intervalles modifiés à la main conservés dans « Ma boîte »), sauvegardes plus anciennes lues de même, réglages partagés entre appareils.
+- [x] Tests unitaires et E2E ; `npm run verify` vert.

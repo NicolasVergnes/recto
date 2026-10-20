@@ -19,6 +19,7 @@ const KEYS: Record<RepoErrorCode, MessageKey> = {
   noteTypeInUse: 'errors.noteTypeInUse',
   undoGone: 'errors.undoGone',
   retireLocked: 'review.retireLocked',
+  leitnerBox: 'errors.leitnerBox',
   mediaType: 'errors.mediaType',
   mediaTooLarge: 'errors.mediaTooLarge',
   mediaUnreadable: 'errors.mediaUnreadable',

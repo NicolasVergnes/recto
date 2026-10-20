@@ -140,5 +140,11 @@ describe('statistics (SPEC §5.6)', () => {
       retired: 1,
     })
     expect(boxDistribution(cards, [deck('L', 'leitner')])).toEqual([1, 0, 1, 0, 0, 0, 1])
+    // M19: as many compartments as the largest box; each card capped by its own deck's box.
+    const three = deck('T', 'leitner', { leitner: { model: 'custom', intervals: [1, 4, 10] } })
+    const five = deck('F', 'leitner', { leitner: { model: 'five', intervals: [1, 3, 7, 14, 30] } })
+    const mixed = [card('t', { box: 6 }, 'n', 'T'), card('f', { box: 5 }, 'n', 'F')]
+    expect(boxDistribution(mixed, [three, five])).toEqual([0, 0, 1, 0, 1])
+    expect(boxDistribution(mixed, [deck('T', 'fsrs')])).toEqual([])
   })
 })

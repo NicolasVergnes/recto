@@ -1,4 +1,4 @@
-# 03 — Planification : FSRS-6 et Leitner « Memory Box »
+# 03 — Planification : FSRS-6 et boîte de Leitner
 
 Les deux planificateurs implémentent la même interface. Le choix se fait par paquet (`deck.scheduler`).
 
@@ -93,15 +93,25 @@ Quand `ratingMode = 2`, l'UI n'affiche que **Encore** (`Rating.Again`) et **Bien
 - Retard : une carte en retard est notée normalement ; FSRS tient compte du délai réel (`elapsed_days`). Aucune pénalité ajoutée.
 - `maximum_interval` par défaut 365 j en V0 pour que les cartes « acquises » repassent au moins une fois par an, en écho au compartiment 7 du livret ; réglable.
 
-## 3. Leitner « Memory Box » (fidèle au livret Larousse 2018)
+## 3. Boîte de Leitner (fidèle au livret de la Memory Box, Larousse 2018)
+
+« Boîte de Leitner » est le nom générique de la méthode ; la Memory Box de Fabien Olicard en est la version à sept compartiments qui a servi de modèle, citée dans les sources (« À propos »). Le nom « Memory Box » a quitté l'interface en M19.
 
 ### 3.1 Ce que dit le livret
 
 Sept compartiments ; C1 « tous les jours », C2 « les jours pairs », C3 « tous les lundis », C4 « chaque 1er du mois », C5 « tous les 3 mois », C6 « tous les 6 mois », C7 « tous les ans ». Réponse juste → compartiment suivant, carte **retournée** (au prochain test, on interroge l'autre face). Réponse fausse ou oubliée → compartiment 1. Une carte réussie en C7 y reste. Routine « temps limité » : sûr → +2, juste avec un doute → +1, faux → retour.
 
-### 3.2 Intervalles par compartiment
+### 3.2 Modèles et intervalles par compartiment (M19)
 
-Chaque carte a sa propre échéance : `due = now + intervals[box-1] jours` avec `intervals = [1, 2, 7, 30, 90, 180, 365]` (approximation des périodes du livret, réglable par paquet). Ce mode respecte P4 (espacement par carte) et lisse la charge.
+Chaque carte a sa propre échéance : `due = now + intervals[box-1] jours`. Ce mode respecte P4 (espacement par carte) et lisse la charge. Les intervalles sont ceux de la **boîte** que suit le paquet (`domain/leitner.ts`) :
+
+| Modèle | Compartiments | Jours |
+|---|---|---|
+| `seven` (défaut) | 7 | 1, 2, 7, 30, 90, 180, 365 (approximation des périodes du livret) |
+| `five` | 5 | 1, 3, 7, 14, 30 (jour, 3 jours, semaine, quinzaine, mois) |
+| `custom` « Ma boîte » | 2 à 10 | ceux de l'utilisateur (Paramètres) : jours entiers de 1 à 36 500, chacun au moins aussi long que le précédent |
+
+Les deux premiers modèles sont fixes : on ne règle plus les intervalles d'un paquet (M9 le permettait). Ma boîte est unique, partagée entre appareils (réglage `leitnerCustom`). Un paquet garde une copie des jours de sa boîte (`settings.leitner.intervals`) : le planificateur ne lit que le paquet ; enregistrer Ma boîte recopie ses jours dans tous les paquets qui la suivent, dans la même transaction (`saveCustomBox`). Le planificateur des nouveaux paquets (`newDeckModel`, FSRS par défaut) vaut pour les paquets créés à la main et par un import (CSV, paquet d'exemple, `.apkg`, où il reste modifiable).
 
 Le calendrier du coffret (C2 les jours pairs, C3 le lundi, C4 le 1er du mois…) n'est pas proposé : il n'existe que pour gérer à la main une boîte en papier, et rend la charge irrégulière (M9, demande de Nicolas du 2026-10-10). Un paquet réglé ainsi avant M9 passe aux intervalles ; les échéances déjà calculées sont conservées.
 
@@ -110,12 +120,12 @@ Le calendrier du coffret (C2 les jours pairs, C3 le lundi, C4 le 1er du mois…)
 | Rating | Libellé | Transition |
 |---|---|---|
 | 1 (Again) | Oublié | `box = 1`, `lapses++`, `state = Relearning`, `due = now` (re-présentation en séance, voir 3.4) |
-| 3 (Good) | Réussi | `box = min(box + 1, 7)` |
-| 4 (Easy) | Sûr | `box = min(box + 2, 7)` (routine « temps limité » du livret ; si `allowSure = false`, `ratings()` renvoie `[1, 3]`) |
+| 3 (Good) | Réussi | `box = min(box + 1, n)`, n = nombre de compartiments de la boîte |
+| 4 (Easy) | Sûr | `box = min(box + 2, n)` (routine « temps limité » du livret ; si `allowSure = false`, `ratings()` renvoie `[1, 3]`) |
 
 - Nouvelle carte (`box = 0`, `state = New`) : première réponse → Réussi/Sûr ⇒ `box = 2` (elle a été vue une fois et réussie) et `state = Review` ; Oublié ⇒ `box = 1`, `state = Relearning`, `due = now` comme ci-dessus.
 - Sens de la question : réglage commun aux deux planificateurs, voir §1.1.
-- Carte en C7 réussie : reste en C7, `due` = + `intervals[6]` j (365 par défaut).
+- Carte réussie dans le dernier compartiment : y reste, `due` = + le dernier intervalle (365 j pour la boîte à 7).
 - `retrievability()` renvoie `null` (Leitner ne modélise pas R) ; les statistiques de rétention réelle restent calculables depuis le journal.
 
 ### 3.4 Répétition intra-séance des échecs
@@ -126,10 +136,11 @@ Comme dans le livret (« replacez la fiche dans le compartiment 1, derrière les
 
 `preview` renvoie pour chaque rating le compartiment cible (`box`) et l'échéance ; seule l'échéance est affichée sous le bouton (« demain », « dans 7 j », « dans 30 j ») : le numéro du compartiment est du jargon (M18).
 
-## 4. Changement de planificateur sur un paquet existant
+## 4. Changement de planificateur ou de boîte sur un paquet existant
 
 - Leitner → FSRS : pour chaque carte avec journal, rejouer l'historique avec `const { reschedule_item } = f.reschedule(createEmptyCard(), history)` et prendre `reschedule_item?.card` (les ratings Leitner 1/3/4 sont des ratings FSRS valides) ; sans journal, `createEmptyCard()` avec `due` conservé.
-- FSRS → Leitner : `box` déduit de la stabilité : `S < 1.5 → 1`, `< 4 → 2`, `< 15 → 3`, `< 50 → 4`, `< 120 → 5`, `< 250 → 6`, sinon `7` ; `due` conservé. Documenter que cette conversion est une approximation.
+- FSRS → Leitner : `box` = le compartiment de la boîte choisie dont l'intervalle est le plus proche de la stabilité, en échelle logarithmique (seuils : moyenne géométrique de deux intervalles voisins ; pour la boîte à 7 : 1,41 / 3,74 / 14,5 / 52 / 127 / 256 j, au lieu de 1,5 / 4 / 15 / 50 / 120 / 250 avant M19) ; `due` conservé. Cette conversion est une approximation.
+- Leitner → autre boîte (M19), ou Ma boîte raccourcie : chaque carte garde le numéro de son compartiment, au plus le dernier de la nouvelle boîte ; `due` conservé ; seules les cartes déplacées sont datées.
 - L'opération est une transaction unique, après confirmation. Elle ne télécharge pas de sauvegarde (M9) : le journal des révisions, intact, permet de revenir à FSRS en rejouant l'historique.
 
 ## 5. File du jour (`src/lib/queue`)
@@ -150,4 +161,4 @@ Tests : cas limites (plafond 0, paquet vide, cartes d'une note le même jour, or
 
 - `ts-fsrs` README (v5.4) : `fsrs()`, `repeat`, `next`, `get_retrievability`, `rollback`, `forget`, `reschedule`, `forgetting_curve`.
 - Rétention cible et charge : manuel Anki « Deck options » ; plage conseillée 0,80–0,97.
-- Livret Memory Box, pages 12–15 (compartiments) et 27–31 (routine temps limité).
+- Livret de la Memory Box, pages 12–15 (compartiments) et 27–31 (routine temps limité).

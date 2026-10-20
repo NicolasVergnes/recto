@@ -68,7 +68,7 @@ Et toujours : les cartes d'une même note sont mélangées par Recto, ne pas s'e
 
 ## Ce qui se règle dans Recto (pas dans le paquet)
 
-- À l'import, l'utilisateur choisit le planificateur des paquets créés : FSRS (défaut) ou Memory Box (boîte à 7 compartiments).
+- À l'import, l'utilisateur choisit le planificateur des paquets créés : FSRS ou une boîte de Leitner (7 compartiments, 5 compartiments ou « Ma boîte », sa propre boîte réglée dans les Paramètres) ; par défaut, celui des Paramètres (FSRS au départ).
 - Les réglages d'un paquet (nouvelles cartes par jour, rétention, alternance des faces, réponse tapée pour les notes basiques, lecture automatique des sons) ne voyagent pas dans un `.apkg` : n'en parler que si le paquet en a besoin, en une ligne précise (« Paquet Vocabulaire › Paramètres : activer la lecture automatique des sons »). La réponse tapée s'active toujours dans les réglages du paquet (« Réponse tapée ») ; `{{type:Champ}}` désigne seulement le champ attendu par une carte `one_way`.
 - Sous-paquets : un niveau (`Matière::Chapitre`) ; au-delà, Recto aplatit le nom.
 - **Régénérer un paquet corrigé** : même nom de type, mêmes champs, même premier champ (ou même `guid=`) → Recto met à jour les notes au lieu de les dupliquer et garde la progression. Changer les champs ou les modèles d'un type existant n'est pas repris par une réimportation : le dire si c'est le cas.

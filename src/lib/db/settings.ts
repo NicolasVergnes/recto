@@ -1,4 +1,6 @@
 import { DEFAULT_DAY_START_HOUR, DEFAULT_GLOBAL_REVIEWS_PER_DAY } from '../config/app'
+import { isBox, LEITNER_PRESETS, type ModelChoice } from '../domain/leitner'
+import { DECK_MODELS, type DeckModel } from '../domain/types'
 import { db, newId } from './schema'
 
 export type Theme = 'system' | 'light' | 'dark'
@@ -32,6 +34,10 @@ export interface SettingsMap {
   tileSize: TileSize
   /** This device, in backups (M12): created on first use, renewed by « Tout effacer ». */
   deviceId: string | null
+  /** M19: how new decks are scheduled, imports included (Paramètres › Planification). */
+  newDeckModel: DeckModel
+  /** M19: intervals of « Ma boîte », the user's own Leitner box (domain/leitner.ts). */
+  leitnerCustom: readonly number[]
 }
 
 export const DEFAULT_SETTINGS: SettingsMap = {
@@ -49,6 +55,8 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   flipStyle: 'horizontal',
   tileSize: 'medium',
   deviceId: null,
+  newDeckModel: 'fsrs',
+  leitnerCustom: LEITNER_PRESETS.seven,
 }
 
 export type SettingKey = keyof SettingsMap
@@ -60,12 +68,15 @@ export type SettingKey = keyof SettingsMap
 export const SHARED_SETTINGS: ReadonlySet<string> = new Set<SettingKey>([
   'dayStartHour',
   'globalReviewsPerDay',
+  'newDeckModel',
+  'leitnerCustom',
 ])
 
 const THEMES: readonly string[] = ['system', 'light', 'dark']
 const BROWSER_VIEWS: readonly string[] = ['list', 'flip', 'both']
 const FLIP_STYLES: readonly string[] = ['none', 'horizontal', 'vertical', 'fade', 'slide']
 const TILE_SIZES: readonly string[] = ['small', 'medium', 'large']
+const MODELS: readonly string[] = DECK_MODELS
 
 /** Runtime validation: settings come from IndexedDB or backups (`unknown`). */
 function isValid<K extends SettingKey>(key: K, value: unknown): value is SettingsMap[K] {
@@ -95,6 +106,10 @@ function isValid<K extends SettingKey>(key: K, value: unknown): value is Setting
       return typeof value === 'string' && FLIP_STYLES.includes(value)
     case 'tileSize':
       return typeof value === 'string' && TILE_SIZES.includes(value)
+    case 'newDeckModel':
+      return typeof value === 'string' && MODELS.includes(value)
+    case 'leitnerCustom':
+      return isBox(value)
     default:
       return false
   }
@@ -126,6 +141,11 @@ export async function setSetting<K extends SettingKey>(
   now = Date.now(),
 ): Promise<void> {
   await db.settings.put(SHARED_SETTINGS.has(key) ? { key, value, updatedAt: now } : { key, value })
+}
+
+/** How a new deck is scheduled (M19): the chosen model, with the intervals of « Ma boîte ». */
+export async function newDeckModel(): Promise<ModelChoice> {
+  return { model: await getSetting('newDeckModel'), custom: await getSetting('leitnerCustom') }
 }
 
 /** This device's id, created and stored on first use. */

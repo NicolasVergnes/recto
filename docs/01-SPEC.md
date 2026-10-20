@@ -6,7 +6,7 @@ Version 1.0 — 25 septembre 2026. Propriétaire : Nicolas. Ce document est la s
 
 ## 1. Vision
 
-Une application de flashcards **personnelle, locale-first, sans serveur ni compte**, qui applique ce que la recherche a établi sur l'apprentissage par cartes (rappel actif, espacement, auto-évaluation, feedback) et qui reste fidèle à la méthode « Memory Box » de Fabien Olicard (boîte à sept compartiments, cartes réversibles, une information par carte) tout en offrant un planificateur moderne (FSRS-6).
+Une application de flashcards **personnelle, locale-first, sans serveur ni compte**, qui applique ce que la recherche a établi sur l'apprentissage par cartes (rappel actif, espacement, auto-évaluation, feedback) et qui reste fidèle à la boîte de Leitner telle que la décrit la « Memory Box » de Fabien Olicard (boîte à sept compartiments, cartes réversibles, une information par carte) tout en offrant un planificateur moderne (FSRS-6).
 
 Elle est faite pour un seul utilisateur qui apprend « un peu de tout » : langues, dates, personnages, drapeaux, départements, constellations, langue des signes, plantes, mathématiques. Les cartes doivent donc porter du texte, des images et du son.
 
@@ -18,7 +18,7 @@ Le fondement scientifique et l'audit concurrentiel sont dans `Dossier-Flashcards
 
 1. Créer, éditer, organiser des cartes (texte, image, audio, texte à trous) dans des paquets.
 2. Réviser chaque jour avec une **file unique mélangée** entre tous les paquets, avec réponse masquée jusqu'à une tentative, feedback systématique et auto-évaluation.
-3. Deux planificateurs au choix par paquet : **FSRS-6** (`ts-fsrs`, rétention cible réglable) et **Leitner « Memory Box »** (sept compartiments, fidèle au livret).
+3. Deux planificateurs au choix par paquet : **FSRS-6** (`ts-fsrs`, rétention cible réglable) et la **boîte de Leitner** : sept compartiments (défaut, fidèle au livret de la Memory Box), cinq, ou « Ma boîte », la boîte de l'utilisateur (2 à 10 compartiments, M19). Le planificateur des nouveaux paquets se choisit dans les Paramètres.
 4. Importer des paquets existants : **CSV/TSV** et **`.apkg` Anki** (legacy `collection.anki2` / `collection.anki21`).
 5. Exporter tout à tout moment : CSV, sauvegarde complète (zip JSON + médias).
 6. Statistiques : cartes dues, prévision de charge, rétention réelle, heatmap, distribution des compartiments.
@@ -64,7 +64,7 @@ Ces règles s'appliquent à tout le produit ; le skill `srs-rules` les détaille
 ### 5.1 Paquets (decks)
 
 - Arborescence à un niveau (paquet → sous-paquet) suffisante en V0 ; nom et description facultative (l'emoji, prévu à l'origine, a été retiré en M11 : il faisait doublon avec le nom).
-- Paramètres par paquet : planificateur (`fsrs` | `leitner`), nouvelles cartes/jour (défaut 20), révisions/jour (défaut 200), ordre des nouvelles cartes (aléatoire par défaut depuis M13 | ordre d'ajout), rétention cible (FSRS), pas d'apprentissage (FSRS), intervalles des compartiments (Leitner), interrogation dans les deux sens (les deux planificateurs, défaut activé, M11), bouton « Sûr » (Leitner, défaut activé).
+- Paramètres par paquet : planificateur (`fsrs` | `leitner`), nouvelles cartes/jour (défaut 20), révisions/jour (défaut 200), ordre des nouvelles cartes (aléatoire par défaut depuis M13 | ordre d'ajout), rétention cible (FSRS), pas d'apprentissage (FSRS), boîte de Leitner (7 compartiments, 5 ou Ma boîte : ses intervalles sont ceux de la boîte, M19), interrogation dans les deux sens (les deux planificateurs, défaut activé, M11), bouton « Sûr » (Leitner, défaut activé).
 - Changer de planificateur sur un paquet existant convertit l'état des cartes (règles en 03-SCHEDULING §4).
 - Actions : créer, renommer, déplacer, fusionner, exporter, supprimer (avec confirmation et compte de cartes ; une sauvegarde complète, qui conserve le journal de révisions, est proposée avant suppression : case à cocher, décochée par défaut).
 
@@ -92,7 +92,7 @@ Le type « Basique + inversé » (deux cartes jumelles par note) a été retiré
 ### 5.3 Révision
 
 - **File du jour** : cartes en apprentissage dues, puis révisions dues (retards d'abord, puis celles du jour), puis nouvelles cartes jusqu'aux plafonds ; chaque lot est présenté dans un ordre aléatoire (stable dans la journée) ; quand un plafond coupe les retards, on garde ceux de plus faible récupérabilité ; les paquets sont entrelacés (round-robin). Les cartes d'une même note peuvent passer le même jour, sans enterrement ni espacement (M13, 03 §5).
-- Écran de carte : recto plein écran, bouton « Afficher la réponse » (Espace/Entrée), puis verso + Extra, boutons de notation avec l'intervalle prévu affiché (FSRS) ou le compartiment cible (Leitner). Raccourcis 1–4 (FSRS) ou 1–3 (Leitner). Mode « réponse tapée » par paquet : champ de saisie, comparaison caractère par caractère, notation proposée mais toujours modifiable.
+- Écran de carte : recto plein écran, bouton « Afficher la réponse » (Espace/Entrée), puis verso + Extra, boutons de notation avec l'échéance prévue affichée (FSRS et Leitner ; le compartiment n'est plus affiché depuis M18). Raccourcis 1–4 (FSRS) ou 1–3 (Leitner). Mode « réponse tapée » par paquet : champ de saisie, comparaison caractère par caractère, notation proposée mais toujours modifiable.
 - Audio : lecture automatique à l'affichage du côté qui le contient (option), bouton de relecture (R).
 - Barre de progression de la séance (restant : apprentissage / révisions / nouvelles). Chronomètre par carte (durée enregistrée dans le journal, plafonnée à 60 s pour les stats).
 - Actions pendant la révision : annuler la dernière réponse (`rollback`), éditer la carte, suspendre, marquer (drapeau), voir les infos de la carte (état, stabilité, difficulté, historique).
@@ -122,6 +122,7 @@ Le type « Basique + inversé » (deux cartes jumelles par note) a été retiré
 
 ### 5.7 Paramètres
 
+- Planification (M19) : planificateur des nouveaux paquets (FSRS par défaut, boîte de Leitner à 7 ou 5 compartiments, Ma boîte), aussi pour les paquets créés par un import ; Ma boîte (nombre de compartiments et jours de chacun), appliquée aux paquets qui la suivent.
 - Heure de début de journée, thème (système/clair/sombre), taille du texte, animation de retournement des tuiles de la mosaïque (sans animation, rotation horizontale ou verticale, fondu, glissement), langue (fr seul en V0, structure prête), raccourcis affichés.
 - Stockage : espace utilisé (`navigator.storage.estimate()`), état de persistance, bouton « Demander la persistance », bouton « Vider le cache des médias orphelins ».
 - Danger : tout effacer (double confirmation, export préalable proposé).
@@ -169,6 +170,6 @@ Les jalons M0 à M6 sont définis dans 07-ROADMAP avec leurs critères d'accepta
 
 - **Note / carte** : contenu saisi / unité révisée générée à partir de la note.
 - **État FSRS** : `New`, `Learning`, `Review`, `Relearning`. **D** difficulté (1–10), **S** stabilité (jours), **R** récupérabilité (probabilité de rappel).
-- **Compartiment (Leitner)** : niveau 1 à 7 de la Memory Box.
+- **Compartiment (Leitner)** : niveau de la boîte de Leitner, de 1 au nombre de compartiments de sa boîte (7 par défaut, comme dans la Memory Box).
 - **Retirée** : carte considérée acquise, sortie de la file (réversible). **Suspendue** : carte mise en pause manuellement.
 - **Journal de révisions (revlog)** : historique immuable de chaque réponse.

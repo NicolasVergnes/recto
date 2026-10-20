@@ -91,7 +91,9 @@ export interface DeckSettings {
     ratingMode: 4 | 2          // 4 boutons ou 2 (Encore/Bien)
   }
   leitner: {
-    intervals: number[]            // jours, défaut [1, 2, 7, 30, 90, 180, 365]
+    model: 'seven' | 'five' | 'custom' // M19 : boîte suivie (7, 5 compartiments ou « Ma boîte »)
+    intervals: number[]            // copie des jours de la boîte, un par compartiment (2 à 10) ;
+                                   // défaut [1, 2, 7, 30, 90, 180, 365] (domain/leitner.ts)
     allowSure: boolean             // défaut true : bouton « Sûr » (+2)
     failToBox: 1                   // fixe en V0
   }
@@ -140,7 +142,7 @@ export interface Card {
   scheduledDays: number
   learningSteps: number
   // Leitner
-  box: number                  // 0 = non applicable / nouvelle, 1..7
+  box: number                  // 0 = non applicable / nouvelle, puis 1..n (n = compartiments de la boîte)
   sideFlipped: boolean         // alternateSides du paquet : true = on teste verso→recto (notes basic)
   createdAt: number
   updatedAt: number            // M12 : dernière modification de toute sorte (réponse, annulation, suspension,
@@ -196,9 +198,9 @@ export interface Deletion {
 
 Suppressions enregistrées (M12, `db/deletions.ts`) : paquets (suppression, fusion), notes et leurs cartes et révisions, cartes retirées d'une note (édition, type de note modifié, réimport, fusion de sauvegarde), types de notes, la révision effacée par une annulation, médias orphelins supprimés. Jamais purgées pour l'instant. « Tout effacer » supprime la base entière, traces comprises : l'appareil repart de zéro (nouvel identifiant), et une fusion suivante lui rend la collection.
 
-Clés `settings` réservées : `dayStartHour` (4), `theme`, `fontScale`, `lastBackupAt`, `persistGranted`, `onboardingDone`, `globalReviewsPerDay` (500), `lastDeckId` (null), `sleepTipDay` (null), `swipeGestures` (false), `browserView` (`list`), `flipStyle` (`horizontal`), `tileSize` (`medium`), `deviceId` (M12 : identifiant de l'appareil, créé au premier besoin, écrit dans les sauvegardes).
+Clés `settings` réservées : `dayStartHour` (4), `theme`, `fontScale`, `lastBackupAt`, `persistGranted`, `onboardingDone`, `globalReviewsPerDay` (500), `lastDeckId` (null), `sleepTipDay` (null), `swipeGestures` (false), `browserView` (`list`), `flipStyle` (`horizontal`), `tileSize` (`medium`), `deviceId` (M12 : identifiant de l'appareil, créé au premier besoin, écrit dans les sauvegardes), `newDeckModel` (M19 : `fsrs` | `seven` | `five` | `custom`, planificateur des nouveaux paquets, `fsrs`), `leitnerCustom` (M19 : jours de « Ma boîte », 2 à 10 entiers de 1 à 36 500 jamais décroissants ; défaut ceux de la boîte à 7).
 
-Portée (M12) : `dayStartHour` et `globalReviewsPerDay` sont des réglages **partagés** de la collection, écrits avec `updatedAt` et fusionnés entre appareils (le plus récent gagne) ; tous les autres sont **propres à l'appareil** et ne viennent jamais d'un autre, ni par fusion ni par restauration « remplacer ».
+Portée (M12) : `dayStartHour`, `globalReviewsPerDay`, `newDeckModel` et `leitnerCustom` (M19) sont des réglages **partagés** de la collection, écrits avec `updatedAt` et fusionnés entre appareils (le plus récent gagne) ; tous les autres sont **propres à l'appareil** et ne viennent jamais d'un autre, ni par fusion ni par restauration « remplacer ».
 
 ### 2.1 Occlusion d'image (V1)
 
@@ -261,7 +263,7 @@ export interface NoteType {
 4. Une carte `retired` ou `suspended` n'apparaît jamais dans la file.
 5. Tout `Media.name` référencé dans un champ existe dans `media` (vérifié à l'import ; un utilitaire « médias orphelins » liste les entrées non référencées).
 6. `Card` FSRS : `stability ≥ 0`, `difficulty ∈ [1, 10]` ou 0 pour `New`.
-7. `Card` Leitner : `box ∈ [1, 7]` dès la première réponse ; `box = 0` tant que `state = New`.
+7. `Card` Leitner : `box ∈ [1, n]` dès la première réponse, n = nombre de compartiments de la boîte du paquet (M19 ; 7 par défaut) ; `box = 0` tant que `state = New`. Changer de boîte ou raccourcir Ma boîte ramène les cartes au-delà du dernier compartiment dans celui-ci.
 
 ## 4. Accès aux données
 
@@ -280,7 +282,7 @@ data.json       { "decks": [...], "noteTypes": [...], "notes": [...], "cards": [
 media/<name>    fichiers binaires
 ```
 
-`schemaVersion` : 2 depuis la V1 (ajout du type `image_occlusion`), 3 depuis M8 (table `noteTypes`, notes `custom` ; une note `custom` sans son type est rejetée à la lecture). 4 depuis M12 (`card.updatedAt`, `deletions`, `setting.updatedAt`, `deviceId`) ; une carte d'une sauvegarde plus ancienne est datée comme à la migration Dexie (`lastReview ?? createdAt`), elle n'a pas de suppressions. 5 depuis M13 (Dexie version 4) : `burySiblings` retiré des réglages de paquet, `newOrder` passé à `'random'` pour tous les paquets ; une sauvegarde plus ancienne est migrée de même à la lecture, la date `updatedAt` du paquet est gardée. 6 depuis M14 et M16 (Dexie version 5) : types de cartes des modèles (`kind`, `field`, `single`), modèles classiques posés dans les deux sens (`twoWay`, M16 ; numéroté 5 sur sa branche avant la fusion avec M13, jamais publié), `note.single`, `note.masks` ; une sauvegarde plus ancienne se lit telle quelle (cartes classiques à sens unique, une carte par trou ou groupe, pas de masques) ; un type inconnu ou un modèle à trous ou d'occlusion sans champ est lu comme classique. 7 depuis M17 (Dexie version 6) : `pausedFormats` et `newByFormat` des réglages de paquet, remplis par leurs défauts à la lecture d'une sauvegarde plus ancienne comme à la migration Dexie. Une clé de format désigne un modèle par son indice : déplacer, retirer ou changer le type d'un modèle (`updateNoteType`, même transaction) réécrit ou retire les clés des paquets, datés ; supprimer un type retire ses clés. Une sauvegarde de version 1 ou 2 se restaure telle quelle (pas de type personnalisé), une version plus récente que l'application est refusée. Les lignes sont lues dans une seule transaction en lecture : un instantané cohérent même si l'application écrit pendant l'export. Fusion : un type de note est identifié par `id`, le plus récemment modifié gagne.
+`schemaVersion` : 2 depuis la V1 (ajout du type `image_occlusion`), 3 depuis M8 (table `noteTypes`, notes `custom` ; une note `custom` sans son type est rejetée à la lecture). 4 depuis M12 (`card.updatedAt`, `deletions`, `setting.updatedAt`, `deviceId`) ; une carte d'une sauvegarde plus ancienne est datée comme à la migration Dexie (`lastReview ?? createdAt`), elle n'a pas de suppressions. 5 depuis M13 (Dexie version 4) : `burySiblings` retiré des réglages de paquet, `newOrder` passé à `'random'` pour tous les paquets ; une sauvegarde plus ancienne est migrée de même à la lecture, la date `updatedAt` du paquet est gardée. 6 depuis M14 et M16 (Dexie version 5) : types de cartes des modèles (`kind`, `field`, `single`), modèles classiques posés dans les deux sens (`twoWay`, M16 ; numéroté 5 sur sa branche avant la fusion avec M13, jamais publié), `note.single`, `note.masks` ; une sauvegarde plus ancienne se lit telle quelle (cartes classiques à sens unique, une carte par trou ou groupe, pas de masques) ; un type inconnu ou un modèle à trous ou d'occlusion sans champ est lu comme classique. 7 depuis M17 (Dexie version 6) : `pausedFormats` et `newByFormat` des réglages de paquet, remplis par leurs défauts à la lecture d'une sauvegarde plus ancienne comme à la migration Dexie. Une clé de format désigne un modèle par son indice : déplacer, retirer ou changer le type d'un modèle (`updateNoteType`, même transaction) réécrit ou retire les clés des paquets, datés ; supprimer un type retire ses clés. 8 depuis M19 (Dexie version 7) : `leitner.model` des paquets, boîtes de 2 à 10 compartiments, réglages `newDeckModel` et `leitnerCustom` ; une sauvegarde plus ancienne est lue comme à la migration Dexie : intervalles de la boîte à 7 → `seven`, intervalles modifiés à la main (M9) → `custom` avec leurs jours, et « Ma boîte » reçoit ceux du paquet modifié le plus récemment si elle n'existe pas (`updatedAt: 0`) ; la date des paquets est gardée. Une sauvegarde de version 1 ou 2 se restaure telle quelle (pas de type personnalisé), une version plus récente que l'application est refusée. Les lignes sont lues dans une seule transaction en lecture : un instantané cohérent même si l'application écrit pendant l'export. Fusion : un type de note est identifié par `id`, le plus récemment modifié gagne.
 
 Restauration « remplacer » : vide la base puis importe (suppressions comprises), sauf les réglages propres à l'appareil, gardés (M12) ; « fusionner » : les entités sont identifiées par `id` (et `sourceGuid` pour les notes) ; en cas de conflit, la version la plus récente (`updatedAt`) gagne, les journaux sont unionnés par `id`.
 

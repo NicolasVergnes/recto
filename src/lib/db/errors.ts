@@ -17,6 +17,7 @@ export type RepoErrorCode =
   | 'noteTypeInUse'
   | 'undoGone'
   | 'retireLocked'
+  | 'leitnerBox'
   | 'mediaType'
   | 'mediaTooLarge'
   | 'mediaUnreadable'

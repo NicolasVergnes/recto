@@ -4,6 +4,22 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 ## [Unreleased]
 
+### M19 — Boîte de Leitner : trois modèles, un défaut pour les nouveaux paquets
+
+#### Added
+
+- Boîte de Leitner à 5 compartiments (1, 3, 7, 14, 30 jours), en plus de celle à 7.
+- « Ma boîte de Leitner » (Paramètres › Planification) : de 2 à 10 compartiments, et le nombre de jours de chacun ; l'enregistrer met à jour les paquets qui la suivent.
+- Paramètres › « Planificateur des nouveaux paquets » : FSRS (par défaut), boîte à 7 ou à 5 compartiments, ou Ma boîte ; il vaut aussi pour les paquets créés par un import (CSV, paquet d'exemple, paquet Anki, où il reste modifiable).
+
+#### Changed
+
+- « Memory Box » s'appelle désormais « Boîte de Leitner » ; la Memory Box (Fabien Olicard, Larousse) est citée dans les sources scientifiques.
+- Paramètres d'un paquet : quatre choix de planificateur ; d'une boîte à l'autre, chaque carte garde son compartiment (au plus le dernier) et son échéance. Les jours des compartiments sont ceux de la boîte, affichés sans être modifiables paquet par paquet.
+- Statistiques : autant de compartiments que la plus grande boîte des paquets affichés.
+- Plugin `recto-deck-builder` 2.2.1 : la phrase sur le choix du planificateur à l'import.
+- Base et sauvegardes (migration) : chaque paquet nomme sa boîte ; des intervalles modifiés à la main deviennent « Ma boîte », sans rien perdre.
+
 ### Navigateur de cartes sur petit téléphone
 
 #### Fixed

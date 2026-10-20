@@ -1,5 +1,6 @@
 import { applyImportPlan, existingCollection } from '$lib/db/importer'
 import { newId } from '$lib/db/schema'
+import { newDeckModel } from '$lib/db/settings'
 import { defaultMapping, detectModelType, parseCsv, planCsvImport } from '$lib/import/csv'
 
 /**
@@ -19,6 +20,7 @@ export async function importSampleDeck(): Promise<string | null> {
       deckId: '',
       newDeckName: 'Géographie',
       duplicates: 'skip',
+      model: await newDeckModel(),
     },
     await existingCollection(),
     Date.now(),

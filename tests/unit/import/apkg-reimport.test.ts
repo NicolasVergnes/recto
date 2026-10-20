@@ -12,7 +12,7 @@ import {
   type ApkgRevlog,
 } from '$lib/import/apkg'
 import type { ImportPlan } from '$lib/import/plan'
-import { boxFromStability } from '$lib/scheduler/leitner'
+import { boxFromStability, LEITNER_PRESETS } from '$lib/domain/leitner'
 import {
   ankiPackage,
   ankiReview,
@@ -38,7 +38,7 @@ const DAY = 86_400_000
 const options: ApkgImportOptions = {
   target: { mode: 'anki' },
   importHistory: false,
-  scheduler: 'fsrs',
+  model: { model: 'fsrs', custom: [] },
   dayStartHour: 4,
 }
 
@@ -301,28 +301,34 @@ describe('re-importing a note that changed in Anki: its cards follow (invariant 
     expect(await cardProblems(env.db)).toEqual([])
   })
 
-  describe('in a Memory Box deck', () => {
+  describe('in a Leitner deck', () => {
     const edited = (revlog: ApkgRevlog[] = []) =>
       ankiPackage([clozeNote(holes(1, 2), T1 + HOUR, [0, { ord: 1, ...REVIEW_STATE }])], revlog)
 
     // The option names the scheduler of the decks an import creates, not of existing ones.
     it('puts the new card in a box from the state of the Anki card', async () => {
-      await importPackage(ankiPackage([clozeNote(holes(1), T1, [0])]), { scheduler: 'leitner' })
+      await importPackage(ankiPackage([clozeNote(holes(1), T1, [0])]), {
+        model: { model: 'seven', custom: [] },
+      })
       const [deck] = await env.db.decks.toArray()
       expect(deck?.scheduler).toBe('leitner')
-      const { plan: written } = await importPackage(edited(), { scheduler: 'fsrs' })
+      const { plan: written } = await importPackage(edited(), {
+        model: { model: 'fsrs', custom: [] },
+      })
       expect(written.cards[0]).toMatchObject({ deckId: deck?.id, ord: 1, state: 2 })
-      expect(written.cards[0]?.box).toBe(boxFromStability(30))
+      expect(written.cards[0]?.box).toBe(boxFromStability(30, LEITNER_PRESETS.seven))
     })
 
-    it('replays the Anki history with the Memory Box scheduler', async () => {
-      await importPackage(ankiPackage([clozeNote(holes(1), T1, [0])]), { scheduler: 'leitner' })
+    it('replays the Anki history with the Leitner scheduler', async () => {
+      await importPackage(ankiPackage([clozeNote(holes(1), T1, [0])]), {
+        model: { model: 'seven', custom: [] },
+      })
       const log = [
         ankiReview(CLOZE_ID, 1, Date.UTC(2023, 10, 20, 10)),
         ankiReview(CLOZE_ID, 1, Date.UTC(2023, 10, 22, 10)),
       ]
       const { plan: written } = await importPackage(edited(log), {
-        scheduler: 'fsrs',
+        model: { model: 'fsrs', custom: [] },
         importHistory: true,
       })
       expect(written.reviews.map((r) => r.scheduler)).toEqual(['leitner', 'leitner'])

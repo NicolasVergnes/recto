@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { boxFromStability, createLeitnerScheduler } from '$lib/scheduler/leitner'
+import { createLeitnerScheduler } from '$lib/scheduler/leitner'
 import type { Rating } from '$lib/domain/types'
 import { card, deck, paris } from '../../helpers/fixtures'
 
@@ -127,20 +127,26 @@ describe('Leitner transitions (03 §3.3)', () => {
   })
 })
 
-describe('FSRS → Leitner conversion (03 §4)', () => {
-  it('maps FSRS stability to a box', () => {
-    const cases: [number, number][] = [
-      [0, 1],
-      [1.49, 1],
-      [1.5, 2],
-      [3.9, 2],
-      [14, 3],
-      [49, 4],
-      [119, 5],
-      [249, 6],
-      [250, 7],
-      [9000, 7],
-    ]
-    for (const [s, box] of cases) expect(boxFromStability(s)).toBe(box)
+describe('boxes of another size (M19)', () => {
+  const five = deck('d1', 'leitner', { leitner: { model: 'five', intervals: [1, 3, 7, 14, 30] } })
+  const three = deck('d1', 'leitner', { leitner: { model: 'custom', intervals: [1, 4, 10] } })
+  const from = (box: number, rating: Rating, d: typeof five) =>
+    leitner.answer(card('c', { box, state: box === 0 ? 0 : 2 }), rating, now, d).card
+
+  it('caps at the last compartment of a five-compartment box', () => {
+    expect(from(0, 3, five)).toMatchObject({ box: 2, due: now + 3 * DAY })
+    expect(from(3, 4, five)).toMatchObject({ box: 5, due: now + 30 * DAY })
+    expect(from(4, 4, five).box).toBe(5)
+    expect(from(5, 3, five)).toMatchObject({ box: 5, due: now + 30 * DAY })
+    expect(from(5, 1, five)).toMatchObject({ box: 1, due: now, state: 3 })
+  })
+
+  it('follows « Ma boîte » with three compartments, Sûr capped too', () => {
+    expect(from(0, 4, three)).toMatchObject({ box: 2, due: now + 4 * DAY })
+    expect(from(2, 4, three)).toMatchObject({ box: 3, due: now + 10 * DAY })
+    expect(from(3, 3, three).box).toBe(3)
+    // A card left above the last compartment comes back to it on its next success.
+    expect(from(6, 3, three)).toMatchObject({ box: 3, due: now + 10 * DAY })
+    expect(leitner.preview(card('c', { box: 1, state: 2 }), now, three)[3]?.label).toBe('dans 4 j')
   })
 })

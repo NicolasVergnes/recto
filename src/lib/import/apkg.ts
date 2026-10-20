@@ -2,25 +2,16 @@
  * Anki package → Recto import plan (05-IMPORT-EXPORT §2.3). Pure (async only for sha256).
  */
 import { makeCard } from '../domain/defaults'
+import { boxFromStability, type ModelChoice } from '../domain/leitner'
 import { cardOrds, reconcileCards, type ReconcilableCard } from '../domain/notes'
 import { labelsFromAnkiComments, occlusionFromAnki, serializeOcclusion } from '../domain/occlusion'
 import { faceOfAnswer, kindOf } from '../domain/templates'
 import { mediaRefs, renameMediaRefs } from '../domain/text'
-import type {
-  Card,
-  Deck,
-  ModelType,
-  Note,
-  NoteType,
-  Rating,
-  Review,
-  SchedulerKind,
-} from '../domain/types'
+import type { Card, Deck, ModelType, Note, NoteType, Rating, Review } from '../domain/types'
 import { sha256Hex } from '../media/hash'
 import { mediaKind, mimeFromName } from '../media/mime'
 import { getScheduler } from '../scheduler'
 import { addDays, startOfDate, studyDate } from '../scheduler/day'
-import { boxFromStability } from '../scheduler/leitner'
 import type { ApkgCard, ApkgModel, ApkgNote, ApkgPackage } from './apkg-read'
 import { DeckResolver } from './decks'
 import { emptyReport, type ImportErrorCode, type ImportMedia, type ImportPlan } from './plan'
@@ -36,8 +27,8 @@ export interface ApkgImportOptions {
   target: ApkgTarget
   /** Rebuild the scheduling state by replaying the review log (05 §2.3). */
   importHistory: boolean
-  /** Scheduler of the decks created by the import. */
-  scheduler: SchedulerKind
+  /** How the decks created by the import are scheduled (M19: FSRS or a Leitner box). */
+  model: ModelChoice
   dayStartHour: number
   /**
    * Formats of the package (`describePackage().formats` keys) whose new cards wait in the decks
@@ -224,7 +215,8 @@ function convertCardState(
     card.stability = stability
     card.difficulty = Math.min(10, Math.max(1, 11 - (ac.factor / 1000) * 2))
     card.lastReview = startOfDate(addDays(day0, ac.due - ivl), dayStartHour)
-    if (deck.scheduler === 'leitner') card.box = boxFromStability(stability)
+    if (deck.scheduler === 'leitner')
+      card.box = boxFromStability(stability, deck.settings.leitner.intervals)
   } else if (ac.type === 1 || ac.type === 3) {
     // Learning: due now; FSRS treats an empty memory state as a first review.
     card.state = 1
@@ -269,7 +261,7 @@ export async function planApkgImport(
     media: [],
     report,
   }
-  const resolver = new DeckResolver(existing.decks, now, newId, options.scheduler)
+  const resolver = new DeckResolver(existing.decks, now, newId, options.model)
   const models = new Map(pkg.models.map((m) => [m.id, m]))
   const conversions = new Map(pkg.models.map((m) => [m.id, convertModel(m)]))
   const ankiDecks = new Map(pkg.decks.map((d) => [d.id, d.name]))

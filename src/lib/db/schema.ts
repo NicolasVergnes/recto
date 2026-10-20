@@ -1,6 +1,11 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type { Card, Deck, Deletion, Media, Note, NoteType, Review, Setting } from '../domain/types'
-import { migrateDeckSettingsM13, migrateDeckSettingsM17 } from '../domain/defaults'
+import {
+  migrateDeckSettingsM13,
+  migrateDeckSettingsM17,
+  migrateDeckSettingsM19,
+} from '../domain/defaults'
+import { customBoxOf } from '../domain/leitner'
 
 export const DB_NAME = 'recto'
 /**
@@ -13,9 +18,12 @@ export const DB_NAME = 'recto'
  * classic templates (`twoWay`), `note.single` and `note.masks` (Dexie version 5): older versions
  * refuse such backups instead of reading a cloze card as a classic one and deleting its cards, or
  * asking a two-way card one way only. 7 (M17) adds
- * `settings.pausedFormats` and `settings.newByFormat` to decks (Dexie version 6).
+ * `settings.pausedFormats` and `settings.newByFormat` to decks (Dexie version 6). 8 (M19) adds
+ * `settings.leitner.model` to decks, boxes of 2 to 10 compartments and the `newDeckModel` and
+ * `leitnerCustom` settings (Dexie version 7): older versions refuse such backups instead of
+ * putting a five-compartment deck back into seven compartments.
  */
-export const SCHEMA_VERSION = 7
+export const SCHEMA_VERSION = 8
 
 /**
  * IndexedDB schema (02-DATA-MODEL §1). Never edit a published `version()` block: add a new one
@@ -80,7 +88,23 @@ export class RectoDB extends Dexie {
         .toCollection()
         .modify((deck) => migrateDeckSettingsM17(deck.settings)),
     )
+    // M19: Leitner models. Decks name the box they follow; intervals changed by hand (M9) become
+    // « Ma boîte » unless it already exists. Deck dates are kept: every device migrates alike.
+    this.version(7).upgrade(async (tx) => {
+      const decks = tx.table<StoredDeck>('decks')
+      await decks.toCollection().modify((deck) => migrateDeckSettingsM19(deck.settings))
+      const custom = customBoxOf(await decks.toArray())
+      const settings = tx.table<Setting>('settings')
+      if (custom && !(await settings.get('leitnerCustom')))
+        await settings.put({ key: 'leitnerCustom', value: custom, updatedAt: 0 })
+    })
   }
+}
+
+/** A deck row as an upgrade reads it: settings of any earlier shape. */
+interface StoredDeck {
+  updatedAt: number
+  settings: Record<string, unknown> & { leitner: { model: string; intervals: unknown } }
 }
 
 /** The application database. Tests swap it with `useDatabase()` (ES live binding). */

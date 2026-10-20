@@ -132,7 +132,7 @@
 
     <DeckDetailsForm {deck} />
 
-    {#key deck.id + deck.scheduler}
+    {#key deck.id + deck.scheduler + deck.settings.leitner.model}
       <DeckSettingsForm {deck} />
     {/key}
 

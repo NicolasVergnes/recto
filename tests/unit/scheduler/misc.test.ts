@@ -59,5 +59,10 @@ describe('scheduler switch (03 §4)', () => {
       convertCard(card('c', { state: 2, stability: 20, due: now + DAY }), 'leitner', d, [], now),
     ).toMatchObject({ box: 4, due: now + DAY })
     expect(convertCard(card('n'), 'leitner', d, [], now).box).toBe(0)
+    // M19: the compartments of the deck's own box.
+    const five = deck('d1', 'leitner', { leitner: { model: 'five', intervals: [1, 3, 7, 14, 30] } })
+    expect(convertCard(card('c', { state: 2, stability: 25 }), 'leitner', five, [], now).box).toBe(
+      5,
+    )
   })
 })

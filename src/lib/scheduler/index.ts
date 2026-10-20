@@ -1,6 +1,6 @@
 /**
  * Schedulers (03-SCHEDULING): common interface, FSRS-6 adapter over ts-fsrs (`fsrs.ts`) and the
- * seven-box Leitner "Memory Box" (`leitner.ts`). Pure: `now` is always a parameter.
+ * Boîte de Leitner of 2 to 10 compartments (`leitner.ts`, M19). Pure: `now` is always a parameter.
  */
 import type { SchedulerKind } from '../domain/types'
 import { createFsrsScheduler } from './fsrs'

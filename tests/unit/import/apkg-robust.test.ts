@@ -140,7 +140,12 @@ describe('robustness of the Anki reader and converter', () => {
     for (const scheduler of ['fsrs', 'leitner'] as const) {
       const noHistory = await planApkgImport(
         pkg,
-        { target: { mode: 'anki' }, importHistory: false, scheduler, dayStartHour: 4 },
+        {
+          target: { mode: 'anki' },
+          importHistory: false,
+          model: { model: scheduler === 'leitner' ? 'seven' : 'fsrs', custom: [] },
+          dayStartHour: 4,
+        },
         { decks: [], notes: [], cards: [], media: new Map() },
         now,
         newId,
@@ -159,7 +164,12 @@ describe('robustness of the Anki reader and converter', () => {
 
       const replay = await planApkgImport(
         pkg,
-        { target: { mode: 'anki' }, importHistory: true, scheduler, dayStartHour: 4 },
+        {
+          target: { mode: 'anki' },
+          importHistory: true,
+          model: { model: scheduler === 'leitner' ? 'seven' : 'fsrs', custom: [] },
+          dayStartHour: 4,
+        },
         { decks: [], notes: [], cards: [], media: new Map() },
         now,
         newId,

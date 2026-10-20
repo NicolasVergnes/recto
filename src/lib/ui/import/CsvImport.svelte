@@ -3,6 +3,7 @@
   import { live } from '$lib/db/live.svelte'
   import * as repo from '$lib/db/repo'
   import { newId } from '$lib/db/schema'
+  import { newDeckModel } from '$lib/db/settings'
   import type { ModelType } from '$lib/domain/types'
   import {
     defaultMapping,
@@ -108,6 +109,7 @@
           deckId: deckId === NEW_DECK ? '' : deckId,
           newDeckName: newDeckName.trim() || fileName,
           duplicates,
+          model: await newDeckModel(),
         },
         await existingCollection(),
         now,

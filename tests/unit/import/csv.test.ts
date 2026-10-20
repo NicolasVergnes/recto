@@ -294,6 +294,20 @@ describe('fallback deck', () => {
       newId,
     )
     expect(p2.decks.map((d) => d.name)).toEqual(['Neuf'])
+    expect(p2.decks[0]?.scheduler).toBe('fsrs')
+    // M19: created decks follow the « planificateur des nouveaux paquets ».
+    const p4 = planCsvImport(
+      withDeck,
+      { ...options(withDeck), model: { model: 'custom', custom: [1, 4, 10] } },
+      empty,
+      now,
+      newId,
+    )
+    expect(p4.decks[0]).toMatchObject({
+      name: 'Langues',
+      scheduler: 'leitner',
+      settings: { leitner: { model: 'custom', intervals: [1, 4, 10] } },
+    })
     // Default name « Import »: here an existing deck of that name is reused.
     const p3 = planCsvImport(without, { ...options(without), deckId: '' }, empty, now, newId)
     expect(p3.decks).toEqual([])

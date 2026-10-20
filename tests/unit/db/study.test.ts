@@ -8,7 +8,7 @@ import {
   recordReview,
   setRetired,
   studyDecks,
-  switchScheduler,
+  switchDeckModel,
   undoReview,
 } from '$lib/db/study'
 import { getScheduler } from '$lib/scheduler'
@@ -24,7 +24,10 @@ const fsrs = getScheduler('fsrs', { fuzz: false })
 const leitner = getScheduler('leitner')
 
 async function setup(scheduler: 'fsrs' | 'leitner' = 'fsrs') {
-  const deck = await repo.createDeck({ name: 'D', scheduler }, now - 30 * DAY)
+  const deck = await repo.createDeck(
+    { name: 'D', model: { model: scheduler === 'leitner' ? 'seven' : 'fsrs', custom: [] } },
+    now - 30 * DAY,
+  )
   const { note, cards } = await repo.createNote(
     { deckId: deck.id, modelType: 'cloze', fields: ['{{c1::a}} {{c2::b}}', ''], tags: [] },
     now - 30 * DAY,
@@ -237,17 +240,17 @@ describe('retire (P7) and scheduler switch', () => {
       c = o.card
     }
     expect(c.box).toBe(5)
-    expect(await switchScheduler(deck.id, 'fsrs', now)).toBe(2)
+    expect(await switchDeckModel(deck.id, 'fsrs', now)).toBe(2)
     expect((await repo.getDeck(deck.id))?.scheduler).toBe('fsrs')
     const fsrsCard = await repo.getCard(c.id)
     expect(fsrsCard?.state).toBe(2)
     expect(fsrsCard?.stability).toBeGreaterThan(1)
     expect((await repo.getCard(cards[1].id))?.state).toBe(0)
-    expect(await switchScheduler(deck.id, 'fsrs', now)).toBe(0)
-    await switchScheduler(deck.id, 'leitner', now)
+    expect(await switchDeckModel(deck.id, 'fsrs', now)).toBe(0)
+    await switchDeckModel(deck.id, 'seven', now)
     expect((await repo.getCard(c.id))?.box).toBeGreaterThanOrEqual(2)
     expect((await repo.getCard(cards[1].id))?.box).toBe(0)
-    await expect(switchScheduler('missing', 'fsrs', now)).rejects.toBeInstanceOf(RepoError)
+    await expect(switchDeckModel('missing', 'fsrs', now)).rejects.toBeInstanceOf(RepoError)
   })
 })
 

@@ -1,6 +1,6 @@
 /**
- * Leitner "Memory Box" with seven boxes and an interval per box (03-SCHEDULING §3).
- * Pure: `now` is a parameter; no Dexie, no DOM.
+ * Boîte de Leitner: one interval per compartment, as many compartments as the deck's box has
+ * (03-SCHEDULING §3, models in domain/leitner.ts). Pure: `now` is a parameter; no Dexie, no DOM.
  */
 import type { Card, CardState, Deck, Rating } from '../domain/types'
 import { formatInterval } from '../i18n/format'
@@ -9,19 +9,7 @@ import { daysBetween } from './day'
 import { flipAfter } from './sides'
 import type { PreviewItem, Scheduler, SchedulerOptions, SchedulerOutcome } from './types'
 
-export const MAX_BOX = 7
 const DAY_MS = 86_400_000
-
-/** FSRS → Leitner conversion (03 §4): box from stability, an approximation. */
-export function boxFromStability(stability: number): number {
-  if (stability < 1.5) return 1
-  if (stability < 4) return 2
-  if (stability < 15) return 3
-  if (stability < 50) return 4
-  if (stability < 120) return 5
-  if (stability < 250) return 6
-  return 7
-}
 
 export function createLeitnerScheduler(options: Pick<SchedulerOptions, 'dayStartHour'>): Scheduler {
   const { dayStartHour } = options
@@ -36,11 +24,12 @@ export function createLeitnerScheduler(options: Pick<SchedulerOptions, 'dayStart
     const s = deck.settings.leitner
     // Hard does not exist in Leitner (03 §3.3); treated as "Réussi" if ever received.
     const success = rating >= 2
+    const last = s.intervals.length
     let box: number
     if (!success) box = s.failToBox
     else if (card.box === 0)
-      box = 2 // first answer of a new card, seen once and right
-    else box = Math.min(card.box + (rating === 4 && s.allowSure ? 2 : 1), MAX_BOX)
+      box = Math.min(2, last) // first answer of a new card, seen once and right
+    else box = Math.min(card.box + (rating === 4 && s.allowSure ? 2 : 1), last)
     const state: CardState = success ? 2 : 3
     // "Replace the card in box 1, behind the others": re-presented in the session (03 §3.4).
     const due = success ? dueFor(box, now, deck) : now

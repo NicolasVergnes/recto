@@ -37,6 +37,11 @@ export const SOURCES: readonly { label: string; url: string }[] = [
     url: 'https://doi.org/10.1037/a0024828',
   },
   {
+    label:
+      'La Memory Box, Fabien Olicard et Céline Holynski (Larousse, 2018) — boîte de Leitner à sept compartiments',
+    url: 'https://www.editions-larousse.fr/livre/la-memory-box-9782035960054/',
+  },
+  {
     label: 'Open Spaced Repetition — FSRS et benchmark SRS',
     url: 'https://github.com/open-spaced-repetition',
   },

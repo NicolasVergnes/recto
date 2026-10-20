@@ -6,7 +6,7 @@ Ordre de lecture pour un développeur (humain ou Claude Code) qui arrive sur le 
 |---|---|---|
 | `01-SPEC.md` | Cahier des charges : vision, principes non négociables (P1–P11), périmètre, exigences | Toujours, en premier |
 | `02-DATA-MODEL.md` | Schéma Dexie, types, invariants, format de sauvegarde | Avant tout code touchant la base |
-| `03-SCHEDULING.md` | FSRS via ts-fsrs, Leitner Memory Box, file du jour | Avant M2, et pour toute question d'échéance |
+| `03-SCHEDULING.md` | FSRS via ts-fsrs, boîte de Leitner (7, 5 ou Ma boîte), file du jour | Avant M2, et pour toute question d'échéance |
 | `04-UI.md` | Routes, parcours, textes français, design, accessibilité | Avant tout écran |
 | `05-IMPORT-EXPORT.md` | CSV, `.apkg`, sauvegarde | Avant M3 et M4 |
 | `06-PWA-QUALITY.md` | PWA, stockage, outils, tests, conventions, déploiement | Avant M0, et à chaque `npm run verify` |

@@ -36,6 +36,7 @@ import type {
 import { recordDeletions } from './deletions'
 import { RepoError } from './errors'
 import { db, newId } from './schema'
+import { newDeckModel } from './settings'
 
 // ─── Decks ──────────────────────────────────────────────────────────────────
 
@@ -74,12 +75,14 @@ async function assertValidParent(parentId: string | null, childId?: string) {
   }
 }
 
+/** A new deck follows the « planificateur des nouveaux paquets » unless `input.model` says. */
 export async function createDeck(input: NewDeckInput, now: number): Promise<Deck> {
   const parentId = input.parentId ?? null
+  const model = input.model ?? (await newDeckModel())
   return db.transaction('rw', db.decks, async () => {
     await assertValidParent(parentId)
     await assertNameFree(input.name, parentId)
-    const deck = makeDeck({ ...input, parentId }, newId(), now)
+    const deck = makeDeck({ ...input, parentId, model }, newId(), now)
     await db.decks.add(deck)
     return deck
   })

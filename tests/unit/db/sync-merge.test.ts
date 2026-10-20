@@ -288,11 +288,15 @@ describe('merging another device follows its deletions (M12)', () => {
     await on(a, async () => {
       await setSetting('theme', 'dark')
       await setSetting('dayStartHour', 6, T0 + 2 * MIN)
+      await setSetting('newDeckModel', 'five', T0 + 2 * MIN)
+      await setSetting('leitnerCustom', [1, 4, 10], T0 + 2 * MIN)
     })
     await on(b, () => setSetting('dayStartHour', 5, T0 + MIN)) // older
     await mergeInto(b, await backupOf(a, T0 + 3 * MIN), T0 + 4 * MIN)
     await on(b, async () => {
       expect(await getSetting('dayStartHour')).toBe(6)
+      expect(await getSetting('newDeckModel')).toBe('five')
+      expect(await getSetting('leitnerCustom')).toEqual([1, 4, 10])
       expect(await getSetting('theme')).toBe('system')
       expect(await getSetting('deviceId')).not.toBe(await on(a, () => getSetting('deviceId')))
     })

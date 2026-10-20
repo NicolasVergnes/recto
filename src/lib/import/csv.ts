@@ -4,6 +4,7 @@
  */
 import Papa from 'papaparse'
 import { makeCard } from '../domain/defaults'
+import type { ModelChoice } from '../domain/leitner'
 import {
   cardOrds,
   noteFront,
@@ -148,6 +149,8 @@ export interface CsvImportOptions {
   /** …or, when `deckId` is empty, a new deck created only if a row needs it. */
   newDeckName?: string
   duplicates: DuplicateStrategy
+  /** M19: how the decks the import creates are scheduled; FSRS when absent. */
+  model?: ModelChoice
 }
 
 export interface ExistingCollection {
@@ -195,7 +198,7 @@ export function planCsvImport(
     const i = col(name)
     return i === -1 ? '' : (row[i] ?? '').trim()
   }
-  const resolver = new DeckResolver(existing.decks, now, newId)
+  const resolver = new DeckResolver(existing.decks, now, newId, options.model)
   const rowDeck = (row: readonly string[]) =>
     resolver.resolve(at(row, 'deck'))?.id ??
     (options.deckId || resolver.resolve(options.newDeckName || 'Import')?.id || '')

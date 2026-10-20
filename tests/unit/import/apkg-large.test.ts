@@ -78,7 +78,12 @@ describe('large .apkg (≥ 1 000 cards, 07-ROADMAP M4)', () => {
     expect(pkg.cards).toHaveLength(10_000)
     const plan = await planApkgImport(
       pkg,
-      { target: { mode: 'anki' }, importHistory: true, scheduler: 'fsrs', dayStartHour: 4 },
+      {
+        target: { mode: 'anki' },
+        importHistory: true,
+        model: { model: 'fsrs', custom: [] },
+        dayStartHour: 4,
+      },
       await existingForApkg(),
       Date.UTC(2026, 8, 25),
       () => crypto.randomUUID(),

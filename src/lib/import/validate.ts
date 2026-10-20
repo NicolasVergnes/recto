@@ -3,14 +3,17 @@
  * (06 §5: no `any`, manual validators).
  */
 import { defaultDeckSettings } from '../domain/defaults'
+import { intervalsOf, LEITNER_PRESETS, MAX_BOXES, MIN_BOXES, sameBox } from '../domain/leitner'
 import {
   DELETION_TABLES,
+  LEITNER_MODELS,
   MODEL_TYPES,
   type Card,
   type CardTemplate,
   type Deck,
   type Deletion,
   type DeckSettings,
+  type LeitnerSettings,
   type Note,
   type NoteType,
   type Review,
@@ -28,6 +31,8 @@ const isStrArray = (x: unknown): x is string[] => Array.isArray(x) && x.every(is
 const isNumArray = (x: unknown): x is number[] => Array.isArray(x) && x.every(isNum)
 const oneOf = <T extends string | number>(values: readonly T[], x: unknown): x is T =>
   values.some((v) => v === x)
+const isDeckBox = (x: unknown): x is number[] =>
+  isNumArray(x) && x.length >= MIN_BOXES && x.length <= MAX_BOXES && x.every((days) => days > 0)
 const optStr = (x: unknown) => x === undefined || isStr(x)
 const nullableNum = (x: unknown): x is number | null => x === null || isNum(x)
 
@@ -53,15 +58,29 @@ function readSettings(x: unknown): DeckSettings | null {
       params: isNumArray(f.params) ? f.params : null,
       ratingMode: f.ratingMode === 2 ? 2 : 4,
     },
-    leitner: {
-      intervals:
-        isNumArray(l.intervals) && l.intervals.length === 7 ? l.intervals : d.leitner.intervals,
-      allowSure: isBool(l.allowSure) ? l.allowSure : d.leitner.allowSure,
-      failToBox: 1,
-    },
+    leitner: readLeitner(l, isBool(l.allowSure) ? l.allowSure : d.leitner.allowSure),
   }
   // Scheduler parameters are validated before they ever reach fsrs() (03 §2.1).
   return validateFsrsSettings(settings.fsrs).length === 0 ? settings : null
+}
+
+/**
+ * M19: the box a deck follows. Without a model (backups before schema 8), the seven-compartment
+ * intervals follow that box and changed ones « Ma boîte », like the Dexie version 7 upgrade. A
+ * fixed box always gets its own intervals; « Ma boîte » keeps the deck's copy (2 to 10 positive
+ * numbers, as hand-made intervals of M9 may be) or falls back to seven compartments.
+ */
+function readLeitner(l: Obj, allowSure: boolean): LeitnerSettings {
+  const seven = LEITNER_PRESETS.seven
+  const model = oneOf(LEITNER_MODELS, l.model)
+    ? l.model
+    : sameBox(l.intervals, seven)
+      ? 'seven'
+      : 'custom'
+  if (model === 'custom' && isDeckBox(l.intervals))
+    return { model, intervals: l.intervals, allowSure, failToBox: 1 }
+  const fixed = model === 'custom' ? 'seven' : model
+  return { model: fixed, intervals: intervalsOf(fixed, []), allowSure, failToBox: 1 }
 }
 
 export function readDeck(x: unknown): Deck | null {

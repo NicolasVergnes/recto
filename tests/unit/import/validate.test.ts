@@ -157,15 +157,40 @@ describe('backup validators', () => {
         newOrder: 'x',
         burySiblings: true,
         fsrs: { learningSteps: 'no', params: 'no' },
-        leitner: { intervals: [1, 2] },
+        leitner: { intervals: [1] },
       },
     })
     expect(d?.settings).not.toHaveProperty('burySiblings')
     expect(d?.settings).toMatchObject({
       newOrder: 'random',
       fsrs: { learningSteps: ['10m', '10m'], params: null, ratingMode: 4 },
-      leitner: { intervals: [1, 2, 7, 30, 90, 180, 365] },
+      leitner: { model: 'seven', intervals: [1, 2, 7, 30, 90, 180, 365], allowSure: true },
     })
     expect(readAll('x', readSetting)).toEqual({ rows: [], invalid: 0 })
+  })
+
+  it('reads the box of a deck, named or not (M19)', () => {
+    const leitner = (box: Record<string, unknown>) =>
+      readDeck({ ...deck, settings: { ...deck.settings, leitner: box } })?.settings.leitner
+    expect(leitner({ model: 'five', intervals: [9, 9], allowSure: false })).toEqual({
+      model: 'five',
+      intervals: [1, 3, 7, 14, 30],
+      allowSure: false,
+      failToBox: 1,
+    })
+    expect(leitner({ model: 'custom', intervals: [1, 4, 10] })).toMatchObject({
+      model: 'custom',
+      intervals: [1, 4, 10],
+    })
+    // Before schema 8: no model; hand-changed intervals (M9) are kept as « Ma boîte ».
+    expect(leitner({ intervals: [1, 2, 7, 30, 90, 180, 365] })?.model).toBe('seven')
+    expect(leitner({ intervals: [1, 2, 5, 30, 90, 180, 365] })).toMatchObject({
+      model: 'custom',
+      intervals: [1, 2, 5, 30, 90, 180, 365],
+    })
+    expect(leitner({ model: 'custom', intervals: [0, 3] })).toMatchObject({ model: 'seven' })
+    expect(leitner({ model: 'x', intervals: Array(11).fill(1) })).toMatchObject({
+      model: 'seven',
+    })
   })
 })

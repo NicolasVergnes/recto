@@ -14,7 +14,8 @@ export function deck(
   patch: SettingsPatch = {},
   createdAt = paris('2026-01-10T10:00:00Z'),
 ): Deck {
-  const d = makeDeck({ name: id, scheduler }, id, createdAt)
+  const model = scheduler === 'fsrs' ? 'fsrs' : 'seven'
+  const d = makeDeck({ name: id, model: { model, custom: [] } }, id, createdAt)
   const { fsrs, leitner, ...rest } = patch
   d.settings = {
     ...d.settings,

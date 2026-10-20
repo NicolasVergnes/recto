@@ -27,7 +27,7 @@ const empty: ApkgExisting = { decks: [], notes: [], cards: [], media: new Map() 
 const options: ApkgImportOptions = {
   target: { mode: 'anki' },
   importHistory: false,
-  scheduler: 'fsrs',
+  model: { model: 'fsrs', custom: [] },
   dayStartHour: 4,
 }
 

@@ -1,6 +1,6 @@
+import { boxFromStability } from '../domain/leitner'
 import type { Card, Deck, Review, SchedulerKind } from '../domain/types'
 import { rescheduleFromHistory } from './fsrs'
-import { boxFromStability } from './leitner'
 
 /**
  * Converts a card when its deck changes scheduler (03 §4). Pure; the caller writes all cards in
@@ -24,6 +24,8 @@ export function convertCard(
       updatedAt: now,
     }
   }
-  // FSRS → Leitner: box from stability (approximation), due kept.
-  return { ...card, box: card.state === 0 ? 0 : boxFromStability(card.stability), updatedAt: now }
+  // FSRS → Leitner: box from stability in the deck's box (approximation), due kept.
+  const box =
+    card.state === 0 ? 0 : boxFromStability(card.stability, deck.settings.leitner.intervals)
+  return { ...card, box, updatedAt: now }
 }

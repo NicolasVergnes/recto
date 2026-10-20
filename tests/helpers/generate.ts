@@ -27,7 +27,10 @@ export async function generateCollection(db: RectoDB, seed: string) {
   const decks: Deck[] = []
   for (let i = 0; i < 1 + int(3); i++) {
     const parent = makeDeck(
-      { name: `Deck ${i} é`, scheduler: pick(['fsrs', 'leitner'] as const) },
+      {
+        name: `Deck ${i} é`,
+        model: { model: pick(['fsrs', 'seven', 'five', 'custom'] as const), custom: [1, 4, 10] },
+      },
       id(),
       t0 + i,
     )

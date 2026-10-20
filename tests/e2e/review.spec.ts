@@ -70,13 +70,11 @@ test('review: reveal, rate, undo and rate again', async ({ page }) => {
   await expect(page.getByText('0 nouvelle', { exact: true })).toBeVisible()
 })
 
-test('Memory Box decks show the due date, not the box, under the rating buttons', async ({
-  page,
-}) => {
+test('Leitner decks show the due date, not the box, under the rating buttons', async ({ page }) => {
   await deckWithNotes(page, 'Boîte', [['Soleil', 'Sun']])
   await page.goto('/#/')
   await page.getByRole('link', { name: 'Boîte', exact: true }).click()
-  await page.getByLabel('Memory Box (7 compartiments)').check()
+  await page.getByLabel('Boîte de Leitner (7 compartiments)', { exact: true }).check()
   // No backup is downloaded before the conversion any more (M9).
   let downloads = 0
   page.on('download', () => downloads++)
@@ -84,8 +82,11 @@ test('Memory Box decks show the due date, not the box, under the rating buttons'
   await page.getByRole('dialog').getByRole('button', { name: 'Changer de planificateur' }).click()
   await expect(page.getByText(/Planificateur changé/)).toBeVisible()
   expect(downloads).toBe(0)
-  // Box intervals stay editable; the booklet calendar is gone.
-  await expect(page.getByLabel('Compartiment 1', { exact: true })).toHaveValue('1')
+  // The intervals belong to the box (M19), shown in the deck; the booklet calendar is gone.
+  const intervals = page.getByRole('list', { name: 'Intervalles des compartiments' })
+  await expect(intervals.getByRole('listitem')).toHaveCount(7)
+  await expect(intervals.getByRole('listitem').first()).toContainText('Compartiment 1')
+  await expect(intervals.getByRole('listitem').first()).toContainText('1 jour')
   await expect(page.getByText(/Calendrier du coffret/)).toHaveCount(0)
 
   await page.getByRole('link', { name: 'Réviser ce paquet' }).click()

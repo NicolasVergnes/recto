@@ -1,5 +1,5 @@
-import type { ModelType } from '$lib/domain/types'
-import type { MessageKey } from '$lib/i18n'
+import type { DeckModel, ModelType } from '$lib/domain/types'
+import { t, type MessageKey } from '$lib/i18n'
 
 /** Display name of each kind of note (imports): built-in ones are Basique notes (M14). */
 export const MODEL_LABEL: Record<ModelType, MessageKey> = {
@@ -15,3 +15,14 @@ export const BASIC_KINDS: readonly { value: Exclude<ModelType, 'custom'>; label:
   { value: 'cloze', label: 'editor.cloze' },
   { value: 'image_occlusion', label: 'editor.imageOcclusion' },
 ]
+
+const DECK_MODEL_LABEL: Record<Exclude<DeckModel, 'custom'>, MessageKey> = {
+  fsrs: 'scheduler.fsrs',
+  seven: 'scheduler.seven',
+  five: 'scheduler.five',
+}
+
+/** How a deck is scheduled, by name (M19); « Ma boîte » says how many compartments it has. */
+export function deckModelLabel(model: DeckModel, customBoxes: number): string {
+  return model === 'custom' ? t('scheduler.custom', { n: customBoxes }) : t(DECK_MODEL_LABEL[model])
+}

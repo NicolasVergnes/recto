@@ -797,3 +797,43 @@ describe('card formats of decks (M17)', () => {
     )
   })
 })
+
+describe('Leitner models (M19)', () => {
+  const zip = (files: Record<string, string>) =>
+    zipSync(Object.fromEntries(Object.entries(files).map(([k, v]) => [k, strToU8(v)])))
+  const manifest = (v: number) => JSON.stringify({ format: 'recto-backup', schemaVersion: v })
+  const deck = makeDeck({ name: 'D', model: { model: 'seven', custom: [] } }, 'd1', 10)
+  const { model: _m, ...unnamed } = deck.settings.leitner
+  const changed = [1, 3, 7, 30, 90, 180, 365]
+
+  it('reads a version 7 backup: decks name their box, changed intervals become « Ma boîte »', () => {
+    const decks = [
+      { ...deck, settings: { ...deck.settings, leitner: unnamed } },
+      {
+        ...deck,
+        id: 'd2',
+        settings: { ...deck.settings, leitner: { ...unnamed, intervals: changed } },
+      },
+    ]
+    const v7 = JSON.stringify({ decks })
+    const { data } = parseBackup(zip({ 'manifest.json': manifest(7), 'data.json': v7 }), 8)
+    expect(data.decks.map((d) => [d.settings.leitner.model, d.settings.leitner.intervals])).toEqual(
+      [
+        ['seven', [1, 2, 7, 30, 90, 180, 365]],
+        ['custom', changed],
+      ],
+    )
+    expect(data.settings).toEqual([{ key: 'leitnerCustom', value: changed, updatedAt: 0 }])
+  })
+
+  it('keeps a five-compartment deck and « Ma boîte » of a version 8 backup; version 7 refuses it', () => {
+    const five = makeDeck({ name: 'D', model: { model: 'five', custom: [] } }, 'd1', 10)
+    const settings = [{ key: 'leitnerCustom', value: [1, 4, 10], updatedAt: 3 }]
+    const v8 = JSON.stringify({ decks: [five], settings })
+    const files = { 'manifest.json': manifest(8), 'data.json': v8 }
+    const { data } = parseBackup(zip(files), 8)
+    expect(data.decks).toEqual([five])
+    expect(data.settings).toEqual(settings)
+    expect(() => parseBackup(zip(files), 7)).toThrow(BackupError)
+  })
+})

@@ -1,6 +1,6 @@
 ---
 name: srs-rules
-description: Règles pédagogiques non négociables de Recto (rappel actif, espacement, auto-évaluation, plafonds, abandon des cartes) issues de la recherche, et recette d'implémentation avec ts-fsrs 5 et le Leitner Memory Box. Charger avant tout travail sur scheduler/, queue/, l'écran de révision, l'éditeur ou les paramètres de paquet.
+description: Règles pédagogiques non négociables de Recto (rappel actif, espacement, auto-évaluation, plafonds, abandon des cartes) issues de la recherche, et recette d'implémentation avec ts-fsrs 5 et la boîte de Leitner (7, 5 compartiments ou Ma boîte). Charger avant tout travail sur scheduler/, queue/, l'écran de révision, l'éditeur ou les paramètres de paquet.
 ---
 
 # Règles de répétition espacée (srs-rules)
@@ -49,10 +49,12 @@ const { collections, reschedule_item } = f.reschedule(createEmptyCard(), history
 - Valider les paramètres venant d'une sauvegarde avant `fsrs()` (21 nombres finis, rétention dans [0,7 ; 0,99]).
 - `enable_fuzz` rend `preview` légèrement aléatoire : les tests passent `enable_fuzz: false` ou comparent avec une tolérance.
 
-## 3. Leitner Memory Box — invariants
+## 3. Boîte de Leitner — invariants
 
-- Compartiments 1–7 ; `intervals = [1, 2, 7, 30, 90, 180, 365]`, réglables par paquet. Pas de mode calendrier du coffret (retiré en M9, `docs/03-SCHEDULING.md` §3.2).
-- Oublié → C1 ; Réussi → +1 ; Sûr → +2 ; plafond C7 ; C7 réussie reste en C7.
+- Trois boîtes (M19, `domain/leitner.ts`) : 7 compartiments `[1, 2, 7, 30, 90, 180, 365]` (défaut, livret de la Memory Box), 5 `[1, 3, 7, 14, 30]`, « Ma boîte » (2 à 10 compartiments, jours entiers 1–36 500 jamais décroissants, réglage partagé `leitnerCustom`). Les deux premières sont fixes. Le paquet nomme sa boîte (`settings.leitner.model`) et garde une copie de ses jours ; le nombre de compartiments est `intervals.length`. Pas de mode calendrier du coffret (retiré en M9, `docs/03-SCHEDULING.md` §3.2).
+- Oublié → C1 ; Réussi → +1 ; Sûr → +2 ; plafond au dernier compartiment, qui garde une carte réussie.
+- Changer de boîte : compartiment gardé, au plus le dernier, échéance gardée. FSRS → boîte : compartiment dont l'intervalle est le plus proche de la stabilité (échelle logarithmique).
+- Interface : « Boîte de Leitner », jamais « Memory Box » (sauf la source scientifique).
 - Nouvelle carte : premier succès → C2 ; premier échec → C1.
 - `alternateSides` (réglage du paquet, FSRS et Leitner depuis M11) : bascule `sideFlipped` à chaque succès uniquement ; une note basique n'a qu'une carte, posée dans les deux sens (plus de `basic_reverse`), sauf `oneWay`.
 - Échec re-présenté dans la séance après ≥ 10 cartes ; chaque réponse journalisée.

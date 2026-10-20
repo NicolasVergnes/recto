@@ -1,7 +1,8 @@
 import { makeDeck } from '../domain/defaults'
 import { splitDeckPath } from '../domain/decks'
 import { normalizeText } from '../domain/text'
-import type { Deck, SchedulerKind } from '../domain/types'
+import type { ModelChoice } from '../domain/leitner'
+import type { Deck } from '../domain/types'
 
 /**
  * Resolves `Parent::Child` paths to decks, creating the missing ones (one nesting level).
@@ -15,7 +16,8 @@ export class DeckResolver {
     existing: readonly Deck[],
     private readonly now: number,
     private readonly newId: () => string,
-    private readonly scheduler: SchedulerKind = 'fsrs',
+    /** M19: how created decks are scheduled (« planificateur des nouveaux paquets »). */
+    private readonly model?: ModelChoice,
   ) {
     for (const deck of existing) this.byKey.set(this.key(deck.parentId ?? null, deck.name), deck)
   }
@@ -28,7 +30,11 @@ export class DeckResolver {
     const key = this.key(parentId, name)
     let deck = this.byKey.get(key)
     if (!deck) {
-      deck = makeDeck({ name, parentId, scheduler: this.scheduler }, this.newId(), this.now)
+      deck = makeDeck(
+        { name, parentId, ...(this.model && { model: this.model }) },
+        this.newId(),
+        this.now,
+      )
       this.byKey.set(key, deck)
       this.created.push(deck)
     }

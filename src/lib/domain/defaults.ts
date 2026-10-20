@@ -1,6 +1,5 @@
-import type { Card, Deck, DeckSettings, Note, SchedulerKind } from './types'
-
-export const DEFAULT_LEITNER_INTERVALS = [1, 2, 7, 30, 90, 180, 365] as const
+import { intervalsOf, isBox, LEITNER_PRESETS, sameBox, type ModelChoice } from './leitner'
+import type { Card, Deck, DeckSettings, Note } from './types'
 
 export function defaultDeckSettings(): DeckSettings {
   return {
@@ -22,7 +21,8 @@ export function defaultDeckSettings(): DeckSettings {
       ratingMode: 4,
     },
     leitner: {
-      intervals: [...DEFAULT_LEITNER_INTERVALS],
+      model: 'seven',
+      intervals: [...LEITNER_PRESETS.seven],
       allowSure: true,
       failToBox: 1,
     },
@@ -48,20 +48,42 @@ export function migrateDeckSettingsM17(settings: Record<string, unknown>): void 
   if (typeof settings.newByFormat !== 'boolean') settings.newByFormat = false
 }
 
+/**
+ * M19 migration of stored deck settings (Dexie version 7, backups before schema 8): a deck with
+ * the seven-compartment intervals follows that box; one whose intervals were changed by hand (M9)
+ * follows « Ma boîte » and keeps them (`customBoxOf` gives « Ma boîte » those intervals).
+ */
+export function migrateDeckSettingsM19(settings: Record<string, unknown>): void {
+  const leitner = settings.leitner
+  if (typeof leitner !== 'object' || leitner === null) return
+  const box = leitner as Record<string, unknown>
+  box.model = sameBox(box.intervals, LEITNER_PRESETS.seven) ? 'seven' : 'custom'
+}
+
 export interface NewDeckInput {
   name: string
   parentId?: string | null
   description?: string
-  scheduler?: SchedulerKind
+  /** FSRS when absent (M19: the app passes the « planificateur des nouveaux paquets »). */
+  model?: ModelChoice
 }
 
 export function makeDeck(input: NewDeckInput, id: string, now: number): Deck {
+  const settings = defaultDeckSettings()
+  const custom = input.model?.custom ?? []
+  // An unusable « Ma boîte » never reaches a deck: the seven-compartment box instead.
+  const chosen = input.model?.model ?? 'fsrs'
+  const model = chosen === 'custom' && !isBox(custom) ? 'seven' : chosen
+  if (model !== 'fsrs') {
+    settings.leitner.model = model
+    settings.leitner.intervals = intervalsOf(model, custom)
+  }
   const deck: Deck = {
     id,
     name: input.name.trim(),
     parentId: input.parentId ?? null,
-    scheduler: input.scheduler ?? 'fsrs',
-    settings: defaultDeckSettings(),
+    scheduler: model === 'fsrs' ? 'fsrs' : 'leitner',
+    settings,
     createdAt: now,
     updatedAt: now,
   }

@@ -24,7 +24,7 @@ const now = Date.UTC(2026, 9, 13, 8)
 const options: ApkgImportOptions = {
   target: { mode: 'anki' },
   importHistory: false,
-  scheduler: 'fsrs',
+  model: { model: 'fsrs', custom: [] },
   dayStartHour: 4,
 }
 const empty: ApkgExisting = { decks: [], notes: [], cards: [], media: new Map() }

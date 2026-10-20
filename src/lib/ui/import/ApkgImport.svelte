@@ -3,9 +3,9 @@
   import { live } from '$lib/db/live.svelte'
   import * as repo from '$lib/db/repo'
   import { newId } from '$lib/db/schema'
-  import { getSetting } from '$lib/db/settings'
+  import { getSetting, newDeckModel } from '$lib/db/settings'
   import { deckOptions } from '$lib/domain/decks'
-  import type { SchedulerKind } from '$lib/domain/types'
+  import type { ModelChoice } from '$lib/domain/leitner'
   import {
     describePackage,
     planApkgImport,
@@ -17,6 +17,7 @@
   import { endSession } from '$lib/state/session.svelte'
   import { toast } from '$lib/state/toast.svelte'
   import { errorMessage } from '../errors'
+  import ModelSelect from '../ModelSelect.svelte'
   import { formatBytes } from '../format'
   import { MODEL_LABEL } from '../model-labels'
   import { ApkgReadError, readApkgFile, shrinkImages } from './apkg-client'
@@ -41,7 +42,8 @@
   let singleDeck = $state(NEW_DECK)
   let newDeckName = $state('')
   let importHistory = $state(true)
-  let scheduler = $state<SchedulerKind>('fsrs')
+  let model = $state<ModelChoice>({ model: 'fsrs', custom: [] })
+  void newDeckModel().then((m) => (model = m))
   let keepOriginals = $state(false)
   /** M17: formats whose new cards wait, and the format after format order. */
   let pausedFormats = $state<string[]>([])
@@ -95,7 +97,7 @@
         {
           target,
           importHistory,
-          scheduler,
+          model: $state.snapshot(model),
           dayStartHour,
           pausedFormats: [...pausedFormats],
           newByFormat,
@@ -195,13 +197,12 @@
 
     <ApkgFormats formats={summary.formats} bind:paused={pausedFormats} bind:newByFormat />
 
-    <div class="field">
-      <label for={`${id}-scheduler`}>{t('apkg.scheduler')}</label>
-      <select id={`${id}-scheduler`} bind:value={scheduler}>
-        <option value="fsrs">{t('scheduler.fsrs')}</option>
-        <option value="leitner">{t('scheduler.leitner')}</option>
-      </select>
-    </div>
+    <ModelSelect
+      id={`${id}-scheduler`}
+      label={t('apkg.scheduler')}
+      bind:value={model.model}
+      customBoxes={model.custom.length}
+    />
     <label class="check">
       <input
         type="checkbox"

@@ -4,6 +4,7 @@
  */
 import { strFromU8, unzipSync } from 'fflate'
 import { migrateDeckSettingsM13 } from '../domain/defaults'
+import { customBoxOf } from '../domain/leitner'
 import type { Card, Deck, Deletion, Note, NoteType, Review, Setting } from '../domain/types'
 import type { BackupManifest } from '../export/backup'
 import {
@@ -69,7 +70,9 @@ function json(entries: Record<string, Uint8Array>, name: string): unknown {
  * `burySiblings`, like the Dexie version 4 upgrade. 5 → 6 (M14, M16) only adds card kinds, two-way
  * templates, single notes and masks of custom notes (absent: classic cards asked one way, one card
  * per index or group, no masks). 6 → 7 (M17) adds the decks' paused formats and `newByFormat`,
- * filled with their defaults by `readSettings` like the Dexie version 6 upgrade.
+ * filled with their defaults by `readSettings` like the Dexie version 6 upgrade. 7 → 8 (M19) names
+ * the box of each deck (`readSettings`) and gives « Ma boîte » the intervals changed by hand
+ * (`parseBackup`), like the Dexie version 7 upgrade.
  */
 function migrate(data: Record<string, unknown>, fromVersion: number): Record<string, unknown> {
   if (fromVersion < 5 && Array.isArray(data.decks))
@@ -104,6 +107,9 @@ export function parseBackup(bytes: Uint8Array, currentSchema: number): ParsedBac
   const cards = readAll(data.cards, readCard)
   const reviews = readAll(data.reviews, readReview)
   const settings = readAll(data.settings, readSetting)
+  const custom = m.schemaVersion < 8 ? customBoxOf(decks.rows) : null
+  if (custom && !settings.rows.some((s) => s.key === 'leitnerCustom'))
+    settings.rows.push({ key: 'leitnerCustom', value: custom, updatedAt: 0 })
   const media = readAll(data.media, readMediaMeta)
   const deletions = readAll(data.deletions, readDeletion)
   const files = new Map<string, Uint8Array<ArrayBuffer>>()

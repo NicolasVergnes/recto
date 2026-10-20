@@ -138,13 +138,21 @@ export function stateDistribution(cards: readonly Card[]): StateCounts {
   return out
 }
 
-/** Cards per Leitner box 1–7 (index 0 = C1), for cards of Memory Box decks. */
+/**
+ * Cards per compartment (index 0 = C1) of the Leitner decks: as many compartments as the largest
+ * box among them (M19); a card above the last compartment of its deck counts in that one.
+ */
 export function boxDistribution(cards: readonly Card[], decks: readonly Deck[]): number[] {
-  const leitner = new Set(decks.filter((d) => d.scheduler === 'leitner').map((d) => d.id))
-  const out = new Array<number>(7).fill(0)
+  const boxes = new Map(
+    decks
+      .filter((d) => d.scheduler === 'leitner')
+      .map((d) => [d.id, d.settings.leitner.intervals.length]),
+  )
+  const out = new Array<number>(Math.max(0, ...boxes.values())).fill(0)
   for (const card of cards) {
-    if (!leitner.has(card.deckId) || card.box < 1 || card.suspended || card.retired) continue
-    const i = Math.min(7, card.box) - 1
+    const last = boxes.get(card.deckId)
+    if (!last || card.box < 1 || card.suspended || card.retired) continue
+    const i = Math.min(last, card.box) - 1
     out[i] = (out[i] ?? 0) + 1
   }
   return out

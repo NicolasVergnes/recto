@@ -7,9 +7,10 @@ import { canRetire } from '../scheduler/retire'
 import { getScheduler, type SchedulerOutcome } from '../scheduler'
 import { dayStart, nextDayStart } from '../scheduler/day'
 import { buildQueue, type QueueCounts, type QueueResult, type TodayReview } from '../queue/build'
-import type { Card, Deck, Review, SchedulerKind } from '../domain/types'
+import type { Card, Deck, DeckModel, Review } from '../domain/types'
 import { deckTree } from '../domain/decks'
 import { cardFormat, type CardFormat } from '../domain/formats'
+import { capBox, deckModel, intervalsOf, isBox } from '../domain/leitner'
 import { recordDeletions } from './deletions'
 import { RepoError } from './errors'
 import { db, newId } from './schema'
@@ -170,34 +171,78 @@ export function countsByDeck(queue: TodayQueue): Map<string, QueueCounts> {
 }
 
 /**
- * Changes a deck's scheduler (03 §4) in a single transaction. Leitner → FSRS replays each
- * card's history (the log is kept); FSRS → Leitner derives the box.
+ * Changes how a deck is scheduled (03 §4) in a single transaction: Leitner → FSRS replays each
+ * card's history (the log is kept), FSRS → Leitner derives the compartment, and another Leitner
+ * box keeps each card's compartment, at most the last one (M19). Returns the cards changed.
  */
-export async function switchScheduler(
+export async function switchDeckModel(
   deckId: string,
-  to: SchedulerKind,
+  model: DeckModel,
   now: number,
 ): Promise<number> {
+  const custom = await getSetting('leitnerCustom')
   return db.transaction('rw', db.decks, db.cards, db.reviews, async () => {
     const deck = await db.decks.get(deckId)
     if (!deck) throw new RepoError('deckNotFound')
-    if (deck.scheduler === to) return 0
-    const target: Deck = { ...deck, scheduler: to, updatedAt: now }
+    const from = deckModel(deck)
+    if (from === model) return 0
+    const target: Deck =
+      model === 'fsrs'
+        ? { ...deck, scheduler: 'fsrs', updatedAt: now }
+        : {
+            ...deck,
+            scheduler: 'leitner',
+            settings: {
+              ...deck.settings,
+              leitner: { ...deck.settings.leitner, model, intervals: intervalsOf(model, custom) },
+            },
+            updatedAt: now,
+          }
     const cards = await db.cards.where('deckId').equals(deckId).toArray()
     const history = new Map<string, Review[]>()
-    if (to === 'fsrs') {
+    if (model === 'fsrs') {
       const rows = await db.reviews
         .where('cardId')
         .anyOf(cards.map((c) => c.id))
         .toArray()
       for (const r of rows) history.set(r.cardId, [...(history.get(r.cardId) ?? []), r])
     }
-    const converted = cards.map((card) =>
-      convertCard(card, to, target, history.get(card.id) ?? [], now),
-    )
+    const count = target.settings.leitner.intervals.length
+    const converted =
+      from !== 'fsrs' && model !== 'fsrs'
+        ? cards.flatMap((card) => capBox(card, count, now) ?? [])
+        : cards.map((card) =>
+            convertCard(card, target.scheduler, target, history.get(card.id) ?? [], now),
+          )
     await db.cards.bulkPut(converted)
     await db.decks.put(target)
     return converted.length
+  })
+}
+
+/**
+ * Saves « Ma boîte » (M19) with the decks that follow it, in a single transaction: they take its
+ * intervals and their cards keep their compartment, at most the last one. Returns those decks.
+ */
+export async function saveCustomBox(intervals: readonly number[], now: number): Promise<number> {
+  if (!isBox(intervals)) throw new RepoError('leitnerBox')
+  return db.transaction('rw', db.settings, db.decks, db.cards, async () => {
+    await db.settings.put({ key: 'leitnerCustom', value: [...intervals], updatedAt: now })
+    const decks = await db.decks
+      .filter((d) => d.scheduler === 'leitner' && d.settings.leitner.model === 'custom')
+      .toArray()
+    await db.decks.bulkPut(
+      decks.map((deck) => {
+        const leitner = { ...deck.settings.leitner, intervals: [...intervals] }
+        return { ...deck, settings: { ...deck.settings, leitner }, updatedAt: now }
+      }),
+    )
+    const cards = await db.cards
+      .where('deckId')
+      .anyOf(decks.map((d) => d.id))
+      .toArray()
+    await db.cards.bulkPut(cards.flatMap((card) => capBox(card, intervals.length, now) ?? []))
+    return decks.length
   })
 }
 

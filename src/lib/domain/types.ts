@@ -17,8 +17,20 @@ export interface FsrsSettings {
   ratingMode: 4 | 2
 }
 
+/**
+ * Boîte de Leitner models (M19, 03 §3): seven compartments (default), five, or « Ma boîte », the
+ * user's own box set in Paramètres.
+ */
+export const LEITNER_MODELS = ['seven', 'five', 'custom'] as const
+export type LeitnerModel = (typeof LEITNER_MODELS)[number]
+/** What a deck is scheduled with: FSRS or one of the boxes (planificateur des nouveaux paquets). */
+export const DECK_MODELS = ['fsrs', ...LEITNER_MODELS] as const
+export type DeckModel = (typeof DECK_MODELS)[number]
+
 export interface LeitnerSettings {
-  /** Days per box, default [1, 2, 7, 30, 90, 180, 365]. */
+  /** M19: the box this deck follows; `intervals` is a copy of its intervals. */
+  model: LeitnerModel
+  /** Days per box, one per compartment (2 to 10), default [1, 2, 7, 30, 90, 180, 365]. */
   intervals: number[]
   /** Default true: "Sûr" button (+2 boxes). */
   allowSure: boolean
@@ -169,7 +181,7 @@ export interface Card {
   scheduledDays: number
   learningSteps: number
   // Leitner
-  /** 0 = not applicable / new, 1..7. */
+  /** 0 = not applicable / new, then 1 to the last compartment of the deck's box (M19). */
   box: number
   /** Deck `alternateSides`: true = asks back→front (basic notes and two-way templates, M16). */
   sideFlipped: boolean

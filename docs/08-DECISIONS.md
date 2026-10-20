@@ -23,7 +23,7 @@ Conséquences : quota large (jusqu'à ~60 % du disque sur Chrome/Safari 17+) ; d
 ## ADR-004 — FSRS-6 via `ts-fsrs` comme planificateur principal, Leitner comme mode fidèle (2026-09-25)
 
 Contexte : le benchmark ouvert (10 000 utilisateurs Anki, 350 M de révisions) place FSRS loin devant SM-2/Leitner ; la méthode Memory Box est celle de départ de l'utilisateur.
-Décision : `ts-fsrs` 5.x (FSRS-6, MIT) pour FSRS ; implémentation maison de Leitner à 7 compartiments avec un intervalle par compartiment (le mode `calendar` du livret, présent jusqu'en M8, est retiré en M9). Pas de SM-2.
+Décision : `ts-fsrs` 5.x (FSRS-6, MIT) pour FSRS ; implémentation maison de Leitner à 7 compartiments avec un intervalle par compartiment (le mode `calendar` du livret, présent jusqu'en M8, est retiré en M9 ; boîtes à 5 compartiments et « Ma boîte » en M19, ADR-013). Pas de SM-2.
 Conséquences : les paramètres FSRS sont d'abord ceux par défaut ; optimisation locale en V1 avec `fsrs-browser`. Les deux planificateurs partagent une interface et le même journal.
 
 ## ADR-005 — Formats ouverts : CSV, `.apkg` legacy en import, sauvegarde zip JSON (2026-09-25)
@@ -89,3 +89,11 @@ Décision : l'export `.apkg` est retiré (code, interface, tests, contrôle manu
 - Aucune dépendance ne part : `sql.js` et `fflate` servent à l'import et à la sauvegarde.
 - Écarté : garder l'export caché ou en option avancée (un code à maintenir pour un usage qui contredit le positionnement).
 Conséquences : pour quitter Recto avec tout, la sauvegarde `.recto.zip` (format documenté, 05 §3) et l'export CSV.
+
+## ADR-013 — Boîte de Leitner à trois modèles (2026-10-21)
+
+Contexte : « Memory Box » est le nom d'un produit (le coffret Larousse de Fabien Olicard) ; la méthode est la boîte de Leitner. Nicolas veut une boîte à 7 compartiments (défaut), une à 5, ou la sienne, et choisir le planificateur des nouveaux paquets. L'ADR-004 prévoyait une boîte à 7 compartiments seulement, aux intervalles réglables par paquet (M9).
+Décision : trois modèles (`seven`, `five`, `custom` « Ma boîte »), `domain/leitner.ts`. Les deux premiers sont fixes ; Ma boîte est unique (2 à 10 compartiments, réglage partagé `leitnerCustom`). Un paquet nomme sa boîte et garde une copie de ses jours (`settings.leitner.model`, `intervals`) : le planificateur ne lit que le paquet, et enregistrer Ma boîte recopie ses jours dans ses paquets, dans la même transaction. Le planificateur des nouveaux paquets (`newDeckModel`, FSRS par défaut, partagé) vaut aussi pour les imports.
+- Changer de boîte : une carte garde son compartiment, au plus le dernier, et son échéance. FSRS → boîte : compartiment dont l'intervalle est le plus proche de la stabilité, en échelle logarithmique (généralise la table de l'ADR-004 ; seuils de la boîte à 7 légèrement déplacés).
+- Écarté : plusieurs modèles personnels nommés (une table de plus à fusionner entre appareils, pour un besoin non exprimé) ; une boîte réglée paquet par paquet (le défaut des nouveaux paquets ne pourrait pas la désigner) ; des paquets qui ne référencent que leur modèle sans copie de ses jours (planificateur et conversions dépendraient d'un réglage global).
+Conséquences : Dexie version 7, sauvegardes en version 8 ; des intervalles modifiés à la main avant M19 deviennent « Ma boîte » (ceux du paquet modifié le plus récemment ; les autres paquets gardent les leurs jusqu'au prochain enregistrement de Ma boîte). Après des modifications de Ma boîte sur deux appareils à la fois, un paquet peut garder les jours de l'autre version jusqu'au prochain enregistrement : rien n'est perdu.
