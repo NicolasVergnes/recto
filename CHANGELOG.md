@@ -4,6 +4,12 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 ## [Unreleased]
 
+### Navigateur de cartes sur petit téléphone
+
+#### Fixed
+
+- Sur un petit téléphone, la mosaïque et la liste des cartes ne passent plus sous la barre de navigation : la page défile quand les filtres prennent la place, et les boutons de la dernière tuile restent accessibles.
+
 ### M18 — Plus simple
 
 #### Changed

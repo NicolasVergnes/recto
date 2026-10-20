@@ -40,9 +40,12 @@
 </div>
 
 <style>
+  /* Sized by its container, never by its rows (`contain: size`): otherwise a screen that only
+     has a minimum height would grow to hold every row and render them all. */
   .viewport {
     flex: 1;
     min-height: 12rem;
+    contain: size;
     overflow-y: auto;
     overscroll-behavior: contain;
   }

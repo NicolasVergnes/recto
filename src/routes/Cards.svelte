@@ -168,16 +168,18 @@
 </section>
 
 <style>
+  /* A minimum, not a fixed height: when the filters leave less than the list's own minimum
+     (small phones), the page scrolls instead of the list running under the bottom navigation. */
   .browser {
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
-    height: calc(100dvh - 4.5rem);
+    min-height: calc(100dvh - 4.5rem);
   }
 
   @media (min-width: 900px) {
     .browser {
-      height: 100dvh;
+      min-height: 100dvh;
     }
   }
 

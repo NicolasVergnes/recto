@@ -22,7 +22,7 @@ test('the text size slider applies while it moves, not only when released', asyn
     el.value = '1.2'
     el.dispatchEvent(new Event('input', { bubbles: true }))
   })
-  await expect(page.getByText(/^Taille du texte des cartes : 120/)).toBeVisible()
+  await expect(page.getByText(/^Taille du texte des cartes\s:\s120/)).toBeVisible()
   expect(
     await page.evaluate(() => document.documentElement.style.getPropertyValue('--font-scale')),
   ).toBe('1.2')

@@ -1,16 +1,27 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-10-15 · Branche : `m18-plus-simple` (à relire et fusionner) · M18 terminé · suppression de paquet avec sauvegarde proposée fusionnée sur `main` (2026-10-15) · M13, M14, M16, M17 et le plugin `recto-deck-builder` 2.2.0 publiés (2026-10-14)
+Dernière mise à jour : 2026-10-20 · Branche : `fix-ci-e2e` (à relire et fusionner) · CI de nouveau verte, mosaïque réparée sur petit téléphone · M18 et la suppression de paquet avec sauvegarde proposée fusionnés et publiés (2026-10-15) · M13, M14, M16, M17 et le plugin `recto-deck-builder` 2.2.0 publiés (2026-10-14)
 
 ## Jalon en cours
 
-Aucun : M18 est terminé, sur sa branche, à relire. Recto reste une PWA installable (décision du 2026-10-12). En attente, sans numéro ni date :
+Aucun : M18 est fusionné sur `main` et publié ; le correctif de la CI est sur sa branche, à relire. Recto reste une PWA installable (décision du 2026-10-12). En attente, sans numéro ni date :
 
 - Application Android avec Capacitor (couche plateforme, projet `android/`, bouton retour, micro, sons, flux Maestro, APK de débogage en CI) ; l'identifiant d'application (`appId`) sera à décider à ce moment (proposition : `fr.nicolasvergnes.recto`).
 - Publication sur le Play Store (politique de confidentialité, signature, fiche, test fermé : 12 testeurs pendant 14 jours).
 - Synchronisation automatique PC ↔ Android (dossier, Drive ou Syncthing).
 
 ## Terminé
+
+### CI rouge depuis M18 : deux E2E réparés, mosaïque sur petit téléphone (2026-10-20)
+
+La CI échouait sur `main` depuis le commit de M18 (run 38658034394 ; le site a été publié quand même, `Pages` est un workflow séparé). Deux causes :
+
+- `smoke.spec.ts` › « the text size slider applies while it moves… » (bureau et mobile, aussi en local) : la RegExp attendait une espace ordinaire avant « : », alors que `t()` met une espace insécable (`frenchSpacing`). Défaut du test seul : `\s:\s`, comme `apkg.spec.ts`.
+- `browser-mosaic.spec.ts` › « the flip style is chosen in Settings… » (mobile, en CI seulement) : la barre de navigation interceptait le clic sur « Retourner ». **Défaut de l'application** : l'écran Cartes avait une hauteur fixe et la liste virtuelle un minimum de 12rem ; quand les filtres prennent plus de place (polices de Linux, filtre « Format de carte » de M17, petit téléphone), la liste débordait sous la barre de navigation, et le bas de la dernière tuile (« Retourner », « Modifier ») devenait inatteignable. Mesuré en local : 14 px cachés sur un Pixel 7, 61 px sur un téléphone de 640 px de haut. Correction : `.browser` en `min-height` (la page défile quand la place manque) et `contain: size` sur la liste virtuelle (elle ne grandit pas avec ses lignes, la virtualisation tient).
+
+Critères :
+- [x] Liste au-dessus de la barre de navigation sur un téléphone de 640 px, clic sur « Retourner » : E2E `browser-mosaic.spec.ts` › « on a small phone the mosaic stays above the bottom navigation » (échoue sans le correctif : bas de la liste à 640 px, barre à 579 px). Vérifié aussi à 1 000, 839 et 740 px : la liste remplit la place libre (312 px à 1 000 px), 2 à 3 tuiles sur 101 dans le DOM.
+- [x] `npm run verify` vert : check 0 erreur 0 avertissement, lint, format, 561 tests unitaires (couverture 91,6 % des lignes), build, E2E 119 réussis et 3 ignorés (bureau et mobile).
 
 ### M18 — Plus simple : curseur en direct, moins de jargon, gestes réparés, Recto sans export Anki (2026-10-15)
 
@@ -369,6 +380,7 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## Décisions prises en session
 
+- 2026-10-20 : quand la place manque sous les filtres de l'écran Cartes, la page défile et la liste garde ses 12rem ; alternative écartée : laisser la liste rétrécir (`min-height: 0`), qui ne montre plus qu'une tranche de tuile sur un petit téléphone, voire rien.
 - 2026-10-15 (M18) : le balayage marchait dans l'émulation mobile de Chromium une fois la réponse affichée ; la panne sur téléphone vient le plus probablement d'un balayage tenté sur la question (sans effet), du réglage propre à chaque appareil (désactivé par défaut) ou d'un geste repris par le navigateur. D'où : sur la carte cachée, un toucher ou un geste horizontal affiche la réponse (jamais de note sans réponse vue, P1) ; capture du pointeur et `pointercancel`. Alternative écartée : `touch-action: none` (empêcherait de faire défiler une longue carte).
 - 2026-10-15 (M18) : le numéro de compartiment reste visible là où l'on creuse (réglages du paquet, statistiques, infos de la carte), plus sous les boutons de révision.
 - 2026-10-15 (M18) : retrait de l'export `.apkg` sans migration : `NoteType.anki` reste stocké ; l'import garde `sourceGuid ?? id` (les fichiers exportés autrefois par Recto se réimportent sans doublons). Les cas d'import que seuls les tests de l'export couvraient (formules, heure d'été, aller-retour) ne sont plus testés de bout en bout ; la couverture du dossier `import` reste au-dessus du seuil.
@@ -537,6 +549,8 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 - Chromium ne passe pas la requête du favicon SVG par le service worker : hors ligne, la console signale l'échec de `logo.svg` (sans effet sur l'application, les icônes du manifeste sont précachées).
 
 ## À vérifier manuellement par Nicolas
+
+- Correctif du 2026-10-20 — Sur le téléphone, Cartes › Mosaïque puis Liste : faire défiler jusqu'en bas ; la dernière tuile (« Retourner », « Modifier ») et la dernière ligne restent au-dessus de la barre de navigation. Sur le PC, rien ne doit changer.
 
 - M18 — Sur le téléphone : activer « Gestes en révision » **dans les Paramètres du téléphone** (réglage propre à chaque appareil), réviser : toucher la carte affiche la réponse, la carte suit le doigt, balayer à droite note Bien (Réussi), à gauche Encore (Oublié). Déplacer le curseur de taille du texte : le pourcentage et le texte changent pendant le geste. Les vérifications ci-dessous qui exportent vers Anki (M6, M10, M14, M16) sont caduques.
 

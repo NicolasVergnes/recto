@@ -233,6 +233,26 @@ test('move: a new deck is created from the move dialog', async ({ page }) => {
   await expect(page.getByRole('row').filter({ hasText: 'Chien' })).toContainText('Animaux')
 })
 
+test('on a small phone the mosaic stays above the bottom navigation', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile', 'the navigation is at the bottom on phones only')
+  await page.setViewportSize({ width: 412, height: 640 })
+  await deckWithNotes(page, 'Petit écran', [['Chien', 'Dog']])
+  await page.goto('/#/cards')
+  await page.getByRole('radio', { name: 'Mosaïque', exact: true }).check()
+  // The filters leave less room than the list needs: the page scrolls, the list ends above the nav.
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+  const listBottom = await grid(page).evaluate((el) => el.getBoundingClientRect().bottom)
+  const navTop = await page
+    .getByRole('navigation', { name: 'Navigation principale' })
+    .evaluate((el) => el.getBoundingClientRect().top)
+  expect(listBottom).toBeLessThanOrEqual(navTop)
+  const flip = grid(page).getByRole('button', { name: 'Retourner' })
+  await flip.click()
+  await expect(flip).toHaveAttribute('aria-pressed', 'true')
+})
+
 test('mosaic: the flip style is chosen in Settings and reduced motion disables it', async ({
   page,
 }) => {
