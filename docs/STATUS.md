@@ -1,10 +1,10 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-10-21 · Branche : `m20-paquet-recto` (à relire et fusionner ; créée depuis `m19-boite-de-leitner`, elle contient M19 et `fix-ci-e2e`) · M20 terminé · M19 et `fix-ci-e2e` à relire (fusionner `m20-paquet-recto` les apporte tous) · M18 fusionné et publié (2026-10-15)
+Dernière mise à jour : 2026-10-21 · Branche : `main` · correctif de la CI, M19 et M20 fusionnés sur `main` (2026-10-21, à la demande de Nicolas) · M18 fusionné et publié (2026-10-15)
 
 ## Jalon en cours
 
-Aucun : M20 est terminé, sur sa branche, à relire. Recto reste une PWA installable (décision du 2026-10-12). En attente, sans numéro ni date :
+Aucun : M20 est fusionné sur `main`. Recto reste une PWA installable (décision du 2026-10-12). En attente, sans numéro ni date :
 
 - Application Android avec Capacitor (couche plateforme, projet `android/`, bouton retour, micro, sons, flux Maestro, APK de débogage en CI) ; l'identifiant d'application (`appId`) sera à décider à ce moment (proposition : `fr.nicolasvergnes.recto`).
 - Publication sur le Play Store (politique de confidentialité, signature, fiche, test fermé : 12 testeurs pendant 14 jours).
