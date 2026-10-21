@@ -103,9 +103,11 @@ describe('saveCustomBox (M19)', () => {
         settings: { leitner: { model: 'custom', intervals: [1, 5] } },
         updatedAt: now + 9,
       })
-    expect(
-      (await env.db.cards.where('deckId').anyOf([a.id, b.id]).toArray()).map((c) => c.box),
-    ).toEqual([1, 2, 2])
+    // Deck by deck: decks have random ids, so one query over both would list them in any order.
+    const boxes = async (deckId: string) =>
+      (await env.db.cards.where('deckId').equals(deckId).sortBy('id')).map((c) => c.box)
+    expect(await boxes(a.id)).toEqual([1, 2])
+    expect(await boxes(b.id)).toEqual([2])
     expect(await env.db.cards.get(kept?.id ?? '')).toEqual(kept)
     expect(await repo.getDeck(seven.id)).toEqual(seven)
     expect(await repo.getDeck(fsrsDeck.id)).toEqual(fsrsDeck)
