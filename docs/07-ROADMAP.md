@@ -209,3 +209,14 @@ Critères d'acceptation :
 - [x] Chaque paquet peut changer de planificateur ou de boîte ensuite : d'une boîte à l'autre, une carte garde son compartiment (au plus le dernier) et son échéance.
 - [x] Données : migration Dexie (paquets nommant leur boîte ; intervalles modifiés à la main conservés dans « Ma boîte »), sauvegardes plus anciennes lues de même, réglages partagés entre appareils.
 - [x] Tests unitaires et E2E ; `npm run verify` vert.
+
+## M20 — Paquet Recto `.rpkg` : partager, importer, exporter un paquet (demande de Nicolas, 2026-10-21)
+
+Hors roadmap initiale. Pour une bibliothèque de paquets comme celle d'Anki, mais propre à Recto, il faut d'abord un format de paquet (ADR-014). Le partage passe par le fichier : la SPEC exclut le partage en ligne (§2).
+
+Critères d'acceptation :
+- [x] Format `.rpkg` documenté (05 §5) : manifeste (titre, description, auteur, licence), paquet et sous-paquets avec leurs réglages (sans planificateur), types de notes, notes, médias ; contenu seul, sans progression.
+- [x] Export depuis la page Paquet (« Exporter », format par défaut), fichier partagé ou téléchargé.
+- [x] Import (Importer › Paquet Recto) : résumé, planificateur choisi à l'import ; réimporter une version plus récente met les notes à jour sans doublon, n'en supprime aucune ; un paquet existant garde ses réglages.
+- [x] Plugin `recto-deck-builder` 3.0.0 : écrit et vérifie des `.rpkg` (réglages de paquet compris), plus de `.apkg`.
+- [x] Tests unitaires (lecture, plan, aller-retour entre deux bases, plugin) et E2E ; `npm run verify` vert.

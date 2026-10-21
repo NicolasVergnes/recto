@@ -4,6 +4,7 @@
   import ApkgImport from '$lib/ui/import/ApkgImport.svelte'
   import BackupRestore from '$lib/ui/import/BackupRestore.svelte'
   import CsvImport from '$lib/ui/import/CsvImport.svelte'
+  import RpkgImport from '$lib/ui/import/RpkgImport.svelte'
 
   let _props: RouteProps = $props()
 </script>
@@ -11,6 +12,11 @@
 <section class="page page-wide stack">
   <h1 tabindex="-1">{t('import.title')}</h1>
   <p class="muted">{t('import.intro')}</p>
+
+  <details class="card-surface" open>
+    <summary><h2>{t('import.rpkg')}</h2></summary>
+    <RpkgImport />
+  </details>
 
   <details class="card-surface" open>
     <summary><h2>{t('import.csv')}</h2></summary>

@@ -1,16 +1,40 @@
 # STATUS — Recto
 
-Dernière mise à jour : 2026-10-21 · Branche : `m19-boite-de-leitner` (à relire et fusionner ; créée depuis `fix-ci-e2e`, elle la contient) · M19 terminé · `fix-ci-e2e` à relire et fusionner (ou fusionner directement `m19-boite-de-leitner`) · M18 fusionné et publié (2026-10-15)
+Dernière mise à jour : 2026-10-21 · Branche : `m20-paquet-recto` (à relire et fusionner ; créée depuis `m19-boite-de-leitner`, elle contient M19 et `fix-ci-e2e`) · M20 terminé · M19 et `fix-ci-e2e` à relire (fusionner `m20-paquet-recto` les apporte tous) · M18 fusionné et publié (2026-10-15)
 
 ## Jalon en cours
 
-Aucun : M19 est terminé, sur sa branche, à relire. Recto reste une PWA installable (décision du 2026-10-12). En attente, sans numéro ni date :
+Aucun : M20 est terminé, sur sa branche, à relire. Recto reste une PWA installable (décision du 2026-10-12). En attente, sans numéro ni date :
 
 - Application Android avec Capacitor (couche plateforme, projet `android/`, bouton retour, micro, sons, flux Maestro, APK de débogage en CI) ; l'identifiant d'application (`appId`) sera à décider à ce moment (proposition : `fr.nicolasvergnes.recto`).
 - Publication sur le Play Store (politique de confidentialité, signature, fiche, test fermé : 12 testeurs pendant 14 jours).
 - Synchronisation automatique PC ↔ Android (dossier, Drive ou Syncthing).
 
 ## Terminé
+
+### M20 — Paquet Recto `.rpkg` : partager, importer, exporter un paquet (2026-10-21)
+
+Demande de Nicolas : une bibliothèque de paquets comme Anki, propre à Recto, commence par un format de paquet pour l'export et l'import. Choix de Nicolas : extension `.rpkg` ; contenu seul (ni progression ni historique) ; les réglages du paquet voyagent, sauf le planificateur ; le plugin `recto-deck-builder` écrit ce format dans ce jalon. ADR-014.
+
+Plan suivi :
+
+1. Spec (05 §5, 02 §5) et ADR-014.
+2. Lecture et plan d'import (tests d'abord) : `src/lib/import/rpkg.ts` (`parseRpkg`, `describeRpkg`, `planRpkgImport`), médias mis en commun avec `.apkg` (`src/lib/import/media-plan.ts`), `PackageExisting`/`existingForPackage` partagés — `tests/unit/import/rpkg.test.ts`.
+3. Export : `src/lib/db/export-rpkg.ts` (`gatherRpkg`, `exportRpkg`), `src/lib/export/rpkg.ts` (`buildRpkg`) — `tests/unit/export-rpkg.test.ts` (aller-retour entre deux bases, mise à jour par l'auteur).
+4. Écran d'export : « Exporter » de la page Paquet, format `.rpkg` ou CSV, titre, description, auteur, licence.
+5. Écran d'import : section « Paquet Recto (.rpkg) » (résumé, planificateur, progression, rapport).
+6. Plugin 3.0.0 : `recto_rpkg.py` écrit et vérifie des `.rpkg` ; test du plugin sur `parseRpkg` + `planRpkgImport`.
+7. Textes et docs (SPEC, 04, 05, 07, 08, README), CHANGELOG.
+8. E2E `tests/e2e/rpkg.spec.ts` (`export-csv.spec.ts` n'a pas eu à changer : le navigateur garde « Exporter (CSV) »).
+9. `npm run verify`, vérification dans l'application, commit.
+
+Critères (07-ROADMAP M20) :
+
+- [x] Format documenté (05 §5, 02 §5, ADR-014), contenu seul, réglages sans planificateur — `tests/unit/import/rpkg.test.ts` › « reading a .rpkg (05 §5) » (aller-retour du format, lignes invalides comptées, réglages illisibles ignorés, refus : pas un zip, pas un paquet, version plus récente, JSON abîmé).
+- [x] Export depuis la page Paquet — `tests/unit/export-rpkg.test.ts` › « gathers the deck, its sub-deck… without progress » ; E2E `rpkg.spec.ts` (bureau et mobile : « Exporter », format par défaut, auteur, licence, fichier `astronomie.rpkg`).
+- [x] Import : résumé, planificateur, mise à jour sans doublon, aucune suppression, réglages gardés — `rpkg.test.ts` › « importing a .rpkg » (paquets et réglages, types avec leur id, cartes suspendues, réimport plus récent, copie identique ignorée, notes de l'auteur retrouvées, type modifié copié, médias renommés) ; `export-rpkg.test.ts` › « imports on another device as it was… », « brings the author an update… » ; E2E (« Tout effacer », import en 5 compartiments, réglage `newPerDay` repris, réimport : « 2 doublons ignorés »).
+- [x] Plugin 3.0.0 — `tests/unit/deck-builder-plugin.test.ts` (exemple : types, cartes, masques, médias, réglages et description ; régénération sans doublon ; 12 refus ; `check` d'un `.rpkg` et renvoi d'un `.apkg` vers Recto ; charte).
+- [x] `npm run verify` vert : check 0 erreur 0 avertissement, lint, format, 591 tests unitaires (couverture 92 % des lignes), build, E2E 125 réussis et 3 ignorés (bureau et mobile). Vérifié dans l'application réelle : export du paquet d'exemple « Géographie » puis résumé d'import (« par Nicolas », « existe déjà », « 101 notes sont déjà dans Recto »), lisibles sur ordinateur et téléphone (captures).
 
 ### M19 — Boîte de Leitner : trois modèles, un défaut pour les nouveaux paquets (2026-10-21)
 
@@ -399,12 +423,18 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 - Optimiseur : évaluation sur les révisions mêmes de l'entraînement (pas de validation croisée, comme Anki) ; il fonctionne dans Firefox (M10) ; Safari non testé (le WebKit de Playwright refuse les `Blob` dans IndexedDB).
 - Les filtres avancés d'Anki (`furigana:`, `tts:`…) rendent la valeur brute ; `[latex]…[/latex]` reste en source (LaTeX en mode texte, que KaTeX ne rend pas).
 - Réimport Anki : un type dont on a réordonné ou modifié les champs dans Recto n'est plus reconnu (ses notes sont ignorées et comptées) ; un type dont Anki a changé les champs aussi. Le style d'un type importé est gardé (`NoteType.anki`) sans plus servir depuis le retrait de l'export (M18).
+- Réimport `.rpkg` (M20) : même dette pour un type dont on a changé les champs dans Recto (copié « Nom (2) », ses notes connues ignorées) ; les modèles d'un type existant ne suivent pas ceux du paquet. Un paquet importé en `.apkg` depuis le plugin 2.x puis régénéré en `.rpkg` met à jour ses notes basiques, à trous et d'occlusion, pas ses questions ni ses types personnalisés (README du plugin).
+- `.rpkg` : pas d'association de fichier (ouvrir un `.rpkg` d'un double-clic), pas de bibliothèque de paquets livrés avec l'application (ADR-014, suites possibles) ; le bouton d'import dit « Importer n notes » même quand toutes sont déjà là (le résumé le dit).
 - CSV : l'export laisse de côté les notes des types personnalisés (pas de colonnes communes), alors que l'import sait désormais en créer.
 - E2E : Firefox et WebKit côte à côte se figent parfois quelques secondes (projets à 15 s d'attente) 
 - Couverture globale ≈ 92 % des lignes (seuils de 90 % appliqués au domaine : scheduler, queue, import) ; `db/`, `export/` et `domain/` couverts sans seuil.
 
 ## Décisions prises en session
 
+- 2026-10-21 (M20) : identité d'une note dans un `.rpkg` = `sourceGuid ?? id` (la convention de l'import `.apkg`) ; l'import pose `sourceGuid`. Un paquet régénéré par le plugin ou réexporté par son auteur retrouve donc ses notes. Le type de note d'un paquet garde son id quand il est libre (un réimport le retrouve sans champ de plus), sinon il est copié. Alternative écartée : un champ « paquet d'origine » sur les paquets (migration du modèle stocké pour un simple affichage ; le résumé compte déjà les notes connues).
+- 2026-10-21 (M20) : un import `.rpkg` ne supprime jamais de note absente du fichier et ne touche pas aux réglages d'un paquet existant (P7 : pas d'abandon de cartes à l'insu de l'utilisateur ; ses réglages sont les siens). Pas de réduction d'images à l'import (contrairement à `.apkg`) : un paquet exporté par Recto contient des images déjà réduites, et réduire changerait leur empreinte (un réimport les dupliquerait en « -2 »).
+- 2026-10-21 (M20) : plugin 3.0.0 sans écriture `.apkg` ni `check` des `.apkg` (Recto importe lui-même les paquets Anki) ; `add_question` devient une note Basique à sens unique (explication et source dans Extra) ; un sous-paquet de plus de deux niveaux est refusé (il était aplati) ; `css` accepté et ignoré pour les scripts existants ; guid par défaut inchangés. Le module s'appelle `recto_rpkg.py`.
+- 2026-10-21 (M20) : `ApkgExisting` devient `PackageExisting` (dans `import/plan.ts`) et `existingForApkg` devient `existingForPackage` : les deux importeurs de paquets partagent l'état de la collection et la gestion des médias (`import/media-plan.ts`, extraite d'`apkg.ts` sans changement de comportement).
 - 2026-10-21 (M19) : un paquet garde une copie des jours de sa boîte (`settings.leitner.intervals`) en plus de son nom (`model`) : planificateur, conversions et statistiques ne lisent que le paquet ; enregistrer Ma boîte recopie ses jours dans ses paquets, en une transaction. Alternative écartée : paquets qui ne référencent que leur modèle (un réglage global à passer à chaque planificateur, conversion et import). Cas rare accepté : après deux modifications de Ma boîte sur deux appareils à la fois, un paquet peut garder les jours de l'autre version jusqu'au prochain enregistrement.
 - 2026-10-21 (M19) : d'une boîte à l'autre (ou Ma boîte raccourcie), une carte garde le numéro de son compartiment, au plus le dernier, et son échéance — règle simple et prévisible. FSRS → boîte : compartiment de l'intervalle le plus proche de la stabilité (échelle logarithmique), une seule règle pour toutes les boîtes ; pour la boîte à 7, les seuils bougent un peu (1,41 / 3,74 / 14,5 / 52 / 127 / 256 j au lieu de 1,5 / 4 / 15 / 50 / 120 / 250).
 - 2026-10-21 (M19) : Ma boîte : 2 à 10 compartiments, jours entiers de 1 à 36 500, jamais plus courts que le précédent (espacement croissant, P4) ; un compartiment ajouté dure deux fois le précédent ; par défaut une copie de la boîte à 7. Une copie de paquet plus souple (2 à 10 nombres positifs) est acceptée à la lecture d'une sauvegarde, pour garder les jours réglés à la main avant M19.
@@ -582,7 +612,9 @@ Versions réellement installées (vs ADR-007) : svelte 5.57.1, vite 8.3.1, @svel
 
 ## À vérifier manuellement par Nicolas
 
-- M19 — Paramètres › Planification : choisir « Boîte de Leitner (5 compartiments) », créer un paquet (il est en 5 compartiments), importer un petit CSV (son paquet aussi) ; régler Ma boîte (par exemple 3 compartiments : 1, 4, 10 jours), passer un paquet sur « Ma boîte » (ses cartes gardent leur compartiment), modifier Ma boîte (confirmation avec le nombre de paquets). Un paquet Memory Box dont les intervalles avaient été changés à la main doit apparaître en « Ma boîte de Leitner » avec les mêmes jours. Paramètres › À propos › Sources : la Memory Box est citée. Sur le téléphone, la section Planification reste lisible. Téléverser le nouveau `tools/deck-builder/recto-deck-builder.zip` (2.2.1) dans l'application Claude.
+- M20 — Page d'un paquet (par exemple « Départements ») › Exporter › Paquet Recto : renseigner l'auteur et la licence, partager le fichier vers le téléphone (Drive, e-mail) ; sur le téléphone, Importer › Paquet Recto : le résumé (titre, auteur, notes déjà présentes) puis l'import ; les images et les réglages du paquet (nouvelles cartes par jour, formats en attente) arrivent, la progression non. Réimporter le même fichier : rien ne double. Plugin 3.0.0 : téléverser `tools/deck-builder/recto-deck-builder.zip` dans l'application Claude, redemander un paquet (il livre un `.rpkg`), l'importer, puis le faire régénérer avec une correction et le réimporter : la note corrigée est mise à jour, sans doublon.
+
+- M19 — Paramètres › Planification : choisir « Boîte de Leitner (5 compartiments) », créer un paquet (il est en 5 compartiments), importer un petit CSV (son paquet aussi) ; régler Ma boîte (par exemple 3 compartiments : 1, 4, 10 jours), passer un paquet sur « Ma boîte » (ses cartes gardent leur compartiment), modifier Ma boîte (confirmation avec le nombre de paquets). Un paquet Memory Box dont les intervalles avaient été changés à la main doit apparaître en « Ma boîte de Leitner » avec les mêmes jours. Paramètres › À propos › Sources : la Memory Box est citée. Sur le téléphone, la section Planification reste lisible. Téléverser le nouveau `tools/deck-builder/recto-deck-builder.zip` dans l'application Claude (la 3.0.0 de M20 remplace la 2.2.1).
 
 - Correctif du 2026-10-20 — Sur le téléphone, Cartes › Mosaïque puis Liste : faire défiler jusqu'en bas ; la dernière tuile (« Retourner », « Modifier ») et la dernière ligne restent au-dessus de la barre de navigation. Sur le PC, rien ne doit changer.
 

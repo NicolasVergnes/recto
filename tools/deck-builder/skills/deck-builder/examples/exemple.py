@@ -1,6 +1,6 @@
 """Exemple complet : un paquet qui utilise chaque type de note de Recto.
 
-    python exemple.py [sortie.apkg]
+    python exemple.py [sortie.rpkg]
 
 - type personnalisé « Pays d'Europe » : drapeau (image SVG générée), pays, capitale, continent ;
   deux cartes : Drapeau → Pays (toujours ce sens), Pays ↔ Capitale (une carte, posée dans les
@@ -12,7 +12,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
-from recto_apkg import Mask, Package, img, one_way, two_way  # noqa: E402
+from recto_rpkg import Mask, Package, img, one_way, two_way  # noqa: E402
 
 pkg = Package()
 
@@ -99,4 +99,9 @@ image = pkg.add_media(schema.encode(), name="couches_terre.svg")
 pkg.add_occlusion("Exemple::Sciences", image, masks, header="Les couches de la Terre",
                   alt="Coupe schématique de la Terre", tags=["geologie", "exemple"])
 
-pkg.write(sys.argv[1] if len(sys.argv) > 1 else "exemple.apkg")
+# ─── Réglages du paquet (appliqués quand l'import le crée ; le planificateur se choisit à l'import)
+pkg.settings("Exemple", description="Un paquet de démonstration du plugin recto-deck-builder.",
+             new_per_day=10, later=[(pays, "Pays ↔ Capitale")])
+pkg.settings("Exemple::Vocabulaire", typed_answer=True)
+
+pkg.write(sys.argv[1] if len(sys.argv) > 1 else "exemple.rpkg", author="recto-deck-builder", licence="CC0 1.0")

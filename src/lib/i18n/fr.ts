@@ -379,6 +379,7 @@ export const fr = {
   },
   import: {
     title: 'Importer',
+    rpkg: 'Paquet Recto (.rpkg)',
     csv: 'Fichier CSV ou TSV',
     apkg: 'Paquet Anki (.apkg)',
     backup: 'Sauvegarde Recto',
@@ -767,6 +768,38 @@ export const fr = {
       'Supprimés ici comme sur l’autre appareil : {n} paquet, note ou type de note.|Supprimés ici comme sur l’autre appareil : {n} paquets, notes ou types de notes.',
     mediaConflicts:
       '{n} média de la sauvegarde ignoré : un fichier du même nom, au contenu différent, existe déjà ici.|{n} médias de la sauvegarde ignorés : des fichiers du même nom, au contenu différent, existent déjà ici.',
+  },
+  rpkg: {
+    export: 'Exporter',
+    format: 'Format',
+    formatRpkg: 'Paquet Recto (.rpkg) : pour le partager ou l’importer dans un autre Recto',
+    formatCsv: 'CSV : pour un tableur',
+    help: 'Le paquet, ses sous-paquets, leurs notes, types de notes, médias et réglages ; ni votre progression ni votre historique. Il s’importe dans n’importe quel Recto (Importer › Paquet Recto).',
+    title: 'Titre',
+    description: 'Description',
+    author: 'Auteur (facultatif)',
+    licence: 'Licence',
+    licenceNone: 'Non précisée',
+    licenceBy: 'CC BY 4.0 (réutilisation libre en citant l’auteur)',
+    licenceBySa: 'CC BY-SA 4.0 (en citant l’auteur, sous la même licence)',
+    licenceZero: 'CC0 (domaine public)',
+    licenceReserved: 'Tous droits réservés',
+    licenceIs: 'Licence : {licence}',
+    exported: 'Paquet exporté ({n} note)|Paquet exporté ({n} notes)',
+    importHelp:
+      'Paquet partagé par un autre utilisateur de Recto ou créé par le plugin de Claude : ses notes, types, médias et réglages. Réimporter une version plus récente met les notes à jour, sans doublon.',
+    notZip: 'Ce fichier n’est pas un paquet Recto (archive illisible).',
+    notPackage: 'Ce fichier n’est pas un paquet Recto.',
+    newerVersion:
+      'Ce paquet vient d’une version plus récente de Recto : mettez l’application à jour.',
+    invalidData: 'Paquet Recto endommagé ou illisible.',
+    by: 'par {author}',
+    exportedOn: 'exporté le {date}',
+    summary: 'Notes : {notes} · cartes : {cards} · médias : {media}',
+    known:
+      '{n} note est déjà dans Recto : mise à jour si ce paquet est plus récent.|{n} notes sont déjà dans Recto : mises à jour si ce paquet est plus récent.',
+    existing: 'existe déjà : les notes y seront ajoutées',
+    invalidRows: '{n} élément illisible ignoré|{n} éléments illisibles ignorés',
   },
   exportCsv: {
     button: 'Exporter (CSV)',

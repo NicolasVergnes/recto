@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { zipSync, strToU8 } from 'fflate'
 import type { SqlJsStatic } from 'sql.js'
-import { applyImportPlan, existingForApkg } from '$lib/db/importer'
+import { applyImportPlan, existingForPackage } from '$lib/db/importer'
 import { planApkgImport, readApkg } from '$lib/import/apkg'
 import { useTestDatabase } from '../../helpers/db'
 
@@ -84,7 +84,7 @@ describe('large .apkg (≥ 1 000 cards, 07-ROADMAP M4)', () => {
         model: { model: 'fsrs', custom: [] },
         dayStartHour: 4,
       },
-      await existingForApkg(),
+      await existingForPackage(),
       Date.UTC(2026, 8, 25),
       () => crypto.randomUUID(),
     )

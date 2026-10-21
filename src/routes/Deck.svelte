@@ -144,7 +144,12 @@
     />
   </section>
 
-  <ExportDialog bind:open={exporting} deckId={deck.id} name={deck.name} />
+  <ExportDialog
+    bind:open={exporting}
+    deckId={deck.id}
+    name={deck.name}
+    {...deck.description ? { description: deck.description } : {}}
+  />
 
   <NewDeckDialog
     bind:open={creatingChild}

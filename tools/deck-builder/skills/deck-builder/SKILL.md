@@ -1,15 +1,15 @@
 ---
 name: deck-builder
-description: Crée un paquet de flashcards clé en main (.apkg) pour l'application Recto, rédigé selon ce que la recherche sur la mémoire impose au format d'une carte (rappel actif, une information par carte, trous courts, image-indice, deux sens seulement si la relation est symétrique) — types de notes à plusieurs champs et plusieurs cartes, images, sons, texte à trous, séquences, occlusion d'image, formules. À utiliser dès que l'utilisateur demande des cartes, des flashcards, un paquet, un deck ou des fiches de révision, à partir d'un sujet, d'un cours, d'un PDF, d'images ou de notes, ou veut importer des cartes dans Recto.
+description: Crée un paquet de flashcards clé en main (paquet Recto .rpkg) pour l'application Recto, rédigé selon ce que la recherche sur la mémoire impose au format d'une carte (rappel actif, une information par carte, trous courts, image-indice, deux sens seulement si la relation est symétrique) — types de notes à plusieurs champs et plusieurs cartes, images, sons, texte à trous, séquences, occlusion d'image, formules. À utiliser dès que l'utilisateur demande des cartes, des flashcards, un paquet, un deck ou des fiches de révision, à partir d'un sujet, d'un cours, d'un PDF, d'images ou de notes, ou veut importer des cartes dans Recto.
 ---
 
 # Paquets clé en main pour Recto
 
-Tu livres un fichier **`.apkg`** que l'utilisateur importe dans Recto (Importer → Paquet Anki), sur ordinateur ou téléphone. Recto est une application de flashcards à répétition espacée, en français, sans serveur. **Clé en main** veut dire deux choses : tout ce que l'utilisateur ferait à la main dans Recto (type de note, champs, cartes dans chaque sens, images, sons, masques d'occlusion, sous-paquets, tags), le paquet le contient déjà ; et chaque carte est **rédigée dans le format que la recherche montre efficace** (`reference/format-cartes.md`), pas seulement importable. Ne lui demande jamais de finir à la main ce que la bibliothèque sait faire.
+Tu livres un **paquet Recto, un fichier `.rpkg`**, que l'utilisateur importe dans Recto (Importer → Paquet Recto), sur ordinateur ou téléphone. Recto est une application de flashcards à répétition espacée, en français, sans serveur. **Clé en main** veut dire deux choses : tout ce que l'utilisateur ferait à la main dans Recto (type de note, champs, cartes dans chaque sens, images, sons, masques d'occlusion, sous-paquets, tags, réglages du paquet), le paquet le contient déjà ; et chaque carte est **rédigée dans le format que la recherche montre efficace** (`reference/format-cartes.md`), pas seulement importable. Ne lui demande jamais de finir à la main ce que la bibliothèque sait faire.
 
-Outils de ce skill (même dossier que ce fichier ; si tu ne le trouves pas : `find / -name recto_apkg.py -path "*deck-builder*" 2>/dev/null`) :
+Outils de ce skill (même dossier que ce fichier ; si tu ne le trouves pas : `find / -name recto_rpkg.py -path "*deck-builder*" 2>/dev/null`) :
 
-- `scripts/recto_apkg.py` : bibliothèque Python (bibliothèque standard seulement) qui écrit le `.apkg` sous la forme exacte que Recto relit, le vérifie, et **relit chaque carte à l'aune de la charte** (avertissements « charte Rn »). **Seule façon d'écrire le paquet** : pas de `.apkg` écrit à la main, pas de genanki, pas de CSV (le CSV ne porte ni types de notes, ni médias).
+- `scripts/recto_rpkg.py` : bibliothèque Python (bibliothèque standard seulement) qui écrit le `.rpkg` sous la forme même que Recto stocke et relit, le vérifie, et **relit chaque carte à l'aune de la charte** (avertissements « charte Rn »). **Seule façon d'écrire le paquet** : pas de `.rpkg` écrit à la main, pas de `.apkg` (genanki ou autre), pas de CSV (le CSV ne porte ni types de notes, ni médias, ni réglages).
 - `reference/format-cartes.md` : **la charte de rédaction** (R1-R13, sources, formats par sujet, avant/après, grille de relecture). À lire avant de rédiger la première carte.
 - `reference/api.md` : l'API, avec un exemple complet de type à plusieurs cartes.
 - `reference/medias.md` : images, sons, formules, masques d'occlusion. À lire dès qu'un média est en jeu.
@@ -24,7 +24,7 @@ Outils de ce skill (même dossier que ce fichier ; si tu ne le trouves pas : `fi
 5. **Produire les médias** (`reference/medias.md`) : générés (schémas, cartes, drapeaux, graphiques), téléchargés si le réseau et la licence le permettent, ou fournis par l'utilisateur. Regarder soi-même 2 ou 3 images produites avant de continuer : rien d'écrit sur l'image qui donne la réponse.
 6. **Écrire le script de construction** (`construire_paquet.py`) avec la bibliothèque, l'exécuter. `Package.write()` vérifie le paquet comme Recto l'importera et **refuse d'écrire** ce qui ne s'importerait pas comme voulu : corriger jusqu'à « OK : importable dans Recto ».
 7. **Relire le rapport** : l'aperçu montre la première note de chaque type, carte par carte (question | réponse) ; chaque carte doit avoir du sens seule, dans son sens. Puis la section **« Charte de rédaction »** : chaque avertissement « charte Rn » se corrige (reformuler, découper, changer de type), ou se garde avec une raison écrite dans le message de livraison. Les autres avertissements (balises retirées, images sans `alt`, champs longs) se traitent de même. Dérouler la grille de relecture de `format-cartes.md` sur l'aperçu.
-8. **Livrer** le `.apkg` et le script de construction (il permet de corriger puis de régénérer), avec le message de livraison ci-dessous.
+8. **Livrer** le `.rpkg` et le script de construction (il permet de corriger puis de régénérer), avec le message de livraison ci-dessous.
 
 ## Choisir le type de note
 
@@ -43,7 +43,6 @@ Types personnalisés, l'essentiel (détail dans `reference/api.md`) :
 - **Sens des cartes, à respecter à la lettre** : « A → B » est une carte toujours posée dans ce sens : `one_way(nom, question, réponse)`. « A ↔ B » est **une seule carte** qui peut être posée dans un sens ou dans l'autre (la face 1 d'abord, la face 2 après une réussite, comme une note basique) : `two_way(nom, face1, face2)`, jamais deux modèles A → B et B → A. Exemple : « Carte → Nom, Nom ↔ Numéro, Nom ↔ Préfecture » = 3 modèles, donc 3 cartes par note. Un `two_way` dont la face 2 se répète d'une note à l'autre (Nom ↔ Région) est ambigu dans le sens inverse : `one_way`. Recto n'affiche pas le nom du modèle en révision : **chaque face dit ce qu'on cherche** de l'autre côté (`<b>{{Nom}}</b><br><i>numéro ?</i>` ↔ `<b>{{Numéro}}</b><br><i>département ?</i>`), sinon deux cartes d'une note posent la même face « Bas-Rhin » sans dire quoi trouver (signalé).
 - **Modèles** : `one_way(nom, question, réponse)` (la réponse reprend la question par `{{FrontSide}}<hr id=answer>`), `two_way(nom, face1, face2)` (chaque face s'écrit seule, sans `{{FrontSide}}` ; la carte n'existe que si les deux faces ont un contenu). Syntaxe : `{{Champ}}`, `{{#Champ}}…{{/Champ}}` (seulement si le champ est rempli), `{{^Champ}}…{{/Champ}}` (s'il est vide), `{{text:Champ}}`, `{{type:Champ}}` (le champ attendu quand le paquet a la réponse tapée). Une note n'a pas la carte d'un modèle dont la question serait vide ou identique pour toutes les notes.
 - **Mise en forme** : `<br>`, `<b>`, `<i>`, `<u>`, `<sub>`, `<sup>`, `<ul>/<ol>/<li>`, `<p>`, `<hr id=answer>`. Recto retire tout le reste à l'affichage (`<div>` : le texte reste mais sans retour à la ligne ; `style` et CSS : ignorés).
-- Au plus 3 champs avec un seul modèle qui demande le 1er champ (ou deux modèles : le 1er puis le 2e) : Recto en ferait une note basique. La bibliothèque le refuse : `add_basic` (une paire A ↔ B seule), ou un champ de plus (`Source`, `Continent`, `Région`).
 - Un texte à trous ne vit pas dans un type personnalisé : `add_cloze` (champs Texte et Extra).
 
 ## La charte en treize règles (détail, sources et exemples : `reference/format-cartes.md`)
@@ -69,8 +68,9 @@ Et toujours : les cartes d'une même note sont mélangées par Recto, ne pas s'e
 ## Ce qui se règle dans Recto (pas dans le paquet)
 
 - À l'import, l'utilisateur choisit le planificateur des paquets créés : FSRS ou une boîte de Leitner (7 compartiments, 5 compartiments ou « Ma boîte », sa propre boîte réglée dans les Paramètres) ; par défaut, celui des Paramètres (FSRS au départ).
-- Les réglages d'un paquet (nouvelles cartes par jour, rétention, alternance des faces, réponse tapée pour les notes basiques, lecture automatique des sons) ne voyagent pas dans un `.apkg` : n'en parler que si le paquet en a besoin, en une ligne précise (« Paquet Vocabulaire › Paramètres : activer la lecture automatique des sons »). La réponse tapée s'active toujours dans les réglages du paquet (« Réponse tapée ») ; `{{type:Champ}}` désigne seulement le champ attendu par une carte `one_way`.
-- Sous-paquets : un niveau (`Matière::Chapitre`) ; au-delà, Recto aplatit le nom.
+- Les réglages d'un paquet **voyagent dans le `.rpkg`** : `pkg.settings(paquet, description=…, new_per_day=…, typed_answer=True, autoplay_audio=…, alternate_sides=…, later=[(type, "modèle")], new_by_format=…)` (détail dans `reference/api.md`). Ils s'appliquent quand l'import crée le paquet, jamais à un paquet que l'utilisateur a déjà. Le planificateur (FSRS ou boîte de Leitner) et la rétention se choisissent dans Recto. `{{type:Champ}}` désigne le champ attendu quand le paquet a la réponse tapée (`typed_answer=True`).
+- `later` sert aux formats à introduire plus tard : un type « Département » peut faire apprendre « Carte → Nom » d'abord, « Nom ↔ Numéro » quand l'utilisateur l'active dans les réglages du paquet.
+- Sous-paquets : un niveau (`Matière::Chapitre`) ; la bibliothèque refuse un niveau de plus.
 - **Régénérer un paquet corrigé** : même nom de type, mêmes champs, même premier champ (ou même `guid=`) → Recto met à jour les notes au lieu de les dupliquer et garde la progression. Changer les champs ou les modèles d'un type existant n'est pas repris par une réimportation : le dire si c'est le cas.
 - Retirer une carte acquise, suspendre, régler la rétention : c'est Recto (principes P6, P7, P9) ; ne pas écrire de consigne de ce genre dans les cartes.
 
@@ -81,7 +81,7 @@ En 5 à 10 lignes :
 - le fichier, et ce qu'il contient : paquets, types de notes (cartes par note), nombre de notes, de cartes et de médias ;
 - **les choix de format** en une ligne (sens des cartes, séquences, indices, cartes de raisonnement) et les avertissements « charte » gardés, avec leur raison ;
 - **les points à vérifier** : faits tirés de ta mémoire ou incertains, choix discutables (ex. « Cergy » plutôt que « Cergy-Pontoise »), cartes suspendues (`bonus`) ;
-- l'import : Recto → Importer → Paquet Anki (.apkg) → choisir le fichier (Google Drive est accessible depuis le sélecteur du téléphone) → planificateur → Importer ;
-- les réglages de paquet à faire dans Recto, seulement s'il y en a.
+- l'import : Recto → Importer → Paquet Recto (.rpkg) → choisir le fichier (Google Drive est accessible depuis le sélecteur du téléphone) → planificateur → Importer ;
+- les réglages déjà portés par le paquet (nouvelles cartes par jour, réponse tapée, formats introduits plus tard), en une ligne.
 
 Ne jamais écrire « importé » : tu livres le fichier, l'utilisateur l'importe.

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { applyImportPlan, existingForApkg } from '$lib/db/importer'
+  import { applyImportPlan, existingForPackage } from '$lib/db/importer'
   import { live } from '$lib/db/live.svelte'
   import * as repo from '$lib/db/repo'
   import { newId } from '$lib/db/schema'
@@ -89,7 +89,7 @@
             ? { mode: 'single', newDeckName: newDeckName.trim() || fileName }
             : { mode: 'single', deckId: singleDeck }
       const [existing, dayStartHour] = await Promise.all([
-        existingForApkg(),
+        existingForPackage(),
         getSetting('dayStartHour'),
       ])
       const plan = await planApkgImport(

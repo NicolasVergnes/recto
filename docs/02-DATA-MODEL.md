@@ -274,8 +274,10 @@ export interface NoteType {
 
 ## 5. Sauvegarde `.recto.zip`
 
+Le paquet Recto `.rpkg` (M20, 05 §5) reprend les mêmes formes de lignes (paquets réduits à leurs réglages hors planificateur, types de notes, notes, métadonnées des médias) et le même `schemaVersion`, pour un seul paquet et sans progression.
+
 ```
-manifest.json   { "format": "recto-backup", "schemaVersion": 7, "appVersion": "0.x", "exportedAt": ms, "device": "<navigator.userAgent tronqué à 120 car.>", "deviceId": "<uuid>", "counts": {...} }
+manifest.json   { "format": "recto-backup", "schemaVersion": 8, "appVersion": "0.x", "exportedAt": ms, "device": "<navigator.userAgent tronqué à 120 car.>", "deviceId": "<uuid>", "counts": {...} }
 data.json       { "decks": [...], "noteTypes": [...], "notes": [...], "cards": [...], "reviews": [...], "settings": [...],
                   "media": [{ "name", "mime", "size", "sha256", "createdAt" }],   // sans blobs
                   "deletions": [...] }

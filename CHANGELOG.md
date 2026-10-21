@@ -4,6 +4,19 @@ Toutes les évolutions notables de Recto. Format inspiré de [Keep a Changelog](
 
 ## [Unreleased]
 
+### M20 — Paquet Recto `.rpkg`
+
+#### Added
+
+- Paquet Recto `.rpkg`, le format de Recto pour partager un paquet : le paquet et ses sous-paquets, leurs notes, types de notes, médias et réglages (sans le planificateur), avec titre, description, auteur et licence ; ni progression ni historique.
+- Page d'un paquet › « Exporter » : « Paquet Recto (.rpkg) » (par défaut) ou CSV.
+- Importer › « Paquet Recto (.rpkg) » : résumé du paquet (ce qu'il contient, ce que vous avez déjà), planificateur des paquets créés, import annulable, rapport. Réimporter une version plus récente met les notes à jour, sans doublon ; aucune note n'est supprimée et un paquet existant garde ses réglages.
+
+#### Changed
+
+- Plugin `recto-deck-builder` 3.0.0 : il écrit des paquets Recto (`.rpkg`, `recto_rpkg.py`) au lieu de `.apkg` ; réglages et description des paquets (`pkg.settings`), formats introduits plus tard, types de deux champs ; `check` vérifie un `.rpkg`.
+- L'import `.apkg` partage avec le `.rpkg` la gestion des médias (même nom et même contenu : ignoré ; contenu différent : renommé).
+
 ### M19 — Boîte de Leitner : trois modèles, un défaut pour les nouveaux paquets
 
 #### Added

@@ -1,12 +1,15 @@
 <script lang="ts">
+  import { exportRpkg } from '$lib/db/export-rpkg'
   import * as repo from '$lib/db/repo'
   import { csvExportable, notesToCsv, type CsvDelimiter } from '$lib/export/csv'
   import { shareOrDownload, timestampedName } from '$lib/export/download'
+  import { RPKG_EXTENSION } from '$lib/export/rpkg'
   import { slugify } from '$lib/media/mime'
   import { t } from '$lib/i18n'
   import { toast } from '$lib/state/toast.svelte'
   import Dialog from './Dialog.svelte'
   import { errorMessage } from './errors'
+  import RpkgFields, { rpkgDetails, type RpkgDraft } from './export/RpkgFields.svelte'
 
   interface Props {
     open: boolean
@@ -15,11 +18,24 @@
     /** …or these notes. */
     noteIds?: readonly string[]
     name: string
+    /** A deck's description, offered for its package. */
+    description?: string
   }
-  let { open = $bindable(), deckId, noteIds, name }: Props = $props()
+  let { open = $bindable(), deckId, noteIds, name, description }: Props = $props()
   const id = $props.id()
   const TAB: CsvDelimiter = '\t'
   let delimiter = $state<CsvDelimiter>(';')
+  // M20: a deck is exported as a Recto package by default; a selection only as CSV.
+  const packageable = $derived(deckId !== undefined && !noteIds)
+  // svelte-ignore state_referenced_locally
+  let format = $state<'rpkg' | 'csv'>(deckId !== undefined && !noteIds ? 'rpkg' : 'csv')
+  // svelte-ignore state_referenced_locally
+  let draft = $state<RpkgDraft>({
+    title: name,
+    description: description ?? '',
+    author: '',
+    licence: '',
+  })
   let busy = $state(false)
   /** The export in progress: closing the dialog (Annuler, Escape) aborts it, nothing is saved. */
   let running: AbortController | null = null
@@ -55,13 +71,23 @@
     if (left > 0) toast(t('exportCsv.leftOut', { n: left }))
   }
 
+  async function exportPackage(signal: AbortSignal) {
+    if (!deckId) return
+    const details = rpkgDetails(draft, name)
+    const { blob, notes } = await exportRpkg(deckId, details, Date.now())
+    signal.throwIfAborted()
+    await shareOrDownload(blob, `${slugify(details.title)}.${RPKG_EXTENSION}`)
+    close()
+    toast(t('rpkg.exported', { n: notes }))
+  }
+
   async function run() {
     if (busy) return
     const controller = new AbortController()
     running = controller
     busy = true
     try {
-      await exportCsv(controller.signal)
+      await (format === 'rpkg' && packageable ? exportPackage : exportCsv)(controller.signal)
     } catch (e) {
       if (!controller.signal.aborted) toast(errorMessage(e), 'error')
     } finally {
@@ -74,18 +100,35 @@
 </script>
 
 <Dialog {open} title={t('exportCsv.title')} onclose={close}>
-  <p class="muted small">{t('exportCsv.help')}</p>
-  <fieldset>
-    <legend>{t('exportCsv.delimiter')}</legend>
-    <label class="check">
-      <input type="radio" name={`${id}-sep`} value=";" bind:group={delimiter} />
-      {t('exportCsv.semicolon')}
-    </label>
-    <label class="check">
-      <input type="radio" name={`${id}-sep`} value={TAB} bind:group={delimiter} />
-      {t('exportCsv.tab')}
-    </label>
-  </fieldset>
+  {#if packageable}
+    <fieldset>
+      <legend>{t('rpkg.format')}</legend>
+      <label class="check">
+        <input type="radio" name={`${id}-format`} value="rpkg" bind:group={format} />
+        {t('rpkg.formatRpkg')}
+      </label>
+      <label class="check">
+        <input type="radio" name={`${id}-format`} value="csv" bind:group={format} />
+        {t('rpkg.formatCsv')}
+      </label>
+    </fieldset>
+  {/if}
+  {#if packageable && format === 'rpkg'}
+    <RpkgFields bind:draft />
+  {:else}
+    <p class="muted small">{t('exportCsv.help')}</p>
+    <fieldset>
+      <legend>{t('exportCsv.delimiter')}</legend>
+      <label class="check">
+        <input type="radio" name={`${id}-sep`} value=";" bind:group={delimiter} />
+        {t('exportCsv.semicolon')}
+      </label>
+      <label class="check">
+        <input type="radio" name={`${id}-sep`} value={TAB} bind:group={delimiter} />
+        {t('exportCsv.tab')}
+      </label>
+    </fieldset>
+  {/if}
   {#if busy}<progress aria-label={t('exportCsv.exporting')}></progress>{/if}
   {#snippet actions()}
     <button class="btn" type="button" onclick={close}>{t('common.cancel')}</button>

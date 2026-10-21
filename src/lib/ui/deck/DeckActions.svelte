@@ -18,7 +18,7 @@
     <button class="btn" type="button" onclick={onmerge}>{t('deck.merge')}</button>
     <button class="btn" type="button" onclick={onexport}>
       <Icon name="download" />
-      {t('exportCsv.button')}
+      {t('rpkg.export')}
     </button>
     <button class="btn btn-danger" type="button" onclick={onremove}>
       <Icon name="trash" />

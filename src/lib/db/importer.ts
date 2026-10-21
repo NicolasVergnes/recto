@@ -137,9 +137,9 @@ export async function existingCollection() {
 
 /**
  * Current decks, notes, note types, cards (one query for all: a re-import reconciles those of
- * the notes it updates) and media hashes, for the `.apkg` planner.
+ * the notes it updates) and media hashes, for the package planners (`.apkg`, `.rpkg`).
  */
-export async function existingForApkg() {
+export async function existingForPackage() {
   const [decks, notes, noteTypes, cards, media] = await Promise.all([
     db.decks.toArray(),
     db.notes.toArray(),

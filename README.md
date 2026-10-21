@@ -1,6 +1,6 @@
 # Recto
 
-Application de flashcards à répétition espacée : locale-first, hors ligne, sans compte ni serveur. Deux planificateurs : FSRS-6 et la boîte de Leitner (sept compartiments comme la « Memory Box », cinq, ou votre propre boîte). Import CSV et Anki (`.apkg`), sauvegarde complète en un clic.
+Application de flashcards à répétition espacée : locale-first, hors ligne, sans compte ni serveur. Deux planificateurs : FSRS-6 et la boîte de Leitner (sept compartiments comme la « Memory Box », cinq, ou votre propre boîte). Paquets Recto (`.rpkg`) à partager, import CSV et Anki (`.apkg`), sauvegarde complète en un clic.
 
 **Adresse : <https://nicolasvergnes.github.io/recto/>** — à activer une fois dans GitHub : _Settings → Pages → Source : GitHub Actions_ ; chaque fusion sur `main` republie ensuite l'application (`.github/workflows/pages.yml`).
 
@@ -37,6 +37,12 @@ Toutes les données restent dans le navigateur de l'appareil : **la sauvegarde e
 - L'accueil rappelle de sauvegarder au-delà de 7 jours sans sauvegarde.
 - **Importer → Sauvegarde Recto** restaure un fichier : _Remplacer toutes les données_ (l'appareil devient identique à la sauvegarde ; les données actuelles sont d'abord téléchargées) ou _Fusionner avec les données actuelles_ (ajoute ce qui manque, garde la version la plus récente de chaque note, et ses cartes suivent le contenu retenu).
 - Pour passer sur un nouveau téléphone : sauvegarder sur l'ancien, restaurer sur le nouveau.
+
+## Partager un paquet (`.rpkg`)
+
+- **Page d'un paquet → Exporter → Paquet Recto (.rpkg)** : le paquet et ses sous-paquets, leurs notes, types de notes, médias et réglages, avec un titre, une description, un auteur et une licence ; ni votre progression ni votre historique. Envoyez le fichier comme vous voulez (e-mail, Drive, clé USB).
+- **Importer → Paquet Recto (.rpkg)** : le résumé dit ce que contient le paquet et ce que vous avez déjà ; choisissez le planificateur, puis importez. Réimporter une version plus récente du même paquet met ses notes à jour, sans doublon, en gardant votre progression.
+- Le plugin Claude `recto-deck-builder` (`tools/deck-builder/`) écrit des paquets Recto clé en main.
 
 ## Importer depuis Anki
 

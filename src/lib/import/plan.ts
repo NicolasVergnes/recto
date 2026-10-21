@@ -1,3 +1,4 @@
+import type { ReconcilableCard } from '../domain/notes'
 import type { Card, Deck, Note, NoteType, Review } from '../domain/types'
 
 export type ImportErrorCode =
@@ -101,4 +102,16 @@ export function emptyReport(): ImportReport {
     shapesSkipped: 0,
     cancelled: false,
   }
+}
+
+/** What Recto already has, for the package planners (.apkg, .rpkg): re-imports update notes. */
+export interface PackageExisting {
+  decks: readonly Deck[]
+  notes: readonly Note[]
+  /** Custom note types: a re-import reuses the matching one. */
+  noteTypes?: readonly NoteType[]
+  /** Cards of the existing notes: a re-import reconciles those of the notes it updates. */
+  cards: readonly ReconcilableCard[]
+  /** Stored media: name → sha256. */
+  media: ReadonlyMap<string, string>
 }

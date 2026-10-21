@@ -1,11 +1,11 @@
-# API de `scripts/recto_apkg.py`
+# API de `scripts/recto_rpkg.py`
 
 Python 3.9 ou plus, bibliothèque standard seulement. Tous les champs sont du **HTML** : un texte brut qui contient `<` ou `&` passe par `html.escape()` (sauf dans une formule, voir `medias.md`).
 
 ```python
 import sys
 sys.path.insert(0, "<dossier du skill>/scripts")
-from recto_apkg import Package, Mask, DeckError, img, sound, pendu, image_size, one_way, two_way
+from recto_rpkg import Package, Mask, DeckError, img, sound, pendu, image_size, one_way, two_way
 ```
 
 ## Paquet
@@ -13,16 +13,17 @@ from recto_apkg import Package, Mask, DeckError, img, sound, pendu, image_size, 
 | Appel | Effet |
 |---|---|
 | `Package(now=None)` | Nouveau paquet ; `now` (secondes epoch) fixe les dates, par défaut l'heure courante. |
-| `pkg.write("x.apkg", quiet=False) -> Report` | Construit, **vérifie comme Recto l'importera**, affiche le rapport, écrit le fichier. Lève `DeckError` (avec le rapport) s'il y a une erreur : rien n'est écrit. |
-| `python recto_apkg.py check x.apkg` | Vérifie un `.apkg` existant (le tien ou un paquet Anki) : code 0 si importable, 1 sinon. |
+| `pkg.write("x.rpkg", title=None, description=None, author=None, licence=None, quiet=False) -> Report` | Construit, **vérifie comme Recto l'importera**, affiche le rapport, écrit le fichier `.rpkg`. `title` (par défaut le nom du premier paquet), `description`, `author` et `licence` (« CC BY 4.0 », « CC BY-SA 4.0 », « CC0 1.0 »…) s'affichent dans Recto avant l'import. Lève `DeckError` (avec le rapport) s'il y a une erreur : rien n'est écrit. |
+| `pkg.settings(paquet, …)` | Réglages et description d'un paquet (section « Réglages du paquet » ci-dessous). |
+| `python recto_rpkg.py check x.rpkg` | Vérifie un `.rpkg` existant : code 0 si importable, 1 sinon. Un paquet Anki (`.apkg`) ne se vérifie pas ici : Recto l'importe directement. |
 
-Les méthodes `add_*` lèvent `DeckError` dès qu'une note serait mal importée (champ inconnu, question vide, doublon, média absent…) : le message dit quoi corriger.
+Les méthodes `add_*` et `settings` lèvent `DeckError` dès qu'une note serait mal importée (champ inconnu, question vide, doublon, média absent…) : le message dit quoi corriger.
 
 Arguments communs des notes :
 
-- `deck` : nom du paquet, `"Matière::Chapitre"` pour un sous-paquet (un niveau).
+- `deck` : nom du paquet, `"Matière::Chapitre"` pour un sous-paquet (un niveau ; un de plus est refusé).
 - `tags` : liste (`["histoire", "dates"]`) ou chaîne (`"histoire dates"`) ; pas d'espace dans un tag.
-- `guid` : identifiant stable de la note. Par défaut, il dérive du type et du premier champ (texte sans HTML, noms d'images gardés) ; deux notes de même type et même premier champ sont refusées comme doublon. Le donner (`guid=f"dep-{numero}"`) quand le premier champ peut changer d'une génération à l'autre.
+- `guid` : identifiant stable de la note (Recto le garde : réimporter le paquet régénéré met la note à jour). Par défaut, il dérive du type et du premier champ (texte sans HTML, noms d'images gardés) ; deux notes de même type et même premier champ sont refusées comme doublon. Le donner (`guid=f"dep-{numero}"`) quand le premier champ peut changer d'une génération à l'autre.
 - `suspended=True` : cartes importées suspendues (utile pour une carte triviale).
 
 ## Types intégrés
@@ -35,7 +36,7 @@ Paire réversible : une carte, posée Recto → Verso puis Verso → Recto. `ext
 ```python
 pkg.add_question(deck, question, answer, explanation="", source="", tags=(), guid=None, suspended=False)
 ```
-Question à sens unique (type « Recto · Question ») : une carte, jamais retournée ; `explanation` puis `source` (en italique) sous la réponse.
+Question à sens unique : une note Basique qui n'est jamais retournée (« Ne jamais retourner cette note »), une carte ; `explanation` puis `source` (en italique) dans son champ Extra, sous la réponse.
 
 ```python
 pkg.add_cloze(deck, text, extra="", tags=(), guid=None, suspended=False)
@@ -73,10 +74,10 @@ pkg.add_note(t, deck, fields, tags=(), guid=None, suspended=False)   # fields = 
 ```
 
 - `one_way` : une carte si la question rendue n'est pas vide (et dépend de la note). Un tuple `(nom, question, réponse)` vaut `one_way`.
-- `two_way` : une seule carte, demandée par la face 1, puis par la face 2 après une réussite (réglage « Interroger dans les deux sens » du paquet, actif par défaut ; indicateur « ↔ Sens inversé »). Chaque face s'écrit seule : pas de `{{FrontSide}}` (refusé). La carte n'existe que si **les deux** faces ont un contenu. Anki, lui, reçoit une carte à sens unique (face 1 → face 2).
+- `two_way` : une seule carte, demandée par la face 1, puis par la face 2 après une réussite (réglage « Interroger dans les deux sens » du paquet, actif par défaut ; indicateur « ↔ Sens inversé »). Chaque face s'écrit seule : pas de `{{FrontSide}}` (refusé). La carte n'existe que si **les deux** faces ont un contenu.
 - Syntaxe des modèles : `{{Champ}}`, `{{FrontSide}}` (dans une réponse `one_way`), `{{#Champ}}…{{/Champ}}`, `{{^Champ}}…{{/Champ}}`, `{{text:Champ}}`, `{{type:Champ}}`. Un champ inconnu ou `{{cloze:…}}` est refusé.
 - Le nom du type fixe son identifiant : régénérer avec le même nom et les mêmes champs réutilise le type déjà importé.
-- `css` sert à Anki seulement ; Recto centre et met en forme lui-même.
+- Un type peut avoir deux champs ou plus, autant de modèles que voulu. `css` est ignoré : Recto centre et met en forme lui-même.
 
 Exemple : la note demandée « Carte de France avec le département en couleur, Nom, Numéro, Préfecture ; cartes Carte → Nom, Nom ↔ Numéro, Nom ↔ Préfecture » :
 
@@ -101,10 +102,26 @@ for d in departements:                      # liste de dicts : numero, nom, pref
         "Carte": img(carte, "Carte de France, un département en orange"),
         "Nom": d["nom"], "Numéro": d["numero"], "Préfecture": d["prefecture"], "Région": d["region"],
     }, tags=["departements"], guid=f"dep-{d['numero']}")
-pkg.write("departements.apkg")
+pkg.settings("Départements", description="Les 101 départements français",
+             later=[(dep, "Nom ↔ Numéro"), (dep, "Nom ↔ Préfecture")])   # « Carte → Nom » d'abord
+pkg.write("departements.rpkg", author="…", licence="CC BY 4.0")
 ```
 
-Résultat : 3 cartes par note, dans un seul paquet : Carte → Nom toujours dans ce sens, Nom ↔ Numéro et Nom ↔ Préfecture posées tantôt dans un sens, tantôt dans l'autre (numéro et préfecture sont uniques : chaque face n'a qu'une réponse). Recto n'affiche ni le nom du modèle ni le nom du champ pendant la révision (seulement un badge « ↔ Sens inversé ») : c'est la face qui dit ce qu'on cherche. Convention : **valeur en gras, puis en italique l'attribut demandé de l'autre côté** (« Bas-Rhin / numéro ? », « 67 / département ? », « Strasbourg / département ? ») ; une face partagée par deux cartes d'une note (« Département : Bas-Rhin » pour Nom ↔ Numéro et Nom ↔ Préfecture) est signalée (charte R5). Le champ Région n'est demandé par aucune carte, il sert de contexte dans les réponses (et donne au type plus de 3 champs) ; pour l'apprendre, ajouter `one_way("Nom → Région", "{{Nom}} : région", "{{FrontSide}}<hr id=answer>{{Région}}")`, pas un `two_way` (plusieurs départements par région : le sens inverse serait ambigu, charte R9).
+Résultat : 3 cartes par note, dans un seul paquet : Carte → Nom toujours dans ce sens, Nom ↔ Numéro et Nom ↔ Préfecture posées tantôt dans un sens, tantôt dans l'autre (numéro et préfecture sont uniques : chaque face n'a qu'une réponse). Recto n'affiche ni le nom du modèle ni le nom du champ pendant la révision (seulement un badge « ↔ Sens inversé ») : c'est la face qui dit ce qu'on cherche. Convention : **valeur en gras, puis en italique l'attribut demandé de l'autre côté** (« Bas-Rhin / numéro ? », « 67 / département ? », « Strasbourg / département ? ») ; une face partagée par deux cartes d'une note (« Département : Bas-Rhin » pour Nom ↔ Numéro et Nom ↔ Préfecture) est signalée (charte R5). Le champ Région n'est demandé par aucune carte, il sert de contexte dans les réponses ; pour l'apprendre, ajouter `one_way("Nom → Région", "{{Nom}} : région", "{{FrontSide}}<hr id=answer>{{Région}}")`, pas un `two_way` (plusieurs départements par région : le sens inverse serait ambigu, charte R9).
+
+## Réglages du paquet
+
+```python
+pkg.settings("Vocabulaire", description="Anglais, niveau A2", new_per_day=10, reviews_per_day=None,
+             new_order="added", typed_answer=True, autoplay_audio=True, alternate_sides=None,
+             later=[(type, "Nom du modèle"), "cloze"], new_by_format=False)
+```
+
+Tous les arguments sont facultatifs ; `None` laisse le réglage par défaut de Recto. Ils s'appliquent **quand l'import crée le paquet** (jamais à un paquet que l'utilisateur a déjà) ; l'utilisateur peut les changer ensuite. Le planificateur (FSRS ou boîte de Leitner) et la rétention se choisissent dans Recto, pas dans le paquet.
+
+- `new_per_day`, `reviews_per_day` : plafonds (entiers ≥ 0) ; `new_order` : `"random"` (défaut de Recto) ou `"added"` (ordre du script).
+- `typed_answer` : réponse tapée, comparée caractère par caractère ; `autoplay_audio` : lecture automatique des sons ; `alternate_sides` : notes basiques et `two_way` posées dans les deux sens (défaut `True`).
+- `later` : formats dont les nouvelles cartes attendent, activés plus tard dans les réglages du paquet : `(type, "nom du modèle")` pour une carte d'un type personnalisé, ou `"basic"`, `"question"`, `"cloze"`, `"occlusion"`. `new_by_format=True` : les nouvelles cartes viennent format après format, dans l'ordre des modèles.
 
 ## Médias
 
@@ -120,7 +137,7 @@ Formats acceptés par Recto : images `png jpg jpeg webp gif svg`, sons `mp3 ogg 
 
 ## Rapport
 
-`write()` et `check` affichent : notes, cartes, médias, cartes par paquet, puis chaque type de note avec ce que Recto en fera et l'aperçu de sa première note, carte par carte. Ensuite viennent les avertissements regroupés (balises retirées, images sans `alt`, champs trop longs, images de plus de 1 280 px que Recto réduit, doublons probables), puis la section **« Charte de rédaction »** et les erreurs. `report.charte` donne ces avertissements seuls (`{clé: [exemples]}`).
+`write()` et `check` affichent : notes, cartes, médias, cartes par paquet, puis chaque type de note avec ce que Recto en fera et l'aperçu de sa première note, carte par carte. Ensuite viennent les avertissements regroupés (balises retirées, images sans `alt`, champs trop longs, images de plus de 1 280 px (paquet lourd : les réduire avant), doublons probables), puis la section **« Charte de rédaction »** et les erreurs. `report.charte` donne ces avertissements seuls (`{clé: [exemples]}`).
 
 Avertissements « charte » (`reference/format-cartes.md`) : ils n'empêchent pas l'écriture, mais chacun se corrige ou se justifie à la livraison.
 

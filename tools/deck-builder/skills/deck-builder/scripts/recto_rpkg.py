@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""Construit et vérifie des paquets .apkg importables dans Recto (et dans Anki).
+"""Construit et vérifie des paquets Recto (.rpkg).
 
-Bibliothèque standard uniquement (Python 3.9 ou plus). Le paquet écrit a la forme exacte de
-l'export .apkg de Recto (mêmes types de notes, mêmes identifiants), que Recto relit sans perte :
-notes basiques, questions à sens unique, texte à trous, occlusion d'image, types de notes
-personnalisés (plusieurs champs, une carte par modèle), images, sons, formules.
+Bibliothèque standard uniquement (Python 3.9 ou plus). Le paquet écrit est un « paquet Recto »
+(05-IMPORT-EXPORT §5) : les notes, types de notes, médias et réglages de paquets, sous la forme
+même que Recto stocke et relit sans perte — notes basiques, questions à sens unique, texte à
+trous, occlusion d'image, types de notes personnalisés (plusieurs champs, une carte par modèle,
+cartes posées dans les deux sens), images, sons, formules. Recto l'importe par Importer ›
+Paquet Recto ; régénérer le paquet met les notes à jour sans doublon.
 
 Construire :
 
     import sys; sys.path.insert(0, "<dossier du skill>/scripts")
-    from recto_apkg import Package, Mask, img, sound, one_way, two_way
+    from recto_rpkg import Package, Mask, img, sound, one_way, two_way
 
     pkg = Package()
     pays = pkg.note_type(
@@ -23,9 +25,10 @@ Construire :
     drapeau = pkg.add_media("drapeau_fr.png")          # chemin d'un fichier, ou (bytes, name=…)
     pkg.add_note(pays, "Géographie::Pays", {"Drapeau": img(drapeau, "Drapeau"), "Pays": "France",
                                             "Capitale": "Paris", "Continent": "Europe"}, tags=["europe"])
-    pkg.write("paquet.apkg")   # vérifie, affiche le rapport, lève DeckError en cas d'erreur
+    pkg.settings("Géographie", description="Les pays d'Europe", new_per_day=10)
+    pkg.write("paquet.rpkg")   # vérifie, affiche le rapport, lève DeckError en cas d'erreur
 
-Vérifier un .apkg (celui-ci ou un autre) : python recto_apkg.py check paquet.apkg
+Vérifier un .rpkg : python recto_rpkg.py check paquet.rpkg
 """
 from __future__ import annotations
 
@@ -35,11 +38,10 @@ import io
 import json
 import os
 import re
-import sqlite3
 import struct
 import sys
-import tempfile
 import time
+import uuid
 import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -52,8 +54,8 @@ __all__ = [
     "Package",
     "Report",
     "Template",
-    "check_apkg",
     "check_bytes",
+    "check_rpkg",
     "image_size",
     "img",
     "one_way",
@@ -62,6 +64,8 @@ __all__ = [
     "two_way",
 ]
 
+VERSION = "3.0.0"
+
 
 class DeckError(Exception):
     """Une note, un type ou un média que Recto ne pourrait pas importer tel quel."""
@@ -69,21 +73,24 @@ class DeckError(Exception):
 
 # ─── Règles de Recto (src/lib/media/mime.ts, sanitize.ts, domain/*) ──────────────────────────────
 
-EXTENSIONS = {
-    "jpg": "image",
-    "jpeg": "image",
-    "png": "image",
-    "webp": "image",
-    "gif": "image",
-    "svg": "image",
-    "mp3": "audio",
-    "ogg": "audio",
-    "oga": "audio",
-    "opus": "audio",
-    "webm": "audio",
-    "m4a": "audio",
-    "mp4": "audio",
+# Extension → type MIME, comme Recto les reconnaît (src/lib/media/mime.ts).
+MIMES = {
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "png": "image/png",
+    "webp": "image/webp",
+    "gif": "image/gif",
+    "svg": "image/svg+xml",
+    "mp3": "audio/mpeg",
+    "ogg": "audio/ogg",
+    "oga": "audio/ogg",
+    "opus": "audio/ogg",
+    "webm": "audio/webm",
+    "m4a": "audio/mp4",
+    "mp4": "audio/mp4",
 }
+EXTENSIONS = {ext: mime.split("/")[0] for ext, mime in MIMES.items()}
+SCHEMA_VERSION = 8  # schéma des données de Recto (src/lib/db/schema.ts) : un Recto plus ancien refuse
 MAX_IMAGE_SIDE = 1280
 HEAVY_IMAGE_BYTES = 600 * 1024
 HEAVY_AUDIO_BYTES = 3 * 1024 * 1024
@@ -92,6 +99,8 @@ ALLOWED_ATTRS = {"src", "alt", "title", "class"}
 SPECIAL_FIELDS = {"FrontSide", "Tags", "Type", "Deck", "Subdeck", "Card", "CardFlag"}
 MIN_MASK_SIZE = 0.005
 LONG_TEXT = 200
+# Identifiants stables : un même nom de paquet, de type ou un même guid donne le même identifiant.
+NAMESPACE = uuid.UUID("6f1d2a9e-4b7c-5e83-9a10-7265637a6f00")
 
 # ─── Charte de rédaction (reference/format-cartes.md) : seuils des avertissements « charte » ────
 LONG_ANSWER_WORDS = 25  # R1 : une réponse courte, le reste dans Extra
@@ -119,64 +128,12 @@ OPEN_RE = re.compile(
     re.I,
 )
 
-# Types intégrés : identifiants, noms, champs et modèles de l'ancien export .apkg de Recto
-# (retiré en M18) ; le type « Question » est propre à ce plugin (4 champs : il reste un
-# type personnalisé, une seule carte, jamais retournée).
-BASIC_ID = 1758758400001
-CLOZE_ID = 1758758400003
-OCCLUSION_ID = 1758758400004
-QUESTION_ID = 1758758400005
-BUILT_IN_MOD = 1758758400
-
-CSS = (
-    ".card { font-family: sans-serif; font-size: 20px; text-align: center; color: black; "
-    "background-color: white; }\n.cloze { font-weight: bold; color: blue; }"
-)
-LATEX_PRE = (
-    "\\documentclass[12pt]{article}\n\\special{papersize=3in,5in}\n\\usepackage[utf8]{inputenc}\n"
-    "\\usepackage{amssymb,amsmath}\n\\pagestyle{empty}\n\\setlength{\\parindent}{0in}\n"
-    "\\begin{document}\n"
-)
-EXTRA = "{{#Extra}}<br><br>{{Extra}}{{/Extra}}"
-IO_FRONT = """{{#Header}}<div>{{Header}}</div>{{/Header}}
-<div style="display: none">{{cloze:Occlusion}}</div>
-<div id="err"></div>
-<div id="image-occlusion-container">
-    {{Image}}
-    <canvas id="image-occlusion-canvas"></canvas>
-</div>
-<script>
-try {
-    anki.imageOcclusion.setup();
-} catch (exc) {
-    document.getElementById("err").innerHTML = `Error loading image occlusion. Is your Anki version up to date?<br><br>${exc}`;
-}
-</script>
-"""
-IO_BACK = (
-    IO_FRONT
-    + """
-<div><button id="toggle">Toggle Masks</button></div>
-{{#Back Extra}}<div>{{Back Extra}}</div>{{/Back Extra}}
-"""
-)
-IO_CSS = """#image-occlusion-canvas {
-    --inactive-shape-color: #ffeba2;
-    --active-shape-color: #ff8e8e;
-    --inactive-shape-border: 1px #212121;
-    --active-shape-border: 1px #212121;
-    --highlight-shape-color: #ff8e8e00;
-    --highlight-shape-border: 1px #ff8e8e;
-}
-
-.card {
-    font-family: arial;
-    font-size: 20px;
-    text-align: center;
-    color: black;
-    background-color: white;
-}
-"""
+# Clés des guid par défaut des notes intégrées : les noms des types de l'ancien plugin (.apkg), pour
+# qu'un paquet régénéré retrouve les notes importées avant la version 3.
+BASIC_KEY = "Recto · Basique"
+QUESTION_KEY = "Recto · Question"
+CLOZE_KEY = "Recto · Texte à trous"
+OCCLUSION_KEY = "Recto · Occlusion d’image"
 
 # ─── Texte, modèles de carte, médias (portage de src/lib/domain) ─────────────────────────────────
 
@@ -191,7 +148,6 @@ SOUND_RE = re.compile(r"\[sound:([^\]]+)\]")
 HTML_TAG_RE = re.compile(r"<\s*/?\s*([a-zA-Z][a-zA-Z0-9-]*)([^>]*)>")
 ATTR_RE = re.compile(r"([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*(?:=\s*(?:\"[^\"]*\"|'[^']*'|[^\s>]+))?")
 REMOTE_RE = re.compile(r"^(?:[a-z][a-z0-9+.-]*:|//)", re.I)
-SHAPE_RE = re.compile(r"\{\{c(\d+)::image-occlusion:([\s\S]*?)\}\}")
 
 
 def strip_html(s: str) -> str:
@@ -292,19 +248,6 @@ def two_way(name: str, face1: str, face2: str) -> Template:
     return Template(name, face1, face2, True)
 
 
-ANSWER_OPENING = re.compile(r"^\s*\{\{\s*FrontSide\s*\}\}\s*(?:<hr\b[^>]*>\s*)?", re.I)
-
-
-def face_of_answer(back: str) -> str:
-    """Face 2 d'un modèle à deux sens à partir de la réponse d'Anki (son ouverture retirée)."""
-    return ANSWER_OPENING.sub("", back, count=1)
-
-
-def answer_of_face(face: str) -> str:
-    """Réponse d'Anki pour la face 2 d'un modèle à deux sens (Recto, src/lib/domain/templates.ts)."""
-    return "{{FrontSide}}\n\n<hr id=answer>\n\n" + face
-
-
 def template_ords(fields: list[str], templates: list[Template], values: list[str]) -> list[int]:
     """Cartes d'une note : un modèle dont la question n'est pas vide et dépend de la note ; un modèle
     à deux sens demande ses deux faces, il faut donc que chacune le permette."""
@@ -326,19 +269,10 @@ def _round4(v: float) -> float:
     return round(v * 10_000) / 10_000
 
 
-def _anki_number(v: float) -> str:
-    s = f"{v:.4f}".rstrip("0").rstrip(".")
-    return re.sub(r"^0(?=\.)", "", s) or "0"
-
-
 def sort_field(s: str) -> str:
-    """Champ de tri d'Anki : HTML retiré, noms d'images gardés."""
+    """Texte d'un champ pour comparer deux notes : HTML retiré, noms d'images gardés."""
     s = IMG_TAG_RE.sub(lambda m: f" {(media_refs(m.group(0)) or [''])[0]} ", s)
     return html.unescape(re.sub(r"<[^>]*>", "", s))
-
-
-def _checksum(s: str) -> int:
-    return int(hashlib.sha1(s.encode("utf-8")).hexdigest()[:8], 16)
 
 
 def image_size(data: bytes) -> tuple[float, float] | None:
@@ -441,15 +375,12 @@ def pendu(answer: str, keep: int = 1) -> str:
 
 @dataclass
 class NoteType:
-    """Type de note : champs nommés et modèles de carte (nom, question, réponse)."""
+    """Type de note personnalisé : champs nommés et modèles de carte (nom, question, réponse)."""
 
-    id: int
+    id: str
     name: str
     fields: list[str]
     templates: list[Template]
-    kind: str  # basic, question, cloze, occlusion, custom
-    css: str = CSS
-    mod: int = BUILT_IN_MOD
 
 
 @dataclass
@@ -487,60 +418,38 @@ class Mask:
         )
 
 
-def _classify(model_type: int, fields: list[str], templates: list[Template]) -> str:
-    """Ce que Recto fait d'un type Anki (src/lib/import/apkg.ts, convertModel)."""
-    if model_type == 1 and any("image-occlusion" in t[1] for t in templates):
-        return "occlusion"
-    if model_type == 1:
-        return "cloze"
+def _normalize_mask(n, x, y, w, h, label: str = "") -> dict | None:
+    """Masque tel que Recto le garde (src/lib/domain/occlusion.ts, normalizeMask), ou None."""
+    try:
+        n, x, y, w, h = int(n), float(x), float(y), float(w), float(h)
+    except (TypeError, ValueError):
+        return None
+    if n < 1:
+        return None
+    x0, y0 = _round4(min(1, max(0, x))), _round4(min(1, max(0, y)))
+    x1, y1 = _round4(min(1, max(0, x + w))), _round4(min(1, max(0, y + h)))
+    if x1 - x0 < MIN_MASK_SIZE or y1 - y0 < MIN_MASK_SIZE:
+        return None
+    out = {"n": n, "x": x0, "y": y0, "w": _round4(x1 - x0), "h": _round4(y1 - y0)}
+    if str(label).strip():
+        out["label"] = re.sub(r"\s+", " ", str(label)).strip()
+    return out
 
-    def asks(ord_: int, f: int) -> bool:
-        return f < len(fields) and bool(fields[f]) and ord_ < len(templates) and (
-            "{{" + fields[f] + "}}"
-        ) in templates[ord_][1]
 
-    basic = len(templates) == 1 and asks(0, 0)
-    reverse = len(templates) == 2 and asks(0, 0) and asks(1, 1)
-    return "basic" if len(fields) <= 3 and (basic or reverse) else "custom"
-
-
-BASIC = NoteType(
-    BASIC_ID,
-    "Recto · Basique",
-    ["Recto", "Verso", "Extra"],
-    [Template("Recto → Verso", "{{Recto}}", "{{FrontSide}}\n\n<hr id=answer>\n\n{{Verso}}" + EXTRA)],
-    "basic",
-)
-QUESTION = NoteType(
-    QUESTION_ID,
-    "Recto · Question",
-    ["Question", "Réponse", "Explication", "Source"],
-    [
-        Template(
-            "Question → Réponse",
-            "{{Question}}",
-            "{{FrontSide}}\n\n<hr id=answer>\n\n{{Réponse}}"
-            "{{#Explication}}<br><br>{{Explication}}{{/Explication}}"
-            "{{#Source}}<br><br><i>{{Source}}</i>{{/Source}}",
-        )
-    ],
-    "question",
-)
-CLOZE = NoteType(
-    CLOZE_ID,
-    "Recto · Texte à trous",
-    ["Texte", "Extra"],
-    [Template("Texte à trous", "{{cloze:Texte}}", "{{cloze:Texte}}" + EXTRA)],
-    "cloze",
-)
-OCCLUSION = NoteType(
-    OCCLUSION_ID,
-    "Recto · Occlusion d’image",
-    ["Occlusion", "Image", "Header", "Back Extra", "Comments"],
-    [Template("Image Occlusion", IO_FRONT, IO_BACK)],
-    "occlusion",
-    css=IO_CSS,
-)
+def _occlusion_masks(text: str) -> tuple[list[dict], int]:
+    """Masques lisibles d'un champ « Masques » de Recto, et nombre de masques ignorés."""
+    try:
+        raw = json.loads(text)
+    except (TypeError, ValueError):
+        return [], 0
+    masks, skipped = [], 0
+    for m in raw.get("masks", []) if isinstance(raw, dict) else []:
+        mask = _normalize_mask(*(m.get(k) for k in "nxywh"), m.get("label", "")) if isinstance(m, dict) else None
+        if mask:
+            masks.append(mask)
+        else:
+            skipped += 1
+    return masks, skipped
 
 
 def _field_name_problem(name: str) -> str | None:
@@ -642,12 +551,14 @@ class Report:
 
 @dataclass
 class _Note:
-    type: NoteType
+    model: str  # basic, cloze, image_occlusion, custom (Note.modelType de Recto)
+    type: NoteType | None
     deck: str
     fields: list[str]
     tags: list[str]
     guid: str
     suspended: bool
+    one_way: bool = False
     ords: list[int] = field(default_factory=list)
 
 
@@ -655,6 +566,8 @@ def _deck_name(deck: str) -> str:
     parts = [p.strip() for p in deck.split("::")]
     if not deck.strip() or any(not p for p in parts):
         raise DeckError(f"nom de paquet invalide : « {deck} » (exemple : « Géographie::Départements »)")
+    if len(parts) > 2:
+        raise DeckError(f"paquet « {deck} » : un seul niveau de sous-paquet dans Recto (« Matière::Chapitre »)")
     return "::".join(parts)
 
 
@@ -671,13 +584,27 @@ def _tags(tags) -> list[str]:
     return out
 
 
-def _stable_id(name: str) -> int:
-    """Identifiant Anki stable d'un type personnalisé : une réimportation retrouve le même type."""
-    return 1_700_000_000_000 + int(hashlib.sha1(name.encode("utf-8")).hexdigest()[:12], 16) % 50_000_000_000
+def _stable_id(kind: str, key: str) -> str:
+    """Identifiant stable : régénérer un paquet garde les identifiants de ses paquets et types."""
+    return str(uuid.uuid5(NAMESPACE, f"{kind}:{key}"))
+
+
+# Réglages d'un paquet que le fichier transporte (le planificateur se choisit à l'import).
+SETTINGS = {
+    "new_per_day": "newPerDay",
+    "reviews_per_day": "reviewsPerDay",
+    "new_order": "newOrder",
+    "typed_answer": "typedAnswer",
+    "autoplay_audio": "autoplayAudio",
+    "alternate_sides": "alternateSides",
+    "new_by_format": "newByFormat",
+}
+BUILT_IN_FORMATS = {"basic": "basic", "question": "basic", "cloze": "cloze", "occlusion": "image_occlusion"}
 
 
 class Package:
-    """Un paquet .apkg en construction. `now` (secondes) fixe les dates ; par défaut, l'heure courante."""
+    """Un paquet Recto (.rpkg) en construction. `now` (secondes) fixe les dates ; par défaut,
+    l'heure courante."""
 
     def __init__(self, now: float | None = None) -> None:
         self.now_ms = int((time.time() if now is None else now) * 1000)
@@ -685,6 +612,7 @@ class Package:
         self._notes: list[_Note] = []
         self._guids: dict[str, int] = {}
         self._media: dict[str, bytes] = {}
+        self._decks: dict[str, dict] = {}
 
     # Types ---------------------------------------------------------------------------------------
 
@@ -696,7 +624,7 @@ class Package:
         css: str | None = None,
     ) -> NoteType:
         """Type de note personnalisé : `templates` = [one_way(…) ou two_way(…), …] ; un tuple
-        (nom, question, réponse) vaut one_way.
+        (nom, question, réponse) vaut one_way. `css` est ignoré (Recto met en forme lui-même).
 
         one_way : une carte par modèle dont la question rendue n'est pas vide. two_way : une seule
         carte, demandée par une face puis par l'autre ; elle existe si ses deux faces ont un contenu.
@@ -708,8 +636,6 @@ class Package:
         fields = [str(f).strip() for f in fields]
         if not name:
             raise DeckError("un type de note doit avoir un nom")
-        if name.casefold() in (t.name.casefold() for t in (BASIC, QUESTION, CLOZE, OCCLUSION)):
-            raise DeckError(f"« {name} » est un type intégré : utiliser add_basic, add_question, add_cloze…")
         problems = [p for p in (_field_name_problem(f) for f in fields) if p]
         folded = [f.strip().casefold() for f in fields]
         if len(set(folded)) != len(folded):
@@ -723,21 +649,59 @@ class Package:
         problems += _template_problems(fields, templates)
         if problems:
             raise DeckError(f"type « {name} » : " + " ; ".join(problems))
-        if _classify(0, fields, templates) == "basic":
-            raise DeckError(
-                f"type « {name} » : avec au plus 3 champs et un modèle qui demande le 1er champ (ou deux "
-                "modèles qui demandent le 1er puis le 2e), Recto en fait une note basique, posée dans les "
-                "deux sens. Utiliser add_basic pour une paire réversible, add_question pour une question à "
-                "sens unique, ou ajouter un champ (Source, Exemple…) pour garder ce type."
-            )
         known = self._types.get(name.casefold())
         if known:
             if known.fields != fields or known.templates != templates:
                 raise DeckError(f"type « {name} » défini deux fois avec des champs ou des modèles différents")
             return known
-        t = NoteType(_stable_id(name), name, list(fields), templates, "custom", css or CSS, self.now_ms // 1000)
+        t = NoteType(_stable_id("type", name), name, list(fields), templates)
         self._types[name.casefold()] = t
         return t
+
+    # Paquets -------------------------------------------------------------------------------------
+
+    def settings(self, deck: str, description: str | None = None, new_per_day: int | None = None,
+                 reviews_per_day: int | None = None, new_order: str | None = None,
+                 typed_answer: bool | None = None, autoplay_audio: bool | None = None,
+                 alternate_sides: bool | None = None, later=(), new_by_format: bool | None = None) -> None:
+        """Réglages d'un paquet, appliqués quand l'import le crée (jamais à un paquet existant).
+        Le planificateur (FSRS ou boîte de Leitner) se choisit à l'import.
+
+        `later` : formats dont les nouvelles cartes attendent (activés plus tard dans les réglages du
+        paquet) : (type, "nom du modèle") pour une carte d'un type personnalisé, ou "basic",
+        "question", "cloze", "occlusion" pour une sorte de note intégrée. `new_by_format=True` :
+        les nouvelles cartes viennent format après format (ordre des modèles)."""
+        deck = _deck_name(deck)
+        entry = self._decks.setdefault(deck, {"settings": {}})
+        values = {"new_per_day": new_per_day, "reviews_per_day": reviews_per_day, "new_order": new_order,
+                  "typed_answer": typed_answer, "autoplay_audio": autoplay_audio,
+                  "alternate_sides": alternate_sides, "new_by_format": new_by_format}
+        for key, value in values.items():
+            if value is None:
+                continue
+            if key in ("new_per_day", "reviews_per_day") and (not isinstance(value, int) or value < 0):
+                raise DeckError(f"paquet « {deck} » : {key} doit être un entier positif ou nul")
+            if key == "new_order" and value not in ("random", "added"):
+                raise DeckError(f"paquet « {deck} » : new_order vaut \"random\" ou \"added\"")
+            entry["settings"][SETTINGS[key]] = value
+        formats = []
+        for item in later:
+            if isinstance(item, str):
+                if item not in BUILT_IN_FORMATS:
+                    raise DeckError(f"paquet « {deck} » : format « {item} » inconnu (basic, question, cloze, occlusion)")
+                formats.append(BUILT_IN_FORMATS[item])
+                continue
+            t, template = item
+            if not isinstance(t, NoteType):
+                raise DeckError(f"paquet « {deck} » : later attend (type, \"nom du modèle\") ou une sorte de note")
+            names = [tpl.name for tpl in t.templates]
+            if template not in names:
+                raise DeckError(f"paquet « {deck} » : modèle « {template} » absent du type « {t.name} »")
+            formats.append(f"{t.id}:{names.index(template)}")
+        if formats:
+            entry["settings"]["pausedFormats"] = list(dict.fromkeys(formats))
+        if description is not None:
+            entry["description"] = str(description).strip()
 
     # Médias --------------------------------------------------------------------------------------
 
@@ -771,7 +735,7 @@ class Package:
     def add_note(self, note_type: NoteType, deck: str, fields, tags=(), guid: str | None = None,
                  suspended: bool = False) -> None:
         """Note d'un type personnalisé ; `fields` : dict {champ: html} ou liste dans l'ordre des champs."""
-        if note_type.kind != "custom" or self._types.get(note_type.name.casefold()) is not note_type:
+        if self._types.get(note_type.name.casefold()) is not note_type:
             raise DeckError("add_note attend un type créé par Package.note_type()")
         if isinstance(fields, dict):
             unknown = [k for k in fields if k not in note_type.fields]
@@ -791,22 +755,27 @@ class Package:
             raise DeckError(
                 f"note « {strip_html(values[0])[:40]} » : aucune carte (chaque question rendue est vide)"
             )
-        self._add(note_type, deck, values, tags, guid, suspended, ords, sort_field(values[0]))
+        self._add("custom", note_type, note_type.name, deck, values, tags, guid, suspended, ords,
+                  sort_field(values[0]))
 
     def add_basic(self, deck: str, front: str, back: str, extra: str = "", tags=(), guid: str | None = None,
                   suspended: bool = False) -> None:
         """Paire réversible : une carte, posée Recto → Verso puis Verso → Recto (le paquet alterne)."""
         if is_empty_field(front) or is_empty_field(back):
             raise DeckError(f"note basique « {strip_html(front)[:40]} » : recto et verso sont obligatoires")
-        self._add(BASIC, deck, [front, back, extra], tags, guid, suspended, [0], sort_field(front))
+        self._add("basic", None, BASIC_KEY, deck, [front, back, extra], tags, guid, suspended, [0],
+                  sort_field(front))
 
     def add_question(self, deck: str, question: str, answer: str, explanation: str = "", source: str = "",
                      tags=(), guid: str | None = None, suspended: bool = False) -> None:
         """Question à sens unique (jamais retournée) ; explication et source affichées après la réponse."""
         if is_empty_field(question) or is_empty_field(answer):
             raise DeckError(f"question « {strip_html(question)[:40]} » : question et réponse sont obligatoires")
-        values = [question, answer, explanation, source]
-        self._add(QUESTION, deck, values, tags, guid, suspended, [0], sort_field(question))
+        extra = explanation.strip()
+        if source.strip():
+            extra += ("<br><br>" if extra else "") + f"<i>{source.strip()}</i>"
+        self._add("basic", None, QUESTION_KEY, deck, [question, answer, extra], tags, guid, suspended, [0],
+                  sort_field(question), one_way=True)
 
     def add_cloze(self, deck: str, text: str, extra: str = "", tags=(), guid: str | None = None,
                   suspended: bool = False) -> None:
@@ -814,7 +783,8 @@ class Package:
         numbers = cloze_indices(text)
         if not numbers:
             raise DeckError(f"texte à trous sans {{{{c1::…}}}} : « {strip_html(text)[:60]} »")
-        self._add(CLOZE, deck, [text, extra], tags, guid, suspended, [n - 1 for n in numbers], sort_field(text))
+        self._add("cloze", None, CLOZE_KEY, deck, [text, extra], tags, guid, suspended,
+                  [n - 1 for n in numbers], sort_field(text))
 
     def add_sequence(self, deck: str, title: str, items: list, window: int = 1, numbered: bool = True,
                      extra: str = "", tags=(), guid: str | None = None, suspended: bool = False) -> int:
@@ -864,53 +834,43 @@ class Package:
             raise DeckError(f"occlusion : « {image} » n'est pas une image")
         if not masks:
             raise DeckError(f"occlusion sur « {image} » : aucun masque")
-        shapes, answers = [], {}
+        out = []
         for m in masks:
             if not isinstance(m.group, int) or m.group < 1:
                 raise DeckError(f"occlusion sur « {image} » : groupe {m.group!r} (entier ≥ 1 attendu)")
-            x0, y0 = _round4(min(1, max(0, m.x))), _round4(min(1, max(0, m.y)))
-            x1, y1 = _round4(min(1, max(0, m.x + m.w))), _round4(min(1, max(0, m.y + m.h)))
-            if x1 - x0 < MIN_MASK_SIZE or y1 - y0 < MIN_MASK_SIZE:
+            mask = _normalize_mask(m.group, m.x, m.y, m.w, m.h, m.answer)
+            if mask is None:
                 raise DeckError(
                     f"occlusion sur « {image} » : masque {m} trop petit ou hors de l'image "
                     "(coordonnées normalisées 0–1 ; Mask.from_pixels convertit des pixels)"
                 )
-            oi = ":oi=1" if hide_all else ""
-            shapes.append(
-                f"{{{{c{m.group}::image-occlusion:rect:left={_anki_number(x0)}:top={_anki_number(y0)}"
-                f":width={_anki_number(_round4(x1 - x0))}:height={_anki_number(_round4(y1 - y0))}{oi}}}}}"
-            )
-            answer = re.sub(r"\s+", " ", m.answer).strip()
-            if answer and answer not in answers.setdefault(m.group, []):
-                answers[m.group].append(answer)
-        comments = "<br>".join(
-            f"{n} : {html.escape(', '.join(answers[n]))}" for n in sorted(answers) if answers[n]
-        )
-        values = ["<br>".join(shapes), img(image, alt), header, extra, comments]
-        groups = sorted({m.group for m in masks})
-        self._add(OCCLUSION, deck, values, tags, guid, suspended, [g - 1 for g in groups],
-                  f"{image}\x1f{strip_html(header)}")
+            out.append(mask)
+        masks_json = json.dumps({"v": 1, "mode": "hideAll" if hide_all else "hideOne", "masks": out},
+                                ensure_ascii=False, separators=(",", ":"))
+        values = [img(image, alt), masks_json, header, extra]
+        groups = sorted({m["n"] for m in out})
+        self._add("image_occlusion", None, OCCLUSION_KEY, deck, values, tags, guid, suspended,
+                  [g - 1 for g in groups], f"{image}\x1f{strip_html(header)}")
 
-    def _add(self, t: NoteType, deck: str, values: list[str], tags, guid: str | None, suspended: bool,
-             ords: list[int], key: str) -> None:
+    def _add(self, model: str, t: NoteType | None, key_name: str, deck: str, values: list[str], tags,
+             guid: str | None, suspended: bool, ords: list[int], key: str, one_way: bool = False) -> None:
         deck = _deck_name(deck)
-        guid = guid or "r" + hashlib.sha1(f"{t.name}\x1f{key.strip()}".encode("utf-8")).hexdigest()[:15]
+        guid = guid or "r" + hashlib.sha1(f"{key_name}\x1f{key.strip()}".encode("utf-8")).hexdigest()[:15]
         if guid in self._guids:
             raise DeckError(
-                f"deux notes « {t.name} » ont la même clé (« {strip_html(key)[:40]} ») : doublon, ou "
+                f"deux notes « {key_name} » ont la même clé (« {strip_html(key)[:40]} ») : doublon, ou "
                 "donner un guid= explicite à chacune"
             )
         self._guids[guid] = len(self._notes)
-        values = [v.replace("\x1f", "") for v in values]
-        self._notes.append(_Note(t, deck, values, _tags(tags), guid, suspended, ords))
+        self._notes.append(_Note(model, t, deck, values, _tags(tags), guid, suspended, one_way, ords))
 
     # Écriture ------------------------------------------------------------------------------------
 
-    def build(self) -> tuple[bytes, list[str]]:
-        """Octets du .apkg et noms des médias ajoutés mais cités par aucune note (laissés de côté)."""
+    def build(self, title: str | None = None, description: str | None = None, author: str | None = None,
+              licence: str | None = None) -> tuple[bytes, list[str]]:
+        """Octets du .rpkg et noms des médias ajoutés mais cités par aucune note (laissés de côté)."""
         if not self._notes:
             raise DeckError("paquet vide : aucune note")
-        now_s = self.now_ms // 1000
         used = []
         for n in self._notes:
             for v in n.fields:
@@ -922,93 +882,106 @@ class Package:
             raise DeckError(f"média(s) cité(s) mais non ajouté(s) avec add_media : {missing[:10]}")
         unused = [m for m in self._media if m not in used]
 
-        last = [1]
-
-        def next_id() -> int:
-            last[0] = max(self.now_ms, last[0] + 1)
-            return last[0]
-
-        decks: dict[str, int] = {}
-        for n in self._notes:
-            parts = n.deck.split("::")
+        # Paquets : ceux des notes et des réglages, chaque sous-paquet avec son parent.
+        paths: list[str] = []
+        for path in [n.deck for n in self._notes] + list(self._decks):
+            parts = path.split("::")
             for i in range(1, len(parts) + 1):
-                path = "::".join(parts[:i])
-                if path.casefold() == "default":
-                    decks[path] = 1
-                decks.setdefault(path, next_id())
-        decks_json = {
-            str(i): {
-                "id": i, "name": name, "mod": now_s, "usn": -1, "desc": "", "dyn": 0, "conf": 1,
-                "collapsed": False, "browserCollapsed": False, "extendNew": 0, "extendRev": 0,
-                "newToday": [0, 0], "revToday": [0, 0], "lrnToday": [0, 0], "timeToday": [0, 0],
+                p = "::".join(parts[:i])
+                if p not in paths:
+                    paths.append(p)
+        decks = []
+        for path in paths:
+            parent = path.rsplit("::", 1)[0] if "::" in path else None
+            entry = self._decks.get(path, {})
+            deck = {
+                "id": _stable_id("deck", path),
+                "name": path.rsplit("::", 1)[-1],
+                "parentId": _stable_id("deck", parent) if parent else None,
+                "settings": dict(entry.get("settings", {})),
             }
-            for name, i in list(decks.items()) + ([] if 1 in decks.values() else [("Default", 1)])
-        }
+            if entry.get("description"):
+                deck["description"] = entry["description"]
+            decks.append(deck)
 
         types = []
         for n in self._notes:
-            if n.type not in types:
+            if n.type and n.type not in types:
                 types.append(n.type)
-        models = {str(t.id): _model_json(t) for t in types}
-        offset = datetime.fromtimestamp(now_s).astimezone().utcoffset()
-        conf = {
-            "schedVer": 2, "rollover": 4,
-            "creationOffset": int(-(offset.total_seconds() // 60)) if offset is not None else 0,
-            "activeDecks": [1], "curDeck": 1, "curModel": types[0].id, "nextPos": len(self._notes) + 1,
-            "newSpread": 0, "collapseTime": 1200, "timeLim": 0, "estTimes": True, "dueCounts": True,
-            "sortType": "noteFld", "sortBackwards": False, "addToCur": True,
+        note_types = [
+            {
+                "id": t.id,
+                "name": t.name,
+                "fields": t.fields,
+                "templates": [
+                    {"name": tpl.name, "front": tpl.front, "back": tpl.back, **({"twoWay": True} if tpl.two_way else {})}
+                    for tpl in t.templates
+                ],
+                "createdAt": self.now_ms,
+                "updatedAt": self.now_ms,
+            }
+            for t in types
+        ]
+        notes = []
+        for i, n in enumerate(self._notes):
+            note = {
+                "id": _stable_id("note", n.guid),
+                "deckId": _stable_id("deck", n.deck),
+                "modelType": n.model,
+                "fields": [v.replace("\x1f", "") for v in n.fields],
+                "tags": n.tags,
+                "sourceGuid": n.guid,
+                # Une milliseconde d'écart : l'ordre d'ajout des nouvelles cartes suit le script.
+                "createdAt": self.now_ms + i,
+                "updatedAt": self.now_ms,
+            }
+            if n.type:
+                note["noteTypeId"] = n.type.id
+            if n.one_way:
+                note["oneWay"] = True
+            if n.suspended:
+                note["suspended"] = True
+            notes.append(note)
+        media = [
+            {"name": name, "mime": MIMES[name.rsplit(".", 1)[-1].lower()], "size": len(self._media[name]),
+             "sha256": hashlib.sha256(self._media[name]).hexdigest(), "createdAt": self.now_ms}
+            for name in used
+        ]
+        roots = [d for d in decks if d["parentId"] is None]
+        manifest = {
+            "format": "recto-deck",
+            "schemaVersion": SCHEMA_VERSION,
+            "id": roots[0]["id"],
+            "title": (title or roots[0]["name"]).strip(),
+            "appVersion": f"recto-deck-builder {VERSION}",
+            "exportedAt": self.now_ms,
+            "counts": {"decks": len(decks), "noteTypes": len(note_types), "notes": len(notes),
+                       "cards": sum(len(n.ords) for n in self._notes), "media": len(media)},
         }
-        dconf = {"1": {
-            "id": 1, "name": "Default", "mod": 0, "usn": 0, "maxTaken": 60, "autoplay": True, "timer": 0,
-            "replayq": True, "dyn": False,
-            "new": {"bury": False, "delays": [10, 10], "initialFactor": 2500, "ints": [1, 4, 0], "order": 1,
-                    "perDay": 20},
-            "rev": {"bury": False, "ease4": 1.3, "ivlFct": 1, "maxIvl": 36500, "perDay": 200, "hardFactor": 1.2},
-            "lapse": {"delays": [10], "leechAction": 1, "leechFails": 8, "minInt": 1, "mult": 0},
-        }}
-
-        with tempfile.TemporaryDirectory() as tmp:
-            path = os.path.join(tmp, "collection.anki21")
-            con = sqlite3.connect(path)
-            try:
-                con.executescript(SCHEMA)
-                for pos, n in enumerate(self._notes, start=1):
-                    nid = next_id()
-                    sfld = sort_field(n.fields[0])
-                    con.execute(
-                        "INSERT INTO notes VALUES (?, ?, ?, ?, -1, ?, ?, ?, ?, 0, '')",
-                        (nid, n.guid, n.type.id, now_s, f" {' '.join(n.tags)} " if n.tags else "",
-                         "\x1f".join(n.fields), sfld, _checksum(sfld)),
-                    )
-                    for ord_ in n.ords:
-                        con.execute(
-                            "INSERT INTO cards VALUES (?, ?, ?, ?, ?, -1, 0, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, '')",
-                            (next_id(), nid, decks[n.deck], ord_, now_s, -1 if n.suspended else 0, pos),
-                        )
-                con.execute(
-                    "INSERT INTO col VALUES (1, ?, ?, ?, 11, 0, 0, 0, ?, ?, ?, ?, '{}')",
-                    (now_s, self.now_ms, self.now_ms, json.dumps(conf), json.dumps(models, ensure_ascii=False),
-                     json.dumps(decks_json, ensure_ascii=False), json.dumps(dconf)),
-                )
-                con.commit()
-            finally:
-                con.close()
-            with open(path, "rb") as f:
-                collection = f.read()
+        for key, value in (("description", description), ("author", author), ("licence", licence)):
+            if value and value.strip():
+                manifest[key] = value.strip()
+        data = {"decks": decks, "noteTypes": note_types, "notes": notes, "media": media}
 
         buf = io.BytesIO()
-        stamp = datetime.fromtimestamp(max(now_s, 315532800)).timetuple()[:6]
+        stamp = datetime.fromtimestamp(max(self.now_ms // 1000, 315532800)).timetuple()[:6]
         with zipfile.ZipFile(buf, "w") as z:
-            z.writestr(zipfile.ZipInfo("collection.anki21", stamp), collection, zipfile.ZIP_DEFLATED)
-            z.writestr(zipfile.ZipInfo("media", stamp),
-                       json.dumps({str(i): name for i, name in enumerate(used)}, ensure_ascii=False))
-            for i, name in enumerate(used):
-                z.writestr(zipfile.ZipInfo(str(i), stamp), self._media[name], zipfile.ZIP_STORED)
+            z.writestr(zipfile.ZipInfo("manifest.json", stamp),
+                       json.dumps(manifest, ensure_ascii=False, indent=2), zipfile.ZIP_DEFLATED)
+            z.writestr(zipfile.ZipInfo("data.json", stamp), json.dumps(data, ensure_ascii=False),
+                       zipfile.ZIP_DEFLATED)
+            for name in used:
+                z.writestr(zipfile.ZipInfo(f"media/{name}", stamp), self._media[name], zipfile.ZIP_STORED)
         return buf.getvalue(), unused
 
-    def write(self, path: str, quiet: bool = False) -> Report:
-        """Construit, vérifie comme Recto l'importera, puis écrit `path` ; DeckError s'il y a des erreurs."""
-        data, unused = self.build()
+    def write(self, path: str, title: str | None = None, description: str | None = None,
+              author: str | None = None, licence: str | None = None, quiet: bool = False) -> Report:
+        """Construit, vérifie comme Recto l'importera, puis écrit `path` (.rpkg) ; DeckError s'il y a
+        des erreurs. `title` (par défaut le nom du premier paquet), `description`, `author` et
+        `licence` (« CC BY 4.0 », « CC BY-SA 4.0 », « CC0 1.0 »…) sont montrés avant l'import."""
+        if not path.lower().endswith(".rpkg"):
+            raise DeckError(f"« {path} » : un paquet Recto s'écrit dans un fichier .rpkg")
+        data, unused = self.build(title, description, author, licence)
         report = check_bytes(data)
         for name in unused:
             report.warn("média ajouté mais cité par aucune note (laissé de côté)", name)
@@ -1022,106 +995,7 @@ class Package:
         return report
 
 
-SCHEMA = """
-CREATE TABLE col (id integer primary key, crt integer not null, mod integer not null, scm integer not null, ver integer not null, dty integer not null, usn integer not null, ls integer not null, conf text not null, models text not null, decks text not null, dconf text not null, tags text not null);
-CREATE TABLE notes (id integer primary key, guid text not null, mid integer not null, mod integer not null, usn integer not null, tags text not null, flds text not null, sfld integer not null, csum integer not null, flags integer not null, data text not null);
-CREATE TABLE cards (id integer primary key, nid integer not null, did integer not null, ord integer not null, mod integer not null, usn integer not null, type integer not null, queue integer not null, due integer not null, ivl integer not null, factor integer not null, reps integer not null, lapses integer not null, left integer not null, odue integer not null, odid integer not null, flags integer not null, data text not null);
-CREATE TABLE revlog (id integer primary key, cid integer not null, usn integer not null, ease integer not null, ivl integer not null, lastIvl integer not null, factor integer not null, time integer not null, type integer not null);
-CREATE TABLE graves (usn integer not null, oid integer not null, type integer not null);
-CREATE INDEX ix_notes_usn on notes (usn);
-CREATE INDEX ix_cards_usn on cards (usn);
-CREATE INDEX ix_revlog_usn on revlog (usn);
-CREATE INDEX ix_cards_nid on cards (nid);
-CREATE INDEX ix_cards_sched on cards (did, queue, due);
-CREATE INDEX ix_revlog_cid on revlog (cid);
-CREATE INDEX ix_notes_csum on notes (csum);
-"""
-
-
-def _model_json(t: NoteType) -> dict:
-    occlusion = t.kind == "occlusion"
-    flds = [
-        {"name": f, "ord": i, "sticky": False, "rtl": False, "font": "Arial", "size": 20, "media": [],
-         **({"tag": i, "preventDeletion": i < 4} if occlusion else {})}
-        for i, f in enumerate(t.fields)
-    ]
-    # Deux sens (Recto M16) : Anki pose la face 1 et répond par la face 2 ; la marque rectoTwoWay
-    # rend l'option à Recto (src/lib/import/apkg-read.ts).
-    tmpls = [
-        {"name": n, "ord": i, "qfmt": q, "afmt": answer_of_face(a) if both else a, "bqfmt": "", "bafmt": "",
-         "did": None, "bfont": "", "bsize": 0, **({"rectoTwoWay": True} if both else {})}
-        for i, (n, q, a, both) in enumerate(t.templates)
-    ]
-    req = [
-        [i, "any", [t.fields.index(f) for f in referenced_fields(tpl.front) if f in t.fields]]
-        for i, tpl in enumerate(t.templates)
-    ]
-    if t.kind == "cloze":
-        req = [[0, "any", [0]]]
-    if occlusion:
-        req = [[0, "any", [0, 1, 2]]]
-    model = {
-        "id": t.id, "mod": t.mod, "usn": -1, "sortf": 0, "did": 1, "css": t.css, "latexPre": LATEX_PRE,
-        "latexPost": "\\end{document}", "latexsvg": False, "tags": [], "vers": [], "name": t.name,
-        "type": 1 if t.kind in ("cloze", "occlusion") else 0, "flds": flds, "tmpls": tmpls, "req": req,
-    }
-    if occlusion:
-        model["originalStockKind"] = 6
-    return model
-
-
-# ─── Vérification (lecture d'un .apkg comme l'importeur de Recto) ────────────────────────────────
-
-
-def _split_shape(body: str) -> list[str]:
-    parts, cur, i = [], "", 0
-    while i < len(body):
-        c = body[i]
-        if c == "\\" and i + 1 < len(body):
-            cur += body[i + 1]
-            i += 2
-            continue
-        if c == ":":
-            parts.append(cur)
-            cur = ""
-        else:
-            cur += c
-        i += 1
-    parts.append(cur)
-    return parts
-
-
-def _occlusion_groups(text: str) -> tuple[list[int], int]:
-    """Groupes lisibles par Recto et nombre de formes ignorées (pivotées, texte, en pixels)."""
-    groups, skipped = set(), 0
-    for m in SHAPE_RE.finditer(text):
-        shape, *props = _split_shape(m.group(2))
-        p = dict(x.split("=", 1) for x in props if "=" in x and x.index("=") > 0)
-        try:
-            if shape not in ("rect", "ellipse", "polygon") or float(p.get("angle", 0)) != 0:
-                skipped += 1
-                continue
-            if shape == "rect":
-                x, y, w, h = (float(p[k]) for k in ("left", "top", "width", "height"))
-            elif shape == "ellipse":
-                x, y, w, h = float(p["left"]), float(p["top"]), 2 * float(p["rx"]), 2 * float(p["ry"])
-            else:
-                pts = [tuple(map(float, q.split(","))) for q in p.get("points", "").split()]
-                xs, ys = [q[0] for q in pts], [q[1] for q in pts]
-                x, y, w, h = min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys)
-        except (KeyError, ValueError, IndexError):
-            skipped += 1
-            continue
-        if not all(v <= 1.0001 for v in (x, y, x + w, y + h)):
-            skipped += 1
-            continue
-        x0, y0 = min(1, max(0, x)), min(1, max(0, y))
-        x1, y1 = min(1, max(0, x + w)), min(1, max(0, y + h))
-        if x1 - x0 < MIN_MASK_SIZE or y1 - y0 < MIN_MASK_SIZE or int(m.group(1)) < 1:
-            skipped += 1
-            continue
-        groups.add(int(m.group(1)))
-    return sorted(groups), skipped
+# ─── Vérification (lecture d'un .rpkg comme l'importeur de Recto, src/lib/import/rpkg.ts) ────────
 
 
 def _preview(s: str, limit: int = 90) -> str:
@@ -1270,9 +1144,10 @@ def _charte_cloze(r: Report, text: str, ords: list[int], label: str) -> None:
                    "(sujet, précision de lieu ou de date)", lab)
 
 
-def _charte_note(r: Report, kind: str, question_type: bool, mfields: list[str], tmpls: list[Template],
-                 values: list[str], ords: list[int], label: str, groups: dict, group_key: tuple) -> None:
-    """Applique la charte à une note ; `groups` accumule les faces pour les contrôles entre notes."""
+def _charte_note(r: Report, kind: str, mfields: list[str], tmpls: list[Template], values: list[str],
+                 ords: list[int], label: str, groups: dict, group_key: tuple) -> None:
+    """Applique la charte à une note (`kind` : basic, question, cloze, custom) ; `groups` accumule les
+    faces pour les contrôles entre notes."""
 
     def group(part: str, name: str, value: str) -> None:
         if value:
@@ -1288,7 +1163,7 @@ def _charte_note(r: Report, kind: str, question_type: bool, mfields: list[str], 
             r.warn("charte R8 — le texte alternatif (alt) de l'image donne la réponse : décrire l'image sans la "
                    "nommer", label)
         group("verso", "basique", _norm(back))
-    elif question_type:
+    elif kind == "question":
         _charte_question(r, values[0], label)
         _charte_answer(r, values[1], label)
         _charte_pair(r, values[0], values[1], label, False)
@@ -1344,131 +1219,157 @@ def _charte_groups(r: Report, groups: dict) -> None:
                        "préciser la face (Olicard, règle 8)", example)
 
 
-def check_apkg(path: str) -> Report:
+def check_rpkg(path: str) -> Report:
     with open(path, "rb") as f:
         return check_bytes(f.read())
 
 
-def check_bytes(data: bytes) -> Report:
-    """Lit un .apkg comme Recto (05-IMPORT-EXPORT §2) et liste ce qui n'irait pas."""
-    r = Report()
-    try:
-        z = zipfile.ZipFile(io.BytesIO(data))
-    except zipfile.BadZipFile:
-        r.error("ce n'est pas une archive .apkg (zip illisible)")
-        return r
-    names = set(z.namelist())
-    if "collection.anki21" in names:
-        collection = z.read("collection.anki21")
-    elif "collection.anki21b" in names:
-        r.error("format récent d'Anki (collection.anki21b) non lu par Recto : réexporter depuis Anki en "
-                "cochant « Prendre en charge les anciennes versions d'Anki »")
-        return r
-    elif "collection.anki2" in names:
-        collection = z.read("collection.anki2")
-    else:
-        r.error("aucune collection (collection.anki21) dans l'archive")
-        return r
-    media: dict[str, bytes] = {}
-    if "media" in names:
-        try:
-            mapping = json.loads(z.read("media").decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError):
-            r.error("fichier « media » illisible (format récent d'Anki ?)")
-            mapping = {}
-        for key, name in mapping.items():
-            if key in names:
-                media[name] = z.read(key)
-            else:
-                r.error(f"média « {name} » listé mais absent de l'archive")
+FIELD_COUNTS = {"basic": 3, "cloze": 2, "image_occlusion": 4}
 
-    with tempfile.TemporaryDirectory() as tmp:
-        path = os.path.join(tmp, "c.db")
-        with open(path, "wb") as f:
-            f.write(collection)
-        con = sqlite3.connect(path)
-        try:
-            models_json, decks_json = con.execute("SELECT models, decks FROM col").fetchone()
-            notes = con.execute("SELECT id, guid, mid, tags, flds FROM notes ORDER BY id").fetchall()
-            cards = con.execute("SELECT nid, did FROM cards ORDER BY id").fetchall()
-        except (sqlite3.DatabaseError, TypeError) as e:
-            r.error(f"collection illisible : {e}")
-            return r
-        finally:
-            con.close()
 
-    models = {}
-    for mid, m in json.loads(models_json).items():
-        flds = [f["name"] for f in sorted(m.get("flds", []), key=lambda f: f.get("ord", 0))]
-        tmpls = [
-            Template(t.get("name", ""), t.get("qfmt", ""), face_of_answer(t.get("afmt", "")), True)
-            if t.get("rectoTwoWay") is True
-            else Template(t.get("name", ""), t.get("qfmt", ""), t.get("afmt", ""))
-            for t in sorted(m.get("tmpls", []), key=lambda t: t.get("ord", 0))
-        ]
-        kind = _classify(int(m.get("type", 0)), flds, tmpls)
-        models[str(mid)] = (m.get("name", "?"), flds, tmpls, kind)
-    deck_names = {str(k): v.get("name", "?") for k, v in json.loads(decks_json).items()}
-    deck_of = {}
-    for nid, did in cards:
-        deck_of.setdefault(nid, deck_names.get(str(did), "Default"))
-
-    # Types de notes : ce que Recto en fera.
-    for mid, (name, flds, tmpls, kind) in models.items():
-        if kind != "custom":
+def _read_types(data: dict, r: Report) -> dict[str, tuple[str, list[str], list[Template]]]:
+    types = {}
+    for t in data.get("noteTypes") or []:
+        if not isinstance(t, dict) or not isinstance(t.get("id"), str):
+            r.error("type de note illisible")
             continue
+        name = str(t.get("name", "?"))
+        flds = [str(f) for f in t.get("fields") or []]
+        tmpls = [
+            Template(str(x.get("name", "")), str(x.get("front", "")), str(x.get("back", "")), x.get("twoWay") is True)
+            for x in t.get("templates") or [] if isinstance(x, dict)
+        ]
+        if not flds or not tmpls:
+            r.error(f"type « {name} » : au moins un champ et un modèle de carte")
         for p in [p for p in (_field_name_problem(f) for f in flds) if p] + _template_problems(flds, tmpls):
             r.error(f"type « {name} » : {p}")
         for tpl in tmpls:
             for key, ex in _html_problems(tpl.front + tpl.back):
                 r.warn(f"type « {name} » : {key}", ex)
+        types[t["id"]] = (name, flds, tmpls)
+    return types
 
+
+def check_bytes(data: bytes) -> Report:
+    """Lit un .rpkg comme Recto (05-IMPORT-EXPORT §5) et liste ce qui n'irait pas."""
+    r = Report()
+    try:
+        z = zipfile.ZipFile(io.BytesIO(data))
+        names = set(z.namelist())
+    except zipfile.BadZipFile:
+        r.error("ce n'est pas un paquet Recto (.rpkg) : archive illisible")
+        return r
+    if "manifest.json" not in names:
+        hint = " ; un paquet Anki (.apkg) s'importe directement dans Recto" if "collection.anki21" in names or \
+            "collection.anki2" in names or "collection.anki21b" in names else ""
+        r.error(f"ce n'est pas un paquet Recto (.rpkg) : manifest.json absent{hint}")
+        return r
+    try:
+        manifest = json.loads(z.read("manifest.json").decode("utf-8"))
+        content = json.loads(z.read("data.json").decode("utf-8"))
+    except (KeyError, UnicodeDecodeError, json.JSONDecodeError):
+        r.error("manifest.json ou data.json illisible")
+        return r
+    if not isinstance(manifest, dict) or manifest.get("format") != "recto-deck" or not isinstance(manifest.get("id"), str):
+        r.error("manifest.json : ce n'est pas un paquet Recto (format « recto-deck » attendu)")
+        return r
+    if not isinstance(manifest.get("schemaVersion"), int) or manifest["schemaVersion"] > SCHEMA_VERSION:
+        r.error(f"version de schéma {manifest.get('schemaVersion')!r} : Recto lit jusqu'à la version {SCHEMA_VERSION}")
+        return r
+    if not isinstance(content, dict):
+        r.error("data.json : objet attendu")
+        return r
+
+    decks = {}
+    for d in content.get("decks") or []:
+        if not isinstance(d, dict) or not isinstance(d.get("id"), str) or not str(d.get("name", "")).strip():
+            r.error("paquet illisible (id et nom attendus)")
+            continue
+        decks[d["id"]] = d
+    paths = {}
+    for d in decks.values():
+        parent = decks.get(d.get("parentId") or "")
+        if d.get("parentId") and not parent:
+            r.warn("sous-paquet dont le parent manque : il deviendra un paquet principal", d["name"])
+        if parent and parent.get("parentId"):
+            r.error(f"paquet « {d['name']} » : un seul niveau de sous-paquet dans Recto")
+        paths[d["id"]] = f"{parent['name']}::{d['name']}" if parent else d["name"]
+    types = _read_types(content, r)
+
+    media: dict[str, bytes] = {}
+    for m in content.get("media") or []:
+        name = m.get("name") if isinstance(m, dict) else None
+        if not isinstance(name, str):
+            r.error("média illisible dans data.json")
+            continue
+        if f"media/{name}" in names:
+            media[name] = z.read(f"media/{name}")
+        else:
+            r.error(f"média « {name} » listé mais absent de l'archive")
+
+    notes = content.get("notes") or []
     cards_per_deck: dict[str, int] = {}
-    notes_per_model: dict[str, int] = {}
+    notes_per_kind: dict[str, int] = {}
     previews: dict[str, list[str]] = {}
     referenced: set[str] = set()
     seen_guid: set[str] = set()
     seen_front: set[tuple] = set()
     charte_groups: dict = {}
     total_cards = 0
-    for nid, guid, mid, _tags, flds in notes:
-        mid = str(mid)
-        model = models.get(mid)
-        if not model:
-            r.error(f"note {nid} : type de note absent du paquet")
+    for note in notes:
+        if not isinstance(note, dict):
+            r.error("note illisible")
             continue
-        mname, mfields, tmpls, kind = model
-        values = flds.split("\x1f")
-        label = _preview(values[0] if kind != "occlusion" else (values[1] if len(values) > 1 else ""))
-        if len(values) != len(mfields):
-            r.error(f"note « {label} » : {len(values)} champs pour {len(mfields)} dans « {mname} »")
+        model = note.get("modelType")
+        values = [str(v) for v in note.get("fields") or []]
+        type_id = note.get("noteTypeId")
+        mtype = types.get(type_id) if model == "custom" else None
+        kind = "question" if model == "basic" and note.get("oneWay") is True else model
+        label = _preview(values[0] if values else "")
+        if model not in ("basic", "cloze", "image_occlusion", "custom"):
+            r.error(f"note « {label} » : sorte de note inconnue ({model!r})")
             continue
-        deck = deck_of.get(nid, "Default")
+        if model == "custom" and not mtype:
+            r.error(f"note « {label} » : type de note absent du paquet")
+            continue
+        mname, mfields, tmpls = mtype if mtype else (model, [], [])
+        expected = len(mfields) if mtype else FIELD_COUNTS[model]
+        if len(values) != expected:
+            r.error(f"note « {label} » : {len(values)} champs pour {expected} ({mname})")
+            continue
+        deck = paths.get(note.get("deckId"))
+        if deck is None:
+            r.error(f"note « {label} » : paquet absent du fichier")
+            continue
+        guid = note.get("sourceGuid") or note.get("id")
         if guid in seen_guid:
-            r.warn("deux notes avec le même guid (Recto ignore la seconde)", label)
+            r.warn("deux notes avec la même identité (sourceGuid) : Recto ne met à jour que la première", label)
         seen_guid.add(guid)
-        if (mid, deck, sort_field(values[0]).strip()) in seen_front and kind != "occlusion":
+        front_key = (type_id or model, deck, sort_field(values[0]).strip())
+        if front_key in seen_front and model != "image_occlusion":
             r.warn("même premier champ, même type, même paquet : doublon probable", label)
-        seen_front.add((mid, deck, sort_field(values[0]).strip()))
-        if kind == "basic":
+        seen_front.add(front_key)
+        if model == "basic":
             ords = [0]
-        elif kind == "cloze":
+        elif model == "cloze":
             ords = [n - 1 for n in cloze_indices(values[0])]
-        elif kind == "occlusion":
-            groups, skipped = _occlusion_groups(values[0])
-            ords = [g - 1 for g in groups]
+        elif model == "image_occlusion":
+            masks, skipped = _occlusion_masks(values[1])
+            ords = [n - 1 for n in sorted({m["n"] for m in masks})]
             if skipped:
-                r.warn("forme d'occlusion ignorée par Recto (pivotée, texte ou en pixels)", label)
+                r.warn("masque d'occlusion ignoré par Recto (hors de l'image ou trop petit)", label)
         else:
             ords = template_ords(mfields, tmpls, values)
+        if note.get("single") is True and ords:
+            ords = [0]
         if not ords:
             r.error(f"note « {label} » ({mname}) : aucune carte pour Recto")
             continue
         total_cards += len(ords)
         cards_per_deck[deck] = cards_per_deck.get(deck, 0) + len(ords)
-        notes_per_model[mid] = notes_per_model.get(mid, 0) + 1
-        _charte_note(r, kind, int(mid) == QUESTION_ID, mfields, tmpls, values, ords, label, charte_groups,
-                     (deck, mid))
+        group_name = mname if mtype else kind
+        notes_per_kind[group_name] = notes_per_kind.get(group_name, 0) + 1
+        _charte_note(r, kind, mfields, tmpls, values, ords, label, charte_groups, (deck, group_name))
         for v in values:
             for name in media_refs(v):
                 referenced.add(name)
@@ -1477,19 +1378,19 @@ def check_bytes(data: bytes) -> Report:
             for url in remote_images(v):
                 r.warn("image distante : Recto ne la charge jamais (l'inclure comme média)", url[:60])
             for tag in IMG_TAG_RE.findall(v):
-                if not re.search(r"\balt\s*=\s*[\"'][^\"']+", tag) and kind != "occlusion":
+                if not re.search(r"\balt\s*=\s*[\"'][^\"']+", tag) and model != "image_occlusion":
                     r.warn("image sans texte alternatif (alt)", label)
-            if kind != "occlusion":
+            if model != "image_occlusion":
                 for key, ex in _html_problems(v):
                     r.warn(key, ex)
-        texts = values[:2] if kind == "basic" else values if kind == "custom" else values[:1]
-        if kind in ("basic", "custom", "cloze") and any(len(strip_html(v)) > LONG_TEXT for v in texts):
+        texts = values[:2] if model == "basic" else values if model == "custom" else values[:1]
+        if model in ("basic", "custom", "cloze") and any(len(strip_html(v)) > LONG_TEXT for v in texts):
             r.warn(f"champ de plus de {LONG_TEXT} caractères : carte à découper ?", label)
-        # Aperçu : la première note de chaque type, chacune de ses cartes.
-        shown = previews.setdefault(mid, [])
+        # Aperçu : la première note de chaque sorte, chacune de ses cartes.
+        shown = previews.setdefault(group_name, [])
         if not shown:
             for o in ords[:6]:
-                if kind == "custom":
+                if model == "custom":
                     vals = dict(zip(mfields, values))
                     q = render_template(tmpls[o].front, vals)
                     a = render_template(tmpls[o].back, vals, front_side="")
@@ -1498,17 +1399,16 @@ def check_bytes(data: bytes) -> Report:
                                      "(une carte : l'une ou l'autre face est demandée)")
                     else:
                         shown.append(f"    [{tmpls[o].name}] Q : {_preview(q)} | R : {_preview(a)}")
-                elif kind == "cloze":
+                elif model == "cloze":
                     answers = [m.group(2) for m in CLOZE_RE.finditer(values[0]) if int(m.group(1)) == o + 1]
                     shown.append(f"    [trou {o + 1}] Q : {_preview(_cloze_side(values[0], o + 1, False), 140)}"
                                  f" | R : {_preview(' … '.join(answers))}")
-                elif kind == "basic":
+                elif model == "basic":
                     shown.append(f"    Q : {_preview(values[0])} | R : {_preview(values[1])}")
                 else:
-                    lines = {ln.split(" : ", 1)[0].strip(): ln.split(" : ", 1)[-1]
-                             for ln in re.split(r"<br\s*/?>", values[4] if len(values) > 4 else "") if " : " in ln}
-                    answer = _preview(lines.get(str(o + 1), "")) or "(pas de réponse écrite)"
-                    shown.append(f"    [masque {o + 1}] image : {label} | R : {answer}")
+                    masks, _ = _occlusion_masks(values[1])
+                    answer = ", ".join(dict.fromkeys(m["label"] for m in masks if m["n"] == o + 1 and "label" in m))
+                    shown.append(f"    [masque {o + 1}] image : {label} | R : {_preview(answer) or '(pas de réponse écrite)'}")
 
     for name, data_ in media.items():
         ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
@@ -1521,37 +1421,40 @@ def check_bytes(data: bytes) -> Report:
         if kind == "image":
             size = image_size(data_)
             if size and max(size) > MAX_IMAGE_SIDE and ext in ("png", "jpg", "jpeg", "webp"):
-                r.warn(f"image de plus de {MAX_IMAGE_SIDE} px (Recto la réduit à l'import)", name)
+                r.warn(f"image de plus de {MAX_IMAGE_SIDE} px (paquet lourd ; la réduire avant)", name)
             if len(data_) > HEAVY_IMAGE_BYTES:
                 r.warn(f"image de plus de {HEAVY_IMAGE_BYTES // 1024} Ko (paquet lourd sur téléphone)", name)
         elif len(data_) > HEAVY_AUDIO_BYTES:
             r.warn(f"son de plus de {HEAVY_AUDIO_BYTES // 1024 // 1024} Mo", name)
-    for deck in cards_per_deck:
-        if deck.count("::") > 1:
-            r.warn("paquet à plus de deux niveaux : Recto aplatit au-delà de « A::B »", deck)
     _charte_groups(r, charte_groups)
 
     kinds = {
         "basic": "basique (une carte, posée dans les deux sens si le paquet alterne)",
         "question": "question à sens unique",
         "cloze": "texte à trous (une carte par numéro)",
-        "occlusion": "occlusion d'image (une carte par groupe de masques)",
+        "image_occlusion": "occlusion d'image (une carte par groupe de masques)",
     }
     size = sum(len(d) for d in media.values()) / 1024 / 1024
+    title = manifest.get("title") or "?"
+    by = f", par {manifest['author']}" if manifest.get("author") else ""
+    r.lines.append(f"Paquet Recto « {title} »{by}")
     r.lines.append(f"{len(notes)} notes, {total_cards} cartes, {len(media)} médias ({size:.1f} Mo)")
     r.lines.append("Paquets :")
     r.lines += [f"  {d} : {n} cartes" for d, n in sorted(cards_per_deck.items())]
-    r.lines.append("Types de notes :")
-    for mid, (name, _f, tmpls, kind) in models.items():
-        if mid not in notes_per_model:
-            continue
-        desc = kinds.get(kind, "")
-        if kind == "custom":
-            desc = ("question à sens unique" if int(mid) == QUESTION_ID else
-                    f"type personnalisé, {len(tmpls)} carte(s) par note : "
-                    + ", ".join(f"{t.name} (deux sens)" if t.two_way else t.name for t in tmpls))
-        r.lines.append(f"  {name} ({notes_per_model[mid]} notes) : {desc}")
-        r.lines += previews.get(mid, [])
+    settings = [(paths[i], d) for i, d in decks.items() if d.get("settings") or d.get("description")]
+    for path, d in settings:
+        keys = ", ".join(sorted(d.get("settings") or {}))
+        r.lines.append(f"  réglages de « {path} » : {keys or '—'}{' ; description' if d.get('description') else ''}")
+    r.lines.append("Notes :")
+    for name, count in notes_per_kind.items():
+        custom = next(((n, f, t) for n, f, t in types.values() if n == name), None)
+        if custom and name not in kinds:
+            desc = (f"type personnalisé, {len(custom[2])} carte(s) par note : "
+                    + ", ".join(f"{t.name} (deux sens)" if t.two_way else t.name for t in custom[2]))
+        else:
+            desc = kinds.get(name, name)
+        r.lines.append(f"  {name} ({count} notes) : {desc}")
+        r.lines += previews.get(name, [])
     return r
 
 
@@ -1559,9 +1462,9 @@ def main(argv: list[str]) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     if len(argv) != 3 or argv[1] != "check":
-        print("usage : python recto_apkg.py check paquet.apkg", file=sys.stderr)
+        print("usage : python recto_rpkg.py check paquet.rpkg", file=sys.stderr)
         return 2
-    report = check_apkg(argv[2])
+    report = check_rpkg(argv[2])
     print(report.text())
     return 0 if report.ok else 1
 

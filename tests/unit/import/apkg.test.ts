@@ -10,10 +10,10 @@ import {
   describePackage,
   planApkgImport,
   readApkg,
-  type ApkgExisting,
   type ApkgImportOptions,
   type ApkgPackage,
 } from '$lib/import/apkg'
+import type { PackageExisting } from '$lib/import/plan'
 import { sha256Hex } from '$lib/media/hash'
 import { sampleBytes } from '../../helpers/samples'
 
@@ -27,7 +27,7 @@ const now = Date.UTC(2026, 8, 25, 8)
 const CRT = 1699934400
 let seq = 0
 const newId = () => `id-${++seq}`
-const empty: ApkgExisting = { decks: [], notes: [], cards: [], media: new Map() }
+const empty: PackageExisting = { decks: [], notes: [], cards: [], media: new Map() }
 const options: ApkgImportOptions = {
   target: { mode: 'anki' },
   importHistory: false,

@@ -1,6 +1,6 @@
 # Charte de rédaction des cartes
 
-Ce que la recherche sur la mémoire et le livret de la Memory Box (Olicard & Holynski, 2018) imposent au **format** d'une carte, et comment la bibliothèque l'applique. Les règles sont numérotées R1 à R13 ; la vérification de `Package.write()` et de `recto_apkg.py check` signale les manquements détectables par « charte Rn — … ». Les sources sont en fin de fichier ; le détail est dans le dossier de recherche de Recto (`Dossier-Flashcards.html`, §1.4 et §2.3).
+Ce que la recherche sur la mémoire et le livret de la Memory Box (Olicard & Holynski, 2018) imposent au **format** d'une carte, et comment la bibliothèque l'applique. Les règles sont numérotées R1 à R13 ; la vérification de `Package.write()` et de `recto_rpkg.py check` signale les manquements détectables par « charte Rn — … ». Les sources sont en fin de fichier ; le détail est dans le dossier de recherche de Recto (`Dossier-Flashcards.html`, §1.4 et §2.3).
 
 ## Pourquoi un format compte
 

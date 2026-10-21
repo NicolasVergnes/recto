@@ -23,13 +23,14 @@ import { validateFsrsSettings } from '../scheduler/fsrs'
 
 type Obj = Record<string, unknown>
 
-const isObj = (x: unknown): x is Obj => typeof x === 'object' && x !== null && !Array.isArray(x)
-const isStr = (x: unknown): x is string => typeof x === 'string'
-const isNum = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x)
-const isBool = (x: unknown): x is boolean => typeof x === 'boolean'
-const isStrArray = (x: unknown): x is string[] => Array.isArray(x) && x.every(isStr)
+export const isObj = (x: unknown): x is Obj =>
+  typeof x === 'object' && x !== null && !Array.isArray(x)
+export const isStr = (x: unknown): x is string => typeof x === 'string'
+export const isNum = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x)
+export const isBool = (x: unknown): x is boolean => typeof x === 'boolean'
+export const isStrArray = (x: unknown): x is string[] => Array.isArray(x) && x.every(isStr)
 const isNumArray = (x: unknown): x is number[] => Array.isArray(x) && x.every(isNum)
-const oneOf = <T extends string | number>(values: readonly T[], x: unknown): x is T =>
+export const oneOf = <T extends string | number>(values: readonly T[], x: unknown): x is T =>
   values.some((v) => v === x)
 const isDeckBox = (x: unknown): x is number[] =>
   isNumArray(x) && x.length >= MIN_BOXES && x.length <= MAX_BOXES && x.every((days) => days > 0)

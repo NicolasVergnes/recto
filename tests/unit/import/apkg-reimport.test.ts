@@ -1,17 +1,16 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import type { SqlJsStatic } from 'sql.js'
-import { applyImportPlan, existingForApkg } from '$lib/db/importer'
+import { applyImportPlan, existingForPackage } from '$lib/db/importer'
 import { newId } from '$lib/db/schema'
 import type { Card, Note } from '$lib/domain/types'
 import {
   planApkgImport,
   readApkg,
-  type ApkgExisting,
   type ApkgImportOptions,
   type ApkgPackage,
   type ApkgRevlog,
 } from '$lib/import/apkg'
-import type { ImportPlan } from '$lib/import/plan'
+import type { ImportPlan, PackageExisting } from '$lib/import/plan'
 import { boxFromStability, LEITNER_PRESETS } from '$lib/domain/leitner'
 import {
   ankiPackage,
@@ -69,14 +68,14 @@ const countryNote = (hint: string, mod: number, cards: AnkiNote['cards']): AnkiN
 
 /** Imports `pkg` as the importer screen does (planner, then the batched writer). */
 async function importPackage(pkg: ApkgPackage, patch: Partial<ApkgImportOptions> = {}) {
-  const existing = await existingForApkg()
+  const existing = await existingForPackage()
   const plan = await planApkgImport(pkg, { ...options, ...patch }, existing, now, newId)
   const report = await applyImportPlan(plan, { now })
   return { plan, report }
 }
 
 /** What the planner sees once `plan` has been written, without the database. */
-const existingAfter = (plan: ImportPlan): ApkgExisting => ({
+const existingAfter = (plan: ImportPlan): PackageExisting => ({
   decks: plan.decks,
   notes: plan.notes,
   noteTypes: plan.noteTypes ?? [],
@@ -84,8 +83,11 @@ const existingAfter = (plan: ImportPlan): ApkgExisting => ({
   media: new Map(),
 })
 
-const plan = (pkg: ApkgPackage, existing: ApkgExisting, patch: Partial<ApkgImportOptions> = {}) =>
-  planApkgImport(pkg, { ...options, ...patch }, existing, now, newId)
+const plan = (
+  pkg: ApkgPackage,
+  existing: PackageExisting,
+  patch: Partial<ApkgImportOptions> = {},
+) => planApkgImport(pkg, { ...options, ...patch }, existing, now, newId)
 
 /** What studying in Recto leaves on the card of an ord, with a log row: it must be kept. */
 async function study(noteId: string, ord: number): Promise<Card> {
@@ -370,7 +372,7 @@ describe('re-importing: what stays untouched', () => {
   })
 
   /** A known cloze note with its two cards, as the first import wrote them. */
-  async function known(): Promise<ApkgExisting> {
+  async function known(): Promise<PackageExisting> {
     const first = await plan(ankiPackage([clozeNote(holes(1, 2), T1, [0, 1])]), {
       decks: [],
       notes: [],

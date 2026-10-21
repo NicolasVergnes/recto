@@ -6,15 +6,13 @@ import { boxFromStability, type ModelChoice } from '../domain/leitner'
 import { cardOrds, reconcileCards, type ReconcilableCard } from '../domain/notes'
 import { labelsFromAnkiComments, occlusionFromAnki, serializeOcclusion } from '../domain/occlusion'
 import { faceOfAnswer, kindOf } from '../domain/templates'
-import { mediaRefs, renameMediaRefs } from '../domain/text'
 import type { Card, Deck, ModelType, Note, NoteType, Rating, Review } from '../domain/types'
-import { sha256Hex } from '../media/hash'
-import { mediaKind, mimeFromName } from '../media/mime'
 import { getScheduler } from '../scheduler'
 import { addDays, startOfDate, studyDate } from '../scheduler/day'
 import type { ApkgCard, ApkgModel, ApkgNote, ApkgPackage } from './apkg-read'
 import { DeckResolver } from './decks'
-import { emptyReport, type ImportErrorCode, type ImportMedia, type ImportPlan } from './plan'
+import { planMedia } from './media-plan'
+import { emptyReport, type ImportErrorCode, type ImportPlan, type PackageExisting } from './plan'
 
 export * from './apkg-read'
 
@@ -37,17 +35,6 @@ export interface ApkgImportOptions {
   pausedFormats?: readonly string[]
   /** M17: the decks the import fills bring their new cards in format after format. */
   newByFormat?: boolean
-}
-
-export interface ApkgExisting {
-  decks: readonly Deck[]
-  notes: readonly Note[]
-  /** Custom note types (a re-import reuses the one with the same Anki id and fields). */
-  noteTypes?: readonly NoteType[]
-  /** Cards of the existing notes: a re-import reconciles those of the notes it updates. */
-  cards: readonly ReconcilableCard[]
-  /** Stored media: name → sha256. */
-  media: ReadonlyMap<string, string>
 }
 
 export interface ModelConversion {
@@ -232,20 +219,10 @@ function noCardError(modelType: ModelType): ImportErrorCode {
   return modelType === 'custom' ? 'emptyFront' : 'noCloze'
 }
 
-function uniqueName(name: string, taken: (n: string) => boolean): string {
-  const dot = name.lastIndexOf('.')
-  const base = dot > 0 ? name.slice(0, dot) : name
-  const ext = dot > 0 ? name.slice(dot) : ''
-  for (let i = 2; ; i++) {
-    const candidate = `${base}-${i}${ext}`
-    if (!taken(candidate)) return candidate
-  }
-}
-
 export async function planApkgImport(
   pkg: ApkgPackage,
   options: ApkgImportOptions,
-  existing: ApkgExisting,
+  existing: PackageExisting,
   now: number,
   newId: () => string,
 ): Promise<ImportPlan> {
@@ -454,52 +431,7 @@ export async function planApkgImport(
     addCards(note, deck, ords, an, ankiCards)
   }
 
-  // Media: stored under their real names; a name taken by different content gets a suffix and
-  // the references are rewritten (05 §2.3).
-  const renames = new Map<string, string>()
-  const imported = new Set<string>()
-  const media: ImportMedia[] = []
-  for (const m of pkg.media) {
-    const mime = mimeFromName(m.name)
-    if (!mime || !mediaKind(mime)) {
-      report.skipped++
-      continue
-    }
-    const sha = await sha256Hex(m.data)
-    const known = existing.media.get(m.name)
-    let name = m.name
-    if (known === sha) continue
-    if (known !== undefined) {
-      name = uniqueName(m.name, (n) => existing.media.has(n) || imported.has(n))
-      renames.set(m.name, name)
-    }
-    imported.add(name)
-    media.push({ name, blob: new Blob([m.data], { type: mime }), mime })
-  }
-  if (renames.size > 0) {
-    const rewrite = (note: Note): Note => {
-      let fields = note.fields
-      for (const [from, to] of renames) fields = fields.map((f) => renameMediaRefs(f, from, to))
-      return { ...note, fields }
-    }
-    plan.notes = plan.notes.map(rewrite)
-    plan.updates = plan.updates.map(rewrite)
-  }
-  plan.media = media
-
-  const available = new Set([
-    ...existing.media.keys(),
-    ...imported,
-    ...pkg.media.map((m) => renames.get(m.name) ?? m.name),
-  ])
-  const missing = new Set(pkg.missingMedia)
-  for (const note of [...plan.notes, ...plan.updates]) {
-    for (const field of note.fields) {
-      const refs = mediaRefs(field)
-      for (const name of [...refs.images, ...refs.sounds])
-        if (!available.has(name)) missing.add(name)
-    }
-  }
+  await planMedia(plan, pkg.media, existing.media, pkg.missingMedia)
 
   plan.decks = resolver.created
   // M17: the formats left for later, and the format after format order, in the decks filled.
@@ -527,8 +459,6 @@ export async function planApkgImport(
   report.notesUpdated = plan.updates.length
   report.cardsRemoved = removedCards.length
   report.reviewsImported = plan.reviews.length
-  report.mediaImported = plan.media.length
-  report.missingMedia = [...missing].sort()
   return plan
 }
 

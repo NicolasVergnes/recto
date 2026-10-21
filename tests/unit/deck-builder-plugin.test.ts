@@ -1,43 +1,31 @@
 /**
- * The Claude plugin tools/deck-builder (05 §2, STATUS « Décisions ») writes .apkg packages with a
- * Python library: they must import into Recto as intended. Python 3 is required (preinstalled
- * on the CI runner); the packages are built here and read by the real Anki importer.
+ * The Claude plugin tools/deck-builder (05 §5, ADR-014) writes Recto packages (.rpkg) with a Python
+ * library: they must import into Recto as intended. Python 3 is required (preinstalled on the CI
+ * runner); the packages are built here and read by the real .rpkg importer.
  */
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
-import type { SqlJsStatic } from 'sql.js'
 import { parseOcclusion } from '$lib/domain/occlusion'
-import {
-  planApkgImport,
-  readApkg,
-  type ApkgExisting,
-  type ApkgImportOptions,
-} from '$lib/import/apkg'
+import { SCHEMA_VERSION } from '$lib/db/schema'
+import type { PackageExisting } from '$lib/import/plan'
+import { parseRpkg, planRpkgImport, type RpkgImportOptions } from '$lib/import/rpkg'
 import { sha256Hex } from '$lib/media/hash'
 
 const skill = resolve(process.cwd(), 'tools/deck-builder/skills/deck-builder')
 const library = join(skill, 'scripts')
 const now = Date.UTC(2026, 9, 13, 8)
-const options: ApkgImportOptions = {
-  target: { mode: 'anki' },
-  importHistory: false,
-  model: { model: 'fsrs', custom: [] },
-  dayStartHour: 4,
-}
-const empty: ApkgExisting = { decks: [], notes: [], cards: [], media: new Map() }
+const options: RpkgImportOptions = { model: { model: 'fsrs', custom: [] } }
+const empty: PackageExisting = { decks: [], notes: [], cards: [], media: new Map() }
 
-let SQL: SqlJsStatic
 let python = ''
 let dir = ''
 let seq = 0
 const newId = () => `id-${++seq}`
 
 beforeAll(async () => {
-  const initSqlJs = (await import('sql.js/dist/sql-wasm.js')).default
-  SQL = await initSqlJs()
   // `python3` on Linux and macOS, `python` on Windows (where `python3` may be a Store stub).
   python =
     ['python3', 'python'].find((cmd) => {
@@ -62,30 +50,38 @@ function build(name: string, body: string) {
   const script = join(dir, `${name}.py`)
   writeFileSync(
     script,
-    `import sys\nsys.path.insert(0, sys.argv[1])\nfrom recto_apkg import *\n${body}`,
+    `import sys\nsys.path.insert(0, sys.argv[1])\nfrom recto_rpkg import *\n${body}`,
     'utf8',
   )
-  return run([script, library, join(dir, `${name}.apkg`)])
+  return run([script, library, join(dir, `${name}.rpkg`)])
 }
 
-const read = (name: string) => readApkg(new Uint8Array(readFileSync(join(dir, name))), SQL)
+const read = (name: string) =>
+  parseRpkg(new Uint8Array(readFileSync(join(dir, name))), SCHEMA_VERSION)
 
 describe('deck-builder plugin: the example package', () => {
   it('imports every note type of Recto, with its media', async () => {
-    const out = join(dir, 'exemple.apkg')
+    const out = join(dir, 'exemple.rpkg')
     const built = run([join(skill, 'examples/exemple.py'), out])
     expect(built.out).toContain('OK : importable dans Recto')
     expect(built.status).toBe(0)
 
-    const plan = await planApkgImport(read('exemple.apkg'), options, empty, now, newId)
+    const pkg = read('exemple.rpkg')
+    expect(pkg.manifest).toMatchObject({
+      title: 'Exemple',
+      author: 'recto-deck-builder',
+      licence: 'CC0 1.0',
+    })
+    expect(pkg.invalid).toBe(0)
+    const plan = await planRpkgImport(pkg, options, empty, now, newId)
     expect(plan.report.errors).toEqual([])
     expect(plan.report.missingMedia).toEqual([])
     expect(plan.report.decksCreated.sort()).toEqual(['Exemple', 'Pays', 'Sciences', 'Vocabulaire'])
-    expect(plan.report.noteTypesCreated.sort()).toEqual(["Pays d'Europe", 'Recto · Question'])
+    expect(plan.report.noteTypesCreated).toEqual(["Pays d'Europe"])
 
     const kinds = plan.notes.map((n) => n.modelType)
-    expect(kinds.filter((k) => k === 'custom')).toHaveLength(5)
-    expect(kinds.filter((k) => k === 'basic')).toHaveLength(2)
+    expect(kinds.filter((k) => k === 'custom')).toHaveLength(4)
+    expect(kinds.filter((k) => k === 'basic')).toHaveLength(3)
     expect(kinds.filter((k) => k === 'cloze')).toHaveLength(1)
     expect(kinds.filter((k) => k === 'image_occlusion')).toHaveLength(1)
     // 4 countries × 2 cards (Drapeau → Pays, Pays ↔ Capitale), 2 basic, 1 question, 2 holes,
@@ -112,10 +108,23 @@ describe('deck-builder plugin: the example package', () => {
     )
     expect(france?.tags).toEqual(['europe', 'exemple'])
 
-    const question = plan.noteTypes?.find((t) => t.name === 'Recto · Question')
-    expect(question?.fields).toEqual(['Question', 'Réponse', 'Explication', 'Source'])
-    const asked = plan.notes.find((n) => n.noteTypeId === question?.id)
+    // A question asked one way only: a Basique note that is never turned over (M11), its
+    // explanation and source after the answer.
+    const asked = plan.notes.find((n) => n.oneWay)
+    expect(asked).toMatchObject({ modelType: 'basic' })
+    expect(asked?.fields[2]).toMatch(
+      /^Au coucher du soleil.*<br><br><i>Cours de physique, chapitre 4<\/i>$/,
+    )
     expect(plan.cards.filter((c) => c.noteId === asked?.id)).toHaveLength(1)
+
+    // Deck settings travel with the package (ADR-014), the scheduler does not.
+    const top = plan.decks.find((d) => d.name === 'Exemple')
+    expect(top).toMatchObject({
+      scheduler: 'fsrs',
+      description: 'Un paquet de démonstration du plugin recto-deck-builder.',
+      settings: { newPerDay: 10, pausedFormats: [`${country?.id}:1`] },
+    })
+    expect(plan.decks.find((d) => d.name === 'Vocabulaire')?.settings.typedAnswer).toBe(true)
 
     const cloze = plan.notes.find((n) => n.modelType === 'cloze')
     expect(cloze?.fields[0]).toContain('{{c1::\\(E_c = \\tfrac{1}{2} m v^2\\)}}')
@@ -168,7 +177,7 @@ pkg.write(sys.argv[2])
     expect(build('v1', deck(1_790_000_000, 'Pontoise')).status).toBe(0)
     expect(build('v2', deck(1_790_000_600, 'Cergy')).status).toBe(0)
 
-    const first = await planApkgImport(read('v1.apkg'), options, empty, now, newId)
+    const first = await planRpkgImport(read('v1.rpkg'), options, empty, now, newId)
     expect(first.report.errors).toEqual([])
     // Carte → Nom, Nom ↔ Numéro, Nom ↔ Préfecture: three cards, two of them asked both ways.
     expect(first.noteTypes?.[0]?.templates.map((t) => [t.name, t.twoWay ?? false])).toEqual([
@@ -189,14 +198,14 @@ pkg.write(sys.argv[2])
     const media = new Map<string, string>()
     for (const m of first.media)
       media.set(m.name, await sha256Hex(new Uint8Array(await m.blob.arrayBuffer())))
-    const existing: ApkgExisting = {
+    const existing: PackageExisting = {
       decks: first.decks,
       notes: first.notes,
       noteTypes: first.noteTypes ?? [],
       cards: first.cards,
       media,
     }
-    const second = await planApkgImport(read('v2.apkg'), options, existing, now, newId)
+    const second = await planRpkgImport(read('v2.rpkg'), options, existing, now, newId)
     expect(second.report.errors).toEqual([])
     expect(second.report.notesCreated).toBe(0)
     expect(second.report.noteTypesCreated).toEqual([])
@@ -223,7 +232,10 @@ def refused(f):
     print("ACCEPTÉ")
 
 pkg = Package()
-refused(lambda: pkg.note_type("Paire", ["A", "B"], [("A → B", "{{A}}", "{{B}}")]))
+print("deux champs :", pkg.note_type("Paire", ["A", "B"], [("A → B", "{{A}}", "{{B}}")]).name)
+refused(lambda: pkg.add_basic("A::B::C", "x", "y"))
+refused(lambda: pkg.settings("P", new_order="x"))
+refused(lambda: pkg.write("paquet.apkg"))
 refused(lambda: pkg.note_type("Inconnu", ["A", "B", "C", "D"], [("A", "{{A}} {{Z}}", "{{B}}")]))
 refused(lambda: pkg.note_type("Trous", ["A", "B", "C", "D"], [("A", "{{cloze:A}}", "{{B}}")]))
 refused(lambda: pkg.note_type("Faces", ["A", "B", "C", "D"], [two_way("A ↔ B", "{{A}}", "{{FrontSide}}{{B}}")]))
@@ -239,29 +251,31 @@ refused(lambda: pkg.add_basic("P", "<img src='manque.png' alt='x'>", "v") or pkg
     )
     expect(r.status).toBe(0)
     expect(r.out).not.toContain('ACCEPTÉ')
-    expect(r.out.match(/refusé :/g)).toHaveLength(10)
+    expect(r.out.match(/refusé :/g)).toHaveLength(12)
+    // A type of two fields stays a type of its own: no more Anki conversion to work around.
+    expect(r.out).toContain('deux champs : Paire')
   })
 
-  it('check: refuses the zstd format and accepts a package exported by Anki', () => {
-    const check = join(library, 'recto_apkg.py')
-    const zstd = run([check, 'check', 'data/samples/unsupported-anki21b.apkg'])
-    expect(zstd.status).toBe(1)
-    expect(zstd.out).toContain('collection.anki21b')
+  it('check: reads a Recto package, and sends an Anki package to Recto itself', () => {
+    const check = join(library, 'recto_rpkg.py')
     const anki = run([check, 'check', 'data/samples/image-occlusion.apkg'])
-    expect(anki.status).toBe(0)
-    expect(anki.out).toContain("occlusion d'image")
+    expect(anki.status).toBe(1)
+    expect(anki.out).toContain("un paquet Anki (.apkg) s'importe directement dans Recto")
+    const own = run([check, 'check', join(dir, 'exemple.rpkg')])
+    expect(own.status).toBe(0)
+    expect(own.out).toContain("occlusion d'image")
   })
 })
 
 describe('deck-builder plugin: the writing charter (reference/format-cartes.md)', () => {
   it('charte.py applies every rule: no « charte » warning, and it imports', async () => {
-    const out = join(dir, 'charte.apkg')
+    const out = join(dir, 'charte.rpkg')
     const built = run([join(skill, 'examples/charte.py'), out])
     expect(built.out).toContain('OK : importable dans Recto')
     expect(built.out).not.toContain('charte R')
     expect(built.status).toBe(0)
 
-    const plan = await planApkgImport(read('charte.apkg'), options, empty, now, newId)
+    const plan = await planRpkgImport(read('charte.rpkg'), options, empty, now, newId)
     expect(plan.report.errors).toEqual([])
     expect(plan.report.missingMedia).toEqual([])
     // add_sequence: 8 planets → 8 cloze notes of one card each, showing only the neighbours.
@@ -313,9 +327,9 @@ print(sorted(k.split(" — ")[0] for k in report.charte))
       "['charte R4', 'charte R5', 'charte R6', 'charte R6', 'charte R7', 'charte R7', 'charte R9', 'charte R9']",
     )
     const check = run([
-      join(library, 'recto_apkg.py'),
+      join(library, 'recto_rpkg.py'),
       'check',
-      join(dir, 'charte-avertissements.apkg'),
+      join(dir, 'charte-avertissements.rpkg'),
     ])
     expect(check.status).toBe(0)
     expect(check.out).toContain('Charte de rédaction (reference/format-cartes.md) : 8 carte(s)')

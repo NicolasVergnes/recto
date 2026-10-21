@@ -1,6 +1,6 @@
 """Exemple : un paquet qui applique la charte de rédaction (reference/format-cartes.md), sujet par sujet.
 
-    python charte.py [sortie.apkg]
+    python charte.py [sortie.rpkg]
 
 Chaque bloc montre le format retenu et, en commentaire, la carte qu'on aurait pu écrire et la règle
 qui l'interdit. Le rapport de write() ne doit afficher aucun avertissement « charte ».
@@ -9,7 +9,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
-from recto_apkg import Package, img, one_way, pendu, two_way  # noqa: E402
+from recto_rpkg import Package, img, one_way, pendu, two_way  # noqa: E402
 
 pkg = Package()
 
@@ -99,4 +99,4 @@ for numero, nom, pref, region in [("67", "Bas-Rhin", "Strasbourg", "Grand Est"),
 pkg.add_basic("Charte::Histoire", "Marignan : nombre de jours de bataille", "2", tags="histoire bonus",
               suspended=True)
 
-pkg.write(sys.argv[1] if len(sys.argv) > 1 else "charte.apkg")
+pkg.write(sys.argv[1] if len(sys.argv) > 1 else "charte.rpkg")

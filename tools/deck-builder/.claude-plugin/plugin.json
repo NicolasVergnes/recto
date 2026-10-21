@@ -1,6 +1,6 @@
 {
   "name": "recto-deck-builder",
-  "version": "2.2.1",
-  "description": "Crée des paquets de flashcards clé en main (.apkg) pour l'application Recto, rédigés selon la charte issue de la recherche sur la mémoire (rappel actif, une information par carte, trous courts, séquences en trous chevauchants, image-indice, deux sens seulement si la relation est symétrique) : types de notes à plusieurs champs et plusieurs cartes, images, sons, texte à trous, occlusion d'image, formules ; vérifiés comme Recto les importe et relus à l'aune de la charte.",
+  "version": "3.0.0",
+  "description": "Crée des paquets de flashcards clé en main (paquets Recto .rpkg) pour l'application Recto, rédigés selon la charte issue de la recherche sur la mémoire (rappel actif, une information par carte, trous courts, séquences en trous chevauchants, image-indice, deux sens seulement si la relation est symétrique) : types de notes à plusieurs champs et plusieurs cartes, images, sons, texte à trous, occlusion d'image, formules, réglages des paquets ; vérifiés comme Recto les importe et relus à l'aune de la charte.",
   "author": { "name": "Nicolas" }
 }

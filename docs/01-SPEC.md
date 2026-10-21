@@ -104,9 +104,11 @@ Le type « Basique + inversé » (deux cartes jumelles par note) a été retiré
 - **CSV/TSV** : détection du séparateur, encodage UTF-8 (BOM géré), aperçu des 20 premières lignes, mappage colonnes → champs (Recto, Verso, Extra, Tags, Paquet), choix du type de note, option « la première ligne est un en-tête », détection des doublons (ignorer | mettre à jour | dupliquer). Les images référencées par URL ne sont pas téléchargées en V0 (message).
 - **`.apkg`** : voir 05-IMPORT-EXPORT. Notes, cartes, paquets, tags, médias ; option « importer l'historique de révisions » qui reconstruit l'état FSRS avec `fsrs.reschedule` ; les modèles inconnus sont convertis en `basic` (premier champ → Recto, deuxième → Verso, champs restants concaténés → Extra) avec un rapport d'import.
 - **Sauvegarde Recto** (`.recto.zip`) : restauration complète (remplacer | fusionner).
+- **Paquet Recto** (`.rpkg`, M20) : un paquet partagé par un autre utilisateur ou produit par le plugin `recto-deck-builder` ; notes, types, médias et réglages du paquet, sans progression ; réimporter une version plus récente met les notes à jour, sans doublon (05 §5).
 
 ### 5.5 Export
 
+- Paquet Recto `.rpkg` d'un paquet et de ses sous-paquets (M20) : pour le partager ou l'importer dans un autre Recto ; titre, description, auteur, licence ; ni progression ni historique (05 §5). Le partage passe par le fichier : pas de catalogue en ligne (§2).
 - CSV d'un paquet ou de la sélection (Recto, Verso, Extra, Tags, Paquet, type ; médias non inclus, noms de fichiers conservés).
 - Sauvegarde complète `.recto.zip` : `manifest.json` (version du schéma, date, appareil), `data.json` (toutes les tables), `media/` (fichiers). Bouton unique « Sauvegarder maintenant » sur l'accueil ; rappel visible si la dernière sauvegarde date de plus de 7 jours.
 - Export `.apkg` : livré en V1, retiré en M18 (ADR-012) ; Recto est un concurrent d'Anki, pas un complément : il en importe les paquets, il n'en écrit pas.
